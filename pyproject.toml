@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "egms-qa"
+version = "1.0.0"
+description = "EGMS-QA: natural-language question answering over persistent-scatterer displacement time series"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "pyarrow>=14.0",
+  "torch>=2.1",
+]
+
+[project.optional-dependencies]
+# Task reference-value computation over the raw tile store.
+tasks = [
+  "scipy>=1.10",
+]
+# Translator training / evaluation on host language models.
+translator = [
+  "transformers>=4.40",
+  "peft>=0.10",
+  "accelerate>=0.28",
+  "bitsandbytes>=0.43",
+  "quantulum3>=0.10,<0.11",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["egms_qa*", "egms_encoder*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Heavy artifacts — download from the data release (see README), never committed
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.npz
+*.npy
+
+# Generated outputs (regenerate from scripts)
+/outputs/
+
+# Downloaded heavy data (keep only the lightweight metadata tracked in data/)
+/data/encoder/tokens/
+/data/encoder/checkpoint/*.pt
+/data/adapters/

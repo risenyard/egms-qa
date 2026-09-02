@@ -1,0 +1,15 @@
+# Core (representation + QA rendering)
+numpy>=1.24
+pandas>=2.0
+pyarrow>=14.0
+torch>=2.1
+
+# Task reference-value computation
+scipy>=1.10
+
+# Translator training / evaluation on host language models
+transformers>=4.40
+peft>=0.10
+accelerate>=0.28
+bitsandbytes>=0.43
+quantulum3>=0.10,<0.11

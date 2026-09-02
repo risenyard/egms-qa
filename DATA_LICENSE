@@ -1,0 +1,15 @@
+# Data and model-weight licence
+
+The EGMS-QA data release — the question–answer records, per-family reference
+tables, encoder token cache, encoder checkpoint, and the trained translator
+adapters — is licensed under the Creative Commons Attribution 4.0 International
+licence (CC-BY-4.0): https://creativecommons.org/licenses/by/4.0/
+
+You may share and adapt these materials for any purpose, provided you give
+appropriate credit to the EGMS-QA project.
+
+The underlying European Ground Motion Service (EGMS) Level-3 product is
+Copernicus data, provided by the European Environment Agency under the Copernicus
+data and information policy (free, full, and open access with attribution). The
+raw EGMS product is not redistributed in this release; see data/METADATA.md for
+provenance and access.

@@ -1,0 +1,53 @@
+{
+  "version": "v4",
+  "created": "2026-05-27",
+  "source": {
+    "tiles_dir": "data/processed/tiles_l3_u_2019_2023_europe",
+    "total_tiles_available": 131281
+  },
+  "filter": {
+    "max_nan_mean": 0.02,
+    "require_first_valid": 0,
+    "require_last_valid_min": 301,
+    "min_points": 200,
+    "pool_size": 83323,
+    "pool_total_points": 101340689
+  },
+  "time_window": {
+    "t_start": 8,
+    "t_end": 302,
+    "input_length": 294,
+    "rationale": "Pool tiles are 100% NaN-free within [t=8, t=302). Earlier steps (t=1,4-7) and tail steps (t=302,303) are systematically missing in 10-21% of pool tiles and are trimmed. Verified by scripts/v4_verify_trim_zero_nan.py on full 83K pool: 0 residual NaN.",
+    "compared_to_v33": "V3.3 used 302 steps (t=0..301 of the no_tail parquet). V4 uses 294 steps (t=8..301 of the raw npz). V4 starts ~6 weeks later in 2019."
+  },
+  "geographic_sampling": {
+    "method": "grid_max_npoints_with_round_robin",
+    "grid_m": 30000,
+    "target_tiles": 10000,
+    "sampled_tiles": 10000,
+    "occupied_cells": 4142,
+    "cells_in_sample": 4142,
+    "rounds_used": 3,
+    "total_points_sampled": 20180485,
+    "seed": 42
+  },
+  "files": {
+    "pool_candidates": "data/processed/v4/v4_pool_candidates.parquet",
+    "sample_10k": "data/processed/v4/v4_sample_10k.parquet",
+    "split": "data/processed/v4/v4_split.json",
+    "nan_profiles_source": "outputs/archive/V4/nan_pattern_analysis_20260527_145457/v4_nan_profiles.parquet"
+  },
+  "split": {
+    "method": "plain_random_tile_level",
+    "ratios": {"train": 0.80, "val": 0.10, "test": 0.10},
+    "counts": {"train": 8000, "val": 1000, "test": 1000},
+    "seed": 1729,
+    "n_grid_cells_per_split": {"train": 4022, "val": 925, "test": 923, "total_cells": 4142},
+    "backup_spatial_blocked": "data/processed/v4/v4_split_spatial_blocked.{json,parquet}.bak"
+  },
+  "tile_field_layout": {
+    "feature_columns_count": 10,
+    "expected_layout": "[easting, northing, height, rmse, mean_velocity, mean_velocity_std, acceleration, acceleration_std, seasonality, seasonality_std, time_series(294)]",
+    "note": "LazyTileStore must construct rows in this order from per-tile npz to remain compatible with V3.3 trainer expectations."
+  }
+}
