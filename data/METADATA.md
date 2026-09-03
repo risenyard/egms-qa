@@ -19,7 +19,7 @@ time range: 2019-01-07 to 2023-12-18
 CRS: EPSG:3035
 ```
 
-The removed tail date is `2023-12-24`, which was excluded before V3/V3.1
-encoder and VLM experiments.
+The removed tail date is `2023-12-24`, which was excluded before the encoder
+and QA experiments.
 
 Large parquet files are local artifacts and are ignored by git.

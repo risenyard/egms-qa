@@ -1,19 +1,9 @@
-"""V4 training entrypoint: tile-aware encoder on the all-Europe V4 pool.
+"""Encoder pretraining entrypoint: self-supervised masked reconstruction of
+the all-Europe tile pool.
 
-Forked from `train_tile_aware.py` (V3.3 entrypoint). V3.3 file is not
-modified. Differences vs V3.3:
-  * Data loading uses LazyTileStore.from_config (per-tile npz, no
-    eager parquet load).
-  * Train/val/test split is precomputed in data/processed/v4/v4_split.json;
-    legacy --val-fraction / --split-strategy / --stratify-bins are
-    accepted but ignored.
-  * Normalization is loaded from data/processed/v4/v4_normalization.json;
-    `fit_tile_normalizer` is not called.
-  * `--input-length` is locked to the V4 time window (default 294) and
-    cannot be overridden above the configured window.
-All other training logic (train_step, prepare_batch, build_model,
-build_optimizer, evaluate, loss, scheduler, checkpointing) is reused
-unchanged from V3.3.
+Data loading uses LazyTileStore.from_config over per-tile npz files, with a
+precomputed train/val/test split and normalization. The input length is locked
+to the configured time window (default 294). See `TileEncoder` for the model.
 """
 
 from __future__ import annotations
@@ -44,10 +34,10 @@ FEATURE_COLUMNS = ["easting", "northing", *STATIC_COLUMNS]
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="V4 tile-aware masked reconstruction training (all-Europe pool).")
-    # V4 data — replaces V3.3's --data-path / --metadata-path
+    p = argparse.ArgumentParser(description="Encoder masked-reconstruction pretraining (all-Europe tile pool).")
+    # Data config + precomputed split / normalization
     p.add_argument("--v4-config", default="data/processed/v4/v4_data_config.json",
-                   help="V4 data config JSON (LazyTileStore + split + window).")
+                   help="Data config JSON (LazyTileStore + split + window).")
     p.add_argument("--v4-normalization", default="data/processed/v4/v4_normalization.json",
                    help="Precomputed normalization JSON (skip fit step).")
     p.add_argument("--output-dir", default="outputs/encoder_pretrain")
@@ -68,36 +58,33 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--mask-strategy", default="block", choices=["random", "block"])
     p.add_argument("--sync-mask", dest="sync_mask", action=argparse.BooleanOptionalAction, default=True,
                    help="Synchronized masking: all points in a tile share the same time mask. "
-                        "V4 default ON. Disabling lets points 'borrow' masked-position values from "
+                        "Default: on. Disabling lets points 'borrow' masked-position values from "
                         "neighbors, which drops reconstruction loss but corrupts embedding quality "
-                        "(V3.x experiments confirmed ACC probe R^2 collapsed from 0.84 to 0.45).")
+                        "(experiments confirmed ACC probe R^2 collapsed from 0.84 to 0.45).")
     p.add_argument("--mask-schedule", default="fixed", choices=["fixed", "short_mix"],
-                   help="V3.1: training mask schedule; validation uses eval_mask_ratio")
+                   help="training mask schedule; validation uses eval_mask_ratio")
     p.add_argument("--eval-mask-ratio", type=float, default=0.30,
-                   help="V3.1: fixed validation mask ratio")
-    # Model version
-    p.add_argument("--model-version", default="v1", choices=["v1", "v2", "v3", "v3_1", "v3_3"],
-                   help="v1=Linear temporal, v2=PatchTST, v3=v2+residual loss, v3_1/v3_3=v2+residual head")
-    p.add_argument("--patch-size", type=int, default=16, help="V2: time patch size")
-    p.add_argument("--temporal-layers", type=int, default=2, help="V2: temporal Transformer layers")
-    p.add_argument("--temporal-heads", type=int, default=4, help="V2: temporal attention heads")
+                   help="fixed validation mask ratio")
+    p.add_argument("--patch-size", type=int, default=16, help="time patch size")
+    p.add_argument("--temporal-layers", type=int, default=2, help="temporal Transformer layers")
+    p.add_argument("--temporal-heads", type=int, default=4, help="temporal attention heads")
     p.add_argument("--residual-loss-weight", type=float, default=0.0,
-                   help="V3/V3.1: residual auxiliary loss weight")
+                   help="residual auxiliary loss weight")
     p.add_argument("--residual-consistency-weight", type=float, default=0.1,
-                   help="V3.1: weight for final reconstruction residual consistency")
+                   help="weight for final reconstruction residual consistency")
     p.add_argument("--residual-head-mode", default="additive", choices=["additive", "aux_only"],
-                   help="V3.1: add residual correction to reconstruction or train it only as an auxiliary head")
+                   help="add residual correction to reconstruction or train it only as an auxiliary head")
     p.add_argument("--coord-scale", type=float, default=None,
                    help="Divide centered coords by this before coord_embedding (e.g. 3500 = tile half-width). "
                         "None keeps legacy raw-metre coords (~+-3700).")
     p.add_argument("--residual-head-lr", type=float, default=None,
-                   help="V3.1: optional learning rate for residual head parameters")
+                   help="optional learning rate for residual head parameters")
     p.add_argument("--init-from-checkpoint", default=None,
                    help="Warm-start compatible model weights without loading optimizer/scaler state")
     p.add_argument("--point-sampling", default="uniform", choices=["uniform", "residual_weighted"],
-                   help="V3.1: point sampling strategy for oversized training tiles")
+                   help="point sampling strategy for oversized training tiles")
     p.add_argument("--residual-sampling-alpha", type=float, default=0.5,
-                   help="V3.1: fraction of oversized tile points sampled by residual RMS")
+                   help="fraction of oversized tile points sampled by residual RMS")
     # Training
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--duration-hours", type=float, default=None)
@@ -131,7 +118,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--log-every-steps", type=int, default=20)
     p.add_argument("--train-window-steps", type=int, default=1000)
     p.add_argument("--resume-from", default=None)
-    return p.parse_args()
+    args = p.parse_args()
+    # Single released encoder configuration (patch temporal Transformer + spatial
+    # attention + additive residual head).
+    args.model_version = "v3_3"
+    return args
 
 
 def collect_validation_batches(args, tile_store, rng, *, resampled: bool) -> list[dict]:
@@ -164,18 +155,18 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load V4 data via LazyTileStore (replaces V3.3 eager TileStore.from_parquet)
+    # Load data via LazyTileStore
     tile_store = LazyTileStore.from_config(args.v4_config)
     v4_input_length = tile_store.time_window.input_length
     if args.input_length is None:
         args.input_length = v4_input_length
     elif args.input_length > v4_input_length:
         raise ValueError(
-            f"Requested input_length={args.input_length} exceeds V4 window {v4_input_length}"
+            f"Requested input_length={args.input_length} exceeds the configured window {v4_input_length}"
         )
     elif args.input_length < v4_input_length:
         print(
-            f"NOTE: --input-length={args.input_length} < V4 window {v4_input_length} "
+            f"NOTE: --input-length={args.input_length} < the configured window {v4_input_length} "
             f"(trailing steps will be unused)",
             flush=True,
         )
@@ -186,19 +177,19 @@ def main() -> None:
     val_indices = tile_store.split_tile_indices("val")
     test_indices = tile_store.split_tile_indices("test")
     print(
-        f"V4 tile split (precomputed from {args.v4_config}): "
+        f"tile split (precomputed from {args.v4_config}): "
         f"train={len(train_indices)} val={len(val_indices)} test={len(test_indices)}",
         flush=True,
     )
 
-    # Load precomputed normalization (skip V3.3's fit_tile_normalizer)
+    # Load precomputed normalization (skip the fit step)
     with open(args.v4_normalization) as f:
         normalizer = json.load(f)
     normalizer.pop("_meta", None)  # strip annotation block before passing into trainer
     with (output_dir / "normalization.json").open("w", encoding="utf-8") as f:
         json.dump(normalizer, f, indent=2)
     print(
-        f"V4 normalizer: mean={normalizer['mean']:.6f} std={normalizer['std']:.6f} "
+        f"normalizer: mean={normalizer['mean']:.6f} std={normalizer['std']:.6f} "
         f"residual_std={normalizer.get('residual_std',1.0):.6f}",
         flush=True,
     )
@@ -407,7 +398,7 @@ def build_model(args, normalizer):
 
 
 def build_optimizer(args, model):
-    """Use an optional dedicated LR for the V3.1 residual head."""
+    """Use an optional dedicated LR for the residual head."""
     if args.model_version not in ("v3_1", "v3_3") or args.residual_head_lr is None:
         return torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
@@ -590,7 +581,7 @@ def effective_mask_ratio(args, rng, is_eval: bool) -> float:
 
 
 def reconstruction_losses(out, target, loss_mask, args, normalizer):
-    """Compute masked global, residual, and V3.1 residual-head losses."""
+    """Compute masked global, residual, and residual-head losses."""
     pred = out["reconstruction"].float()
     diff = pred - target
     masked_diff = diff[loss_mask]

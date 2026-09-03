@@ -58,16 +58,13 @@ def load_encoder(checkpoint_path: Path, device: torch.device):
     print(f"[load] {checkpoint_path}", flush=True)
     ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     train_args = ckpt["args"]
-    if train_args.get("model_version") != "v3_3":
-        raise ValueError(f"unexpected model_version={train_args.get('model_version')}")
 
     from egms_encoder.models.tile_encoder import TileEncoder
 
     # coord_scale is applied INSIDE the model's forward (coords / coord_scale
-    # before the coord embedding). It MUST be reconstructed from the checkpoint
-    # args or EGMS encoder (coord_scale=3500) would see raw-scale coords and produce
-    # garbage tokens. v4.2 has coord_scale=None, so this is a no-op there
-    # (backward compatible).
+    # before the coord embedding), so it must match the value the checkpoint was
+    # trained with (recorded in its args); otherwise the coordinate branch sees
+    # raw-scale coords and produces garbage tokens.
     coord_scale = train_args.get("coord_scale")
     print(f"[coord_scale] {coord_scale}", flush=True)
     model = TileEncoder(
@@ -145,7 +142,7 @@ def main():
     print(f"[norm] mean={norm_mean:.4f} std={norm_std:.4f}", flush=True)
 
     model, train_args = load_encoder(ckpt_path, device)
-    print(f"[encoder] v4 encoder, d_model={train_args['d_model']}, "
+    print(f"[encoder] d_model={train_args['d_model']}, "
           f"layers={train_args['num_layers']}, heads={train_args['num_heads']}", flush=True)
     input_length = train_args["input_length"]
     fc = 10  # FEATURE_COLUMNS_COUNT in LazyTileStore

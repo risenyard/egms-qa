@@ -22,7 +22,7 @@ pooling step assigns points to an 8×8 grid and mean-pools features per cell,
 yielding 65 tokens (1 tile summary + 64 cells) with a validity mask.
 
 This directory vendors the encoder model and data code (`models/`, `data/`,
-`train_tile_aware_v4.py`) so the released checkpoint can be loaded and tokens can
+`train_tile_aware.py`) so the released checkpoint can be loaded and tokens can
 be extracted. Reproduction from raw tiles additionally needs the per-tile point
 store from the EGMS encoder project, located via `EGMS_ENCODER_HOME` (see
 `../egms_qa/paths.py`).

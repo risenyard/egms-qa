@@ -26,7 +26,7 @@ CKPT = ENCODER_DATA / "checkpoint/encoder.pt"
 DATA_CONFIG = ENCODER_DATA / "manifest/data_config.json"
 
 from egms_encoder.data.lazy_tile_store import LazyTileStore  # noqa: E402
-from egms_encoder.train_tile_aware_v4 import FEATURE_COLUMNS, build_model  # noqa: E402
+from egms_encoder.train_tile_aware import FEATURE_COLUMNS, build_model  # noqa: E402
 
 
 def stable_seed(text: str) -> int:
