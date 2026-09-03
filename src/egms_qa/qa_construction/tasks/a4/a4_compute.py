@@ -45,10 +45,10 @@ def main() -> None:
     ap.add_argument("--log-every", type=int, default=1000)
     args = ap.parse_args()
 
-    from egms_encoder.data.lazy_tile_store import LazyTileStore, V4TimeWindow
+    from egms_encoder.data.lazy_tile_store import LazyTileStore, TimeWindow
 
     cfg = json.load(open(args.data_config))
-    tw = V4TimeWindow(
+    tw = TimeWindow(
         t_start=int(cfg["time_window"]["t_start"]),
         t_end=int(cfg["time_window"]["t_end"]),
     )

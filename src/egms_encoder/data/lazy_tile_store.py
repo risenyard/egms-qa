@@ -1,12 +1,12 @@
-"""V4 LazyTileStore — per-tile npz reader with precomputed split.
+"""LazyTileStore — per-tile npz reader with precomputed split.
 
-Lives alongside (not replacing) the V3.3 ``TileStore`` in ``tile_store.py``.
-Constructed from a V4 manifest parquet (one row per tile, with ``path``,
+
+Constructed from a manifest parquet (one row per tile, with ``path``,
 ``tile_id``, ``centroid_x``, ``centroid_y``, ``n_points`` …) and an optional
 spatial blocked split JSON. Each tile's full feature row is materialised
 on demand by reading the npz; nothing is loaded eagerly.
 
-Tile row layout matches V3.3 ``TileStore.get_tile``:
+Tile row layout matches ``TileStore.get_tile``:
     [easting, northing,
      height, rmse,
      mean_velocity, mean_velocity_std,
@@ -14,7 +14,7 @@ Tile row layout matches V3.3 ``TileStore.get_tile``:
      seasonality, seasonality_std,
      time_series(T) ...]
 
-For V4 the time series is sliced to ``[t_start, t_end)``; the resulting
+The time series is sliced to ``[t_start, t_end)``; the resulting
 window is guaranteed NaN-free by the pool filter (verified by
 ``scripts/v4_verify_trim_zero_nan.py``).
 """
@@ -38,7 +38,7 @@ STATIC_KEYS = (
 
 
 @dataclass(frozen=True)
-class V4TimeWindow:
+class TimeWindow:
     t_start: int
     t_end: int  # exclusive
 
@@ -55,18 +55,18 @@ class LazyTileStore:
     manifest : pd.DataFrame
         Must contain columns: ``tile_id``, ``path``, ``n_points``,
         ``centroid_x``, ``centroid_y``. Row order defines tile indices.
-    time_window : V4TimeWindow
+    time_window : TimeWindow
         Time-axis slice applied to every loaded tile.
     split_assignments : dict[str, str] | None
         Optional ``tile_id -> {"train","val","test"}`` mapping.
     feature_columns_count : int
-        Kept at 10 for V3.3-compatible row layout.
+        Kept at 10 to match the tile row layout.
     """
 
     def __init__(
         self,
         manifest: pd.DataFrame,
-        time_window: V4TimeWindow,
+        time_window: TimeWindow,
         split_assignments: dict[str, str] | None = None,
         feature_columns_count: int = FEATURE_COLUMNS_COUNT,
     ) -> None:
@@ -132,7 +132,7 @@ class LazyTileStore:
 
         sample_path = repo_root / cfg["files"]["sample_10k"]
         manifest = pd.read_parquet(sample_path)
-        window = V4TimeWindow(
+        window = TimeWindow(
             t_start=int(cfg["time_window"]["t_start"]),
             t_end=int(cfg["time_window"]["t_end"]),
         )
@@ -156,7 +156,7 @@ class LazyTileStore:
 
     def get_tile(self, tile_index: int) -> np.ndarray:
         """Return ``[N, feature_columns_count + input_length]`` row matrix
-        with V3.3-compatible layout."""
+        with the standard tile layout."""
         meta = self.tile_metadata[tile_index]
         z = np.load(meta["path"])
         coords = z["coords"]                  # (N, 2) easting, northing
@@ -177,10 +177,10 @@ class LazyTileStore:
         return out
 
     def split_tile_indices(self, split: str, *args, **kwargs) -> np.ndarray:
-        """V4 ignores legacy V3.3 split-config args (val_fraction, split_seed,
+        """Ignores legacy split-config args (val_fraction, split_seed,
         test_fraction, split_strategy, stratify_bins) because the split is
         precomputed and loaded from disk. Extra args are accepted only for
-        signature compatibility with V3.3's iter_tile_batches.
+        signature compatibility with iter_tile_batches.
         """
         if split not in self._split_idx:
             raise ValueError(

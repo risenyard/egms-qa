@@ -88,11 +88,11 @@ def load_encoder(checkpoint_path: Path, device: torch.device):
 
 
 def load_lazy_store(manifest_path: Path, data_config_path: Path):
-    from egms_encoder.data.lazy_tile_store import LazyTileStore, V4TimeWindow
+    from egms_encoder.data.lazy_tile_store import LazyTileStore, TimeWindow
 
     with open(data_config_path) as f:
         cfg = json.load(f)
-    tw = V4TimeWindow(t_start=cfg["time_window"]["t_start"],
+    tw = TimeWindow(t_start=cfg["time_window"]["t_start"],
                       t_end=cfg["time_window"]["t_end"])
     print(f"[manifest] reading {manifest_path}", flush=True)
     manifest = pd.read_parquet(manifest_path)
