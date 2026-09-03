@@ -32,3 +32,4 @@ env/
 /data/encoder/tokens/
 /data/encoder/checkpoint/*.pt
 /data/adapters/
+/data/tiles/

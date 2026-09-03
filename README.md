@@ -36,8 +36,8 @@ Each block pairs a code module here with its released artifacts on 🤗 Hugging 
 
 | block | code (this repo) | what it is | artifacts (🤗) |
 |---|---|---|---|
-| **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | the frozen tile representation and token extraction | [`egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) — checkpoint + token cache |
-| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | the 78-task definitions and the question–answer records | [`egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) — QA records + tables |
+| **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | the frozen tile representation and token extraction | [`egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) — checkpoint |
+| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | the 78-task definitions and the question–answer records | [`egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) — raw tiles, tokens, QA + tables |
 | **translator** | [`src/egms_qa/translator/`](src/egms_qa/translator/) | projector + LoRA training and evaluation on host LLMs | [`egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) — 4 adapters |
 
 Each block has its own README. The task system (78 tasks, families A/B/C/D/S/X)
@@ -67,26 +67,25 @@ translator training/evaluation.
 
 ## Data
 
-Code lives here; the heavy artifacts are released on Hugging Face:
+Code lives here; the heavy artifacts are released on Hugging Face. The encoder
+and dataset repos mirror this checkout's layout, so downloading them into a
+checkout drops every file into place:
 
-- **Encoder** — checkpoint + 10k-tile token cache: [`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder)
-- **Dataset** — QA records, labels, per-family reference tables: [`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
-- **Translators** — 4 LoRA adapters + projectors: [`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator)
+- **Encoder** — frozen checkpoint: [`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) → `data/encoder/checkpoint/encoder.pt`
+- **Dataset** — raw EGMS tiles, encoder token cache, QA records + reference tables: [`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) → `data/tiles/`, `data/encoder/tokens/`, `outputs/qa/`, `outputs/tasks/`
+- **Translators** — 4 LoRA adapters + projectors: [`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) → `outputs/runs/<key>/best/`
 
-Place the downloaded files into a checkout as:
-
-```
-data/encoder/checkpoint/encoder.pt         # from egms-qa-encoder
-data/encoder/tokens/encoder_tokens_10k.pt  # from egms-qa-encoder
-outputs/qa/…            # labels + QA jsonl              (from egms-qa-dataset)
-outputs/tasks/…         # per-family reference tables    (from egms-qa-dataset)
-outputs/runs/<key>/best/   # adapters qwen|gemma|llama|mistral (from egms-qa-translator)
+```bash
+# fetch the dataset (raw tiles + tokens + QA) into a checkout
+hf download risenyard/egms-qa-dataset --repo-type dataset --local-dir .
 ```
 
-Paths are overridable via `EGMS_QA_ROOT`, `EGMS_QA_DATA`, `EGMS_QA_OUTPUTS`,
-`EGMS_ENCODER_HOME` (see [`src/egms_qa/paths.py`](src/egms_qa/paths.py)). The raw
-EGMS Level-3 product is Copernicus data and is not redistributed; see
-[`data/METADATA.md`](data/METADATA.md).
+Run reproduction commands from the checkout root so the relative tile paths in the
+split manifest resolve. Paths are overridable via `EGMS_QA_ROOT`, `EGMS_QA_DATA`,
+`EGMS_QA_OUTPUTS`, `EGMS_ENCODER_HOME` (see [`src/egms_qa/paths.py`](src/egms_qa/paths.py)).
+The raw tiles derive from the EGMS Level-3 product (© European Union, Copernicus
+Land Monitoring Service / EEA), redistributed under its free-and-open terms with
+attribution; see [`data/METADATA.md`](data/METADATA.md).
 
 ## Reproduce
 

@@ -35,8 +35,8 @@ token,再由一个宿主语言模型用自然语言回答监测类问题,并对�
 
 | 模块 | 代码(本仓库) | 内容 | 产物(🤗) |
 |---|---|---|---|
-| **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | 冻结的瓦片表示与 token 提取 | [`egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) — checkpoint + token 缓存 |
-| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | 78 个任务的定义与问答对记录 | [`egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) — QA 记录 + 参考值表 |
+| **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | 冻结的瓦片表示与 token 提取 | [`egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) — checkpoint |
+| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | 78 个任务的定义与问答对记录 | [`egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) — 原始瓦片、tokens、QA + 参考值表 |
 | **translator** | [`src/egms_qa/translator/`](src/egms_qa/translator/) | 投影器 + LoRA 在宿主 LLM 上的训练与评测 | [`egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) — 4 个 adapter |
 
 每个模块都有各自的 README。任务体系(78 个任务,A/B/C/D/S/X 六族)与数据集
@@ -62,25 +62,22 @@ pip install -e ".[tasks]"        # + 任务参考值计算
 
 ## 数据
 
-代码在本仓库;重数据发布在 Hugging Face:
+代码在本仓库;重数据发布在 Hugging Face。encoder 与 dataset 库**镜像本 checkout 的目录**,
+下载进 checkout 即可各就各位:
 
-- **编码器** —— checkpoint + 1 万瓦片 token 缓存:[`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder)
-- **数据集** —— 问答对记录、标签、各族参考值表:[`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
-- **翻译器** —— 4 个 LoRA adapter + projector:[`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator)
+- **编码器** —— 冻结 checkpoint:[`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) → `data/encoder/checkpoint/encoder.pt`
+- **数据集** —— 原始 EGMS 瓦片、token 缓存、QA 记录 + 参考值表:[`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) → `data/tiles/`、`data/encoder/tokens/`、`outputs/qa/`、`outputs/tasks/`
+- **翻译器** —— 4 个 LoRA adapter + projector:[`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) → `outputs/runs/<key>/best/`
 
-下载后放进 checkout 的对应位置:
-
-```
-data/encoder/checkpoint/encoder.pt         # 来自 egms-qa-encoder
-data/encoder/tokens/encoder_tokens_10k.pt  # 来自 egms-qa-encoder
-outputs/qa/…            # 标签 + QA jsonl              (来自 egms-qa-dataset)
-outputs/tasks/…         # 各任务族参考值表            (来自 egms-qa-dataset)
-outputs/runs/<key>/best/   # adapter qwen|gemma|llama|mistral (来自 egms-qa-translator)
+```bash
+# 把数据集(原始瓦片 + tokens + QA)拉进 checkout
+hf download risenyard/egms-qa-dataset --repo-type dataset --local-dir .
 ```
 
-路径均可通过环境变量 `EGMS_QA_ROOT`、`EGMS_QA_DATA`、`EGMS_QA_OUTPUTS`、
-`EGMS_ENCODER_HOME` 覆盖(见 [`src/egms_qa/paths.py`](src/egms_qa/paths.py))。
-原始 EGMS Level-3 产品为 Copernicus 数据,本发布不再转发;见
+复现命令请**从 checkout 根目录运行**,这样 split manifest 里的相对瓦片路径才能解析。
+路径均可通过 `EGMS_QA_ROOT`、`EGMS_QA_DATA`、`EGMS_QA_OUTPUTS`、`EGMS_ENCODER_HOME`
+覆盖(见 [`src/egms_qa/paths.py`](src/egms_qa/paths.py))。原始瓦片源自 EGMS Level-3
+产品(© European Union, Copernicus / EEA),按其免费开放条款并署名后在此转发;见
 [`data/METADATA.md`](data/METADATA.md)。
 
 ## 复现
