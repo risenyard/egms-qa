@@ -16,6 +16,7 @@
 [![Python](https://img.shields.io/badge/python-%E2%89%A5%203.10-blue.svg)](pyproject.toml)
 [![Stars](https://img.shields.io/github/stars/risenyard/egms-qa?style=flat)](https://github.com/risenyard/egms-qa/stargazers)
 [![Forks](https://img.shields.io/github/forks/risenyard/egms-qa?style=flat)](https://github.com/risenyard/egms-qa/network/members)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-data%20%26%20models-yellow)](https://huggingface.co/risenyard/egms-qa-dataset)
 
 Natural-language question answering over persistent-scatterer displacement time
 series, for the [European Ground Motion Service](https://egms.land.copernicus.eu/)
@@ -66,20 +67,20 @@ translator training/evaluation.
 
 ## Data
 
-Code lives here; heavy artifacts are in the data release:
+Code lives here; the heavy artifacts are released on Hugging Face:
 
-- encoder checkpoint and 10k-tile token cache,
-- the question–answer records and per-family reference tables,
-- the four trained translator adapters (one per host model).
+- **Encoder** — checkpoint + 10k-tile token cache: [`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder)
+- **Dataset** — QA records, labels, per-family reference tables: [`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
+- **Translators** — 4 LoRA adapters + projectors: [`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator)
 
-**Download:** _<data release URL — to be added>_. Place files as:
+Place the downloaded files into a checkout as:
 
 ```
-data/encoder/checkpoint/encoder.pt
-data/encoder/tokens/encoder_tokens_10k.pt
-outputs/qa/…            # QA records + labels
-outputs/tasks/…         # per-family reference tables
-outputs/runs/<key>/best/   # trained adapters (qwen | gemma | llama | mistral)
+data/encoder/checkpoint/encoder.pt         # from egms-qa-encoder
+data/encoder/tokens/encoder_tokens_10k.pt  # from egms-qa-encoder
+outputs/qa/…            # labels + QA jsonl              (from egms-qa-dataset)
+outputs/tasks/…         # per-family reference tables    (from egms-qa-dataset)
+outputs/runs/<key>/best/   # adapters qwen|gemma|llama|mistral (from egms-qa-translator)
 ```
 
 Paths are overridable via `EGMS_QA_ROOT`, `EGMS_QA_DATA`, `EGMS_QA_OUTPUTS`,

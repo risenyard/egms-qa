@@ -16,6 +16,7 @@
 [![Python](https://img.shields.io/badge/python-%E2%89%A5%203.10-blue.svg)](pyproject.toml)
 [![Stars](https://img.shields.io/github/stars/risenyard/egms-qa?style=flat)](https://github.com/risenyard/egms-qa/stargazers)
 [![Forks](https://img.shields.io/github/forks/risenyard/egms-qa?style=flat)](https://github.com/risenyard/egms-qa/network/members)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-data%20%26%20models-yellow)](https://huggingface.co/risenyard/egms-qa-dataset)
 
 面向[欧洲地面运动服务](https://egms.land.copernicus.eu/)(EGMS)的持久散射体形变
 时间序列自然语言问答系统。
@@ -61,20 +62,20 @@ pip install -e ".[tasks]"        # + 任务参考值计算
 
 ## 数据
 
-代码在本仓库;重数据在数据发布包中:
+代码在本仓库;重数据发布在 Hugging Face:
 
-- 编码器 checkpoint 与 1 万瓦片的 token 缓存,
-- 问答对记录与各任务族的参考值表,
-- 四个训练好的翻译器 adapter(每个宿主模型一个)。
+- **编码器** —— checkpoint + 1 万瓦片 token 缓存:[`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder)
+- **数据集** —— 问答对记录、标签、各族参考值表:[`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
+- **翻译器** —— 4 个 LoRA adapter + projector:[`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator)
 
-**下载:** _<数据发布链接——待补充>_。放置位置:
+下载后放进 checkout 的对应位置:
 
 ```
-data/encoder/checkpoint/encoder.pt
-data/encoder/tokens/encoder_tokens_10k.pt
-outputs/qa/…            # QA 记录 + 标签
-outputs/tasks/…         # 各任务族参考值表
-outputs/runs/<key>/best/   # 训练好的 adapter(qwen | gemma | llama | mistral)
+data/encoder/checkpoint/encoder.pt         # 来自 egms-qa-encoder
+data/encoder/tokens/encoder_tokens_10k.pt  # 来自 egms-qa-encoder
+outputs/qa/…            # 标签 + QA jsonl              (来自 egms-qa-dataset)
+outputs/tasks/…         # 各任务族参考值表            (来自 egms-qa-dataset)
+outputs/runs/<key>/best/   # adapter qwen|gemma|llama|mistral (来自 egms-qa-translator)
 ```
 
 路径均可通过环境变量 `EGMS_QA_ROOT`、`EGMS_QA_DATA`、`EGMS_QA_OUTPUTS`、
