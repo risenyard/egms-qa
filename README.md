@@ -7,42 +7,27 @@
 \____/ \____/\_|  |_/\____/        \_/\_\_| |_/
 ```
 
-<div align="center">
-
 # EGMS-QA
 
-### Natural-language question answering over InSAR ground-motion time series
+*[English](README.md) · [中文](README.zh-CN.md)*
 
-*Ask any 7 km tile of the [European Ground Motion Service](https://egms.land.copernicus.eu/) a plain-language question — get a calibrated answer, or an honest refusal.*
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Data: CC BY 4.0](https://img.shields.io/badge/Data-CC%20BY%204.0-blue.svg)](DATA_LICENSE)
+[![Python](https://img.shields.io/badge/python-%E2%89%A5%203.10-blue.svg)](pyproject.toml)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-data%20%26%20models-yellow)](https://huggingface.co/risenyard/egms-qa-dataset)
 
-[English](README.md) · [中文](README.zh-CN.md)
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
-[![Data: CC BY 4.0](https://img.shields.io/badge/Data-CC%20BY%204.0-1f6feb?style=for-the-badge)](DATA_LICENSE)
-[![Python](https://img.shields.io/badge/Python-%E2%89%A53.10-3776AB?style=for-the-badge&logo=python&logoColor=white)](pyproject.toml)
-[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-data%20%26%20models-ffcc4d?style=for-the-badge)](https://huggingface.co/risenyard/egms-qa-dataset)
-[![Stars](https://img.shields.io/github/stars/risenyard/egms-qa?style=for-the-badge&logo=github)](https://github.com/risenyard/egms-qa/stargazers)
-
-**🤗 [Dataset](https://huggingface.co/datasets/risenyard/egms-qa-dataset) · [Encoder](https://huggingface.co/risenyard/egms-qa-encoder) · [Translator](https://huggingface.co/risenyard/egms-qa-translator)**
-
-</div>
-
----
+Natural-language question answering over persistent-scatterer displacement time
+series, for the [European Ground Motion Service](https://egms.land.copernicus.eu/)
+(EGMS).
 
 EGMS-QA reads each 7 km tile of EGMS point histories, represents it as a fixed
 set of tokens, and lets a host language model answer monitoring questions in
 plain language — with calibrated refusal for out-of-scope questions.
 
-```mermaid
-flowchart LR
-    A["🛰️ EGMS tile<br/>variable points · 294-step histories"] --> B["❄️ frozen EGMS encoder<br/>+ 8×8 pooling"]
-    B --> C["65 × 256 tokens<br/>(X, mask m)"]
-    C --> D["2-layer projector"]
-    D --> E["🧊 host LLM + LoRA<br/>frozen base"]
-    E --> F["💬 answer<br/>or calibrated refusal"]
-    style A fill:#e8f0fe,stroke:#1f6feb
-    style C fill:#fff4e5,stroke:#e8912d
-    style F fill:#e6f4ea,stroke:#2ea043
+```
+tile (variable # points, 294-step histories)
+   → frozen EGMS encoder + 8×8 pooling → 65 × 256 tokens
+   → 2-layer projector → prefix ; "Question: …\nAnswer:" → frozen host LLM + LoRA → answer
 ```
 
 ## The three blocks

@@ -7,42 +7,26 @@
 \____/ \____/\_|  |_/\____/        \_/\_\_| |_/
 ```
 
-<div align="center">
-
 # EGMS-QA
 
-### InSAR 地面形变时间序列的自然语言问答
+*[English](README.md) · [中文](README.zh-CN.md)*
 
-*向[欧洲地面运动服务](https://egms.land.copernicus.eu/)(EGMS)的任意 7 km 瓦片用自然语言提问——得到经过校准的回答,或一次诚实的拒答。*
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Data: CC BY 4.0](https://img.shields.io/badge/Data-CC%20BY%204.0-blue.svg)](DATA_LICENSE)
+[![Python](https://img.shields.io/badge/python-%E2%89%A5%203.10-blue.svg)](pyproject.toml)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-data%20%26%20models-yellow)](https://huggingface.co/risenyard/egms-qa-dataset)
 
-[English](README.md) · [中文](README.zh-CN.md)
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
-[![Data: CC BY 4.0](https://img.shields.io/badge/Data-CC%20BY%204.0-1f6feb?style=for-the-badge)](DATA_LICENSE)
-[![Python](https://img.shields.io/badge/Python-%E2%89%A53.10-3776AB?style=for-the-badge&logo=python&logoColor=white)](pyproject.toml)
-[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-data%20%26%20models-ffcc4d?style=for-the-badge)](https://huggingface.co/risenyard/egms-qa-dataset)
-[![Stars](https://img.shields.io/github/stars/risenyard/egms-qa?style=for-the-badge&logo=github)](https://github.com/risenyard/egms-qa/stargazers)
-
-**🤗 [数据集](https://huggingface.co/datasets/risenyard/egms-qa-dataset) · [编码器](https://huggingface.co/risenyard/egms-qa-encoder) · [翻译器](https://huggingface.co/risenyard/egms-qa-translator)**
-
-</div>
-
----
+面向[欧洲地面运动服务](https://egms.land.copernicus.eu/)(EGMS)的持久散射体形变
+时间序列自然语言问答系统。
 
 EGMS-QA 读取每个 7 km 瓦片(tile)内的 EGMS 点位时间序列,将其编码为一组固定长度的
 token,再由一个宿主语言模型用自然语言回答监测类问题,并对超出范围的问题给出经过校准
 的拒答。
 
-```mermaid
-flowchart LR
-    A["🛰️ EGMS 瓦片<br/>点数可变 · 294 步历史"] --> B["❄️ 冻结 EGMS 编码器<br/>+ 8×8 池化"]
-    B --> C["65 × 256 token<br/>(X, 掩码 m)"]
-    C --> D["两层投影器"]
-    D --> E["🧊 宿主 LLM + LoRA<br/>基座冻结"]
-    E --> F["💬 答案<br/>或校准拒答"]
-    style A fill:#e8f0fe,stroke:#1f6feb
-    style C fill:#fff4e5,stroke:#e8912d
-    style F fill:#e6f4ea,stroke:#2ea043
+```
+瓦片(点数可变,294 步历史)
+   → 冻结的 EGMS 编码器 + 8×8 池化 → 65 × 256 token
+   → 两层投影器 → 前缀 ; "Question: …\nAnswer:" → 冻结宿主 LLM + LoRA → 答案
 ```
 
 ## 三个模块
