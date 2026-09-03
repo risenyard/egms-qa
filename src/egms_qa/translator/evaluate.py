@@ -53,7 +53,7 @@ QWEN_DEFAULT = DEFAULT_HOST_MODEL
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--adapter-dir", required=True, help="Checkpoint dir containing projector.pt and qwen_lora_adapter/.")
+    p.add_argument("--adapter-dir", required=True, help="Checkpoint dir containing projector.pt and lora_adapter/.")
     p.add_argument("--token-cache", default=TOK_DEFAULT)
     p.add_argument("--labels", default=str(DEFAULT_LABELS))
     p.add_argument("--meta", default=str(DEFAULT_META))
@@ -244,7 +244,7 @@ def load_model(adapter_dir: str, token_mode: str, seed: int, token_cache: str):
         raise RuntimeError(f"could not load base={base} model_type={model_type}: {last}")
     print(f"[eval] loaded base model_type={model_type or '?'} via {used}", flush=True)
 
-    model = PeftModel.from_pretrained(model, str(Path(adapter_dir) / "qwen_lora_adapter"))
+    model = PeftModel.from_pretrained(model, str(Path(adapter_dir) / "lora_adapter"))
     model.eval()
     model.config.use_cache = True
     model._needs_tti = any("vision" in n for n, _ in model.named_modules())

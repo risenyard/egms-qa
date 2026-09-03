@@ -39,7 +39,7 @@ def parse_args():
     p.add_argument("--include-tasks", default="",
                    help="comma list to restrict tasks; empty = all A-X tasks")
     p.add_argument("--resume-adapter", default="",
-                   help="path to a saved qwen_lora_adapter dir to CONTINUE training "
+                   help="path to a saved lora_adapter dir to CONTINUE training "
                         "(chains 14h jobs to accumulate epochs); pair with "
                         "--warm-start-projector <same ckpt>/projector.pt")
     p.add_argument("--warm-start-projector", default=PHASEA_PROJECTOR,
@@ -469,7 +469,7 @@ def main():
         torch.save({"projector_state": projector.state_dict(), "args": vars(args),
                     "metrics": metrics, "egms_dim": egms_dim, "llm_hidden": llm_hidden},
                    d / "projector.pt")
-        qwen.save_pretrained(d / "qwen_lora_adapter")
+        qwen.save_pretrained(d / "lora_adapter")
 
     def run_eval(epoch):
         nonlocal best_ppl, best
@@ -529,7 +529,7 @@ def main():
         "lora": {"r": args.lora_r, "alpha": args.lora_alpha, "dropout": args.lora_dropout,
                  "target_modules": "all-linear"},
         "global_step": gstep, "wall_time_seconds": round(time.monotonic() - t0, 2)}, indent=2))
-    print(f"\nwrote {out}/{{best,last}}/{{projector.pt, qwen_lora_adapter}} + summary.json  "
+    print(f"\nwrote {out}/{{best,last}}/{{projector.pt, lora_adapter}} + summary.json  "
           f"best ppl={best_ppl:.3f}", flush=True)
 
 

@@ -1003,7 +1003,7 @@ def main() -> None:
             checkpoint["numeric_auxiliary_state"] = auxiliary_heads.state_dict()
             checkpoint["numeric_auxiliary_stats"] = auxiliary_stats
         torch.save(checkpoint, d / "projector.pt")
-        model.save_pretrained(d / "qwen_lora_adapter")
+        model.save_pretrained(d / "lora_adapter")
 
     def run_eval() -> None:
         nonlocal best_ppl, best_metrics
