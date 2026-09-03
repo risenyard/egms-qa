@@ -34,11 +34,13 @@ tile (variable # points, 294-step histories)
 
 ## The three blocks
 
-| block | directory | what it is |
-|---|---|---|
-| **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | the frozen tile representation and token extraction |
-| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | the 78-task definitions and the question–answer records |
-| **translator** | [`src/egms_qa/translator/`](src/egms_qa/translator/) | projector + LoRA training and evaluation on host LLMs |
+Each block pairs a code module here with its released artifacts on 🤗 Hugging Face:
+
+| block | code (this repo) | what it is | artifacts (🤗) |
+|---|---|---|---|
+| **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | the frozen tile representation and token extraction | [`egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) — checkpoint + token cache |
+| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | the 78-task definitions and the question–answer records | [`egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) — QA records + tables |
+| **translator** | [`src/egms_qa/translator/`](src/egms_qa/translator/) | projector + LoRA training and evaluation on host LLMs | [`egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) — 4 adapters |
 
 Each block has its own README. The task system (78 tasks, families A/B/C/D/S/X)
 and the dataset datasheet are documented in

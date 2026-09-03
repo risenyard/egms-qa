@@ -33,11 +33,13 @@ token,再由一个宿主语言模型用自然语言回答监测类问题,并对�
 
 ## 三个模块
 
-| 模块 | 目录 | 内容 |
-|---|---|---|
-| **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | 冻结的瓦片表示与 token 提取 |
-| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | 78 个任务的定义与问答对记录 |
-| **translator** | [`src/egms_qa/translator/`](src/egms_qa/translator/) | 投影器 + LoRA 在宿主 LLM 上的训练与评测 |
+每一块都由本仓库的代码模块与其在 🤗 Hugging Face 上发布的产物配对:
+
+| 模块 | 代码(本仓库) | 内容 | 产物(🤗) |
+|---|---|---|---|
+| **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | 冻结的瓦片表示与 token 提取 | [`egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) — checkpoint + token 缓存 |
+| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | 78 个任务的定义与问答对记录 | [`egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) — QA 记录 + 参考值表 |
+| **translator** | [`src/egms_qa/translator/`](src/egms_qa/translator/) | 投影器 + LoRA 在宿主 LLM 上的训练与评测 | [`egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) — 4 个 adapter |
 
 每个模块都有各自的 README。任务体系(78 个任务,A/B/C/D/S/X 六族)与数据集
 datasheet 记录在 [`src/egms_qa/qa_construction/README.md`](src/egms_qa/qa_construction/README.md)。

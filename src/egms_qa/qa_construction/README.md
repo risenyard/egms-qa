@@ -1,5 +1,7 @@
 # QA construction (task definitions and question–answer records)
 
+> 🤗 Released dataset (train/val/test + labels + tables): [`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
+
 This block turns the frozen tile representation and the raw tile records into
 the EGMS-QA question–answer dataset. It has three stages:
 

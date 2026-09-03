@@ -1,5 +1,7 @@
 # Encoder (tile representation)
 
+> 🤗 Released weights & token cache: [`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder)
+
 The EGMS encoder maps a variable-size tile of persistent-scatterer displacement
 histories to a fixed 65-token representation used by the rest of EGMS-QA. It is a
 self-supervised spatio-temporal model:

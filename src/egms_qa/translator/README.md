@@ -1,5 +1,7 @@
 # Translator (language-model adaptation)
 
+> 🤗 Released adapters + projectors (4 host models): [`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator)
+
 The translator adapts a host language model to answer EGMS-QA questions from the
 frozen tile tokens alone. A two-layer projector maps each 256-d token to the host
 model's embedding width; the projected tokens form a prefix before the tokenized
