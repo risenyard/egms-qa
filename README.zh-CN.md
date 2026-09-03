@@ -35,11 +35,11 @@ token,再由一个宿主语言模型用自然语言回答监测类问题,并对�
 | 模块 | 目录 | 内容 |
 |---|---|---|
 | **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | 冻结的瓦片表示与 token 提取 |
-| **qa** | [`src/egms_qa/qa/`](src/egms_qa/qa/) | 78 个任务的定义与问答对记录 |
+| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | 78 个任务的定义与问答对记录 |
 | **translator** | [`src/egms_qa/translator/`](src/egms_qa/translator/) | 投影器 + LoRA 在宿主 LLM 上的训练与评测 |
 
 每个模块都有各自的 README。任务体系(78 个任务,A/B/C/D/S/X 六族)与数据集
-datasheet 记录在 [`src/egms_qa/qa/README.md`](src/egms_qa/qa/README.md)。
+datasheet 记录在 [`src/egms_qa/qa_construction/README.md`](src/egms_qa/qa_construction/README.md)。
 
 ## 结果(留出测试集)
 
@@ -89,8 +89,8 @@ outputs/runs/<key>/best/   # 训练好的 adapter(qwen | gemma | llama | mistral
 python -m egms_encoder.extract_tokens --output-dir outputs/tokens
 
 # 2. 任务标签 + QA 记录(或直接下载)
-python -m egms_qa.qa.build_probe_labels
-python -m egms_qa.qa.generate_qa --out-dir outputs/qa
+python -m egms_qa.qa_construction.build_probe_labels
+python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 
 # 3. 训练并评测一个宿主模型
 python -m egms_qa.translator.train --qwen-path Qwen/Qwen3.5-9B \

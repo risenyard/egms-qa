@@ -75,8 +75,8 @@ Nearest anchor:
 ## File Inventory
 
 ```text
-src/egms_qa/qa/tasks/s1/s1_compute.py   # this script
-src/egms_qa/qa/tasks/s1/s1_algorithm.md # this document
+src/egms_qa/qa_construction/tasks/s1/s1_compute.py   # this script
+src/egms_qa/qa_construction/tasks/s1/s1_algorithm.md # this document
 outputs/tasks/s1/s1_final_table.csv     # generated canonical table (data release)
 ```
 

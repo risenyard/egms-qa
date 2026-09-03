@@ -94,8 +94,8 @@ Official all10k S22 counts:
 ## File Inventory
 
 ```text
-src/egms_qa/qa/tasks/s2/s2_compute.py   # this script
-src/egms_qa/qa/tasks/s2/s2_algorithm.md # this document
+src/egms_qa/qa_construction/tasks/s2/s2_compute.py   # this script
+src/egms_qa/qa_construction/tasks/s2/s2_algorithm.md # this document
 outputs/tasks/s2/s2_final_table.csv     # generated canonical table (data release)
 ```
 

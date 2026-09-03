@@ -16,8 +16,8 @@ the EGMS-QA question–answer dataset. It has three stages:
    static X refusal tasks are sampled so they do not dominate the loss.
 
 ```bash
-python -m egms_qa.qa.build_probe_labels          # -> outputs/qa/labels.parquet
-python -m egms_qa.qa.generate_qa --out-dir outputs/qa
+python -m egms_qa.qa_construction.build_probe_labels          # -> outputs/qa/labels.parquet
+python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 ```
 
 ## Task system (78 tasks, six families)

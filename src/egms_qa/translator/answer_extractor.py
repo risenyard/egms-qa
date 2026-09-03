@@ -16,7 +16,7 @@ from typing import Any, Iterable
 from quantulum3 import classifier as quantity_classifier
 from quantulum3 import parser as quantity_parser
 
-from egms_qa.qa.qa_lib import (
+from egms_qa.qa_construction.qa_lib import (
     MISSING_VALUE,
     TaskRecord,
     categorical_label_aliases,

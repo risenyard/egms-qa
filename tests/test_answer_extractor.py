@@ -8,7 +8,7 @@ from egms_qa.translator.answer_extractor import (
     extraction_is_correct,
 )
 from egms_qa.translator.evaluate import summarize_task
-from egms_qa.qa.qa_lib import MISSING_VALUE, TaskRecord
+from egms_qa.qa_construction.qa_lib import MISSING_VALUE, TaskRecord
 
 
 def task(task_id: str, label_type: str, target_column: str = "") -> TaskRecord:

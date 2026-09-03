@@ -26,7 +26,7 @@ from egms_qa.translator.answer_extractor import (
     extract_answer,
     extraction_is_correct,
 )
-from egms_qa.qa.qa_lib import (
+from egms_qa.qa_construction.qa_lib import (
     ANSWER_PROTOCOL,
     DEFAULT_LABELS,
     DEFAULT_META,

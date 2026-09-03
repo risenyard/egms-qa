@@ -36,12 +36,12 @@ tile (variable # points, 294-step histories)
 | block | directory | what it is |
 |---|---|---|
 | **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | the frozen tile representation and token extraction |
-| **qa** | [`src/egms_qa/qa/`](src/egms_qa/qa/) | the 78-task definitions and the question–answer records |
+| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | the 78-task definitions and the question–answer records |
 | **translator** | [`src/egms_qa/translator/`](src/egms_qa/translator/) | projector + LoRA training and evaluation on host LLMs |
 
 Each block has its own README. The task system (78 tasks, families A/B/C/D/S/X)
 and the dataset datasheet are documented in
-[`src/egms_qa/qa/README.md`](src/egms_qa/qa/README.md).
+[`src/egms_qa/qa_construction/README.md`](src/egms_qa/qa_construction/README.md).
 
 ## Results (held-out test)
 
@@ -94,8 +94,8 @@ EGMS Level-3 product is Copernicus data and is not redistributed; see
 python -m egms_encoder.extract_tokens --output-dir outputs/tokens
 
 # 2. task labels + QA records (or download them)
-python -m egms_qa.qa.build_probe_labels
-python -m egms_qa.qa.generate_qa --out-dir outputs/qa
+python -m egms_qa.qa_construction.build_probe_labels
+python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 
 # 3. train and evaluate a host model
 python -m egms_qa.translator.train --qwen-path Qwen/Qwen3.5-9B \
