@@ -21,7 +21,9 @@ B42_european_acceleration_typicality =
     extreme   if B41 > 1.404
 ```
 
-B42 is a European reference distribution label, not a causal anomaly claim.
+B42 is a European reference distribution label, not a causal anomaly claim. The
+cutoffs are **corpus-relative**: fixed quantiles of the full European
+candidate-pool distribution, baked into the compute script as constants.
 
 ## Final Counts
 

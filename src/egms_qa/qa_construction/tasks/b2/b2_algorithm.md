@@ -27,6 +27,9 @@ else:
     B22_mean_subsidence_intensity_band = low
 ```
 
+The band cutoffs are **corpus-relative**: fixed quantiles of the full European
+candidate-pool velocity distribution, baked into the compute script as constants.
+
 The B34 direction used here is copied into the B2 final table as an upstream explanation column so B22 is reproducible within the folder:
 
 ```text

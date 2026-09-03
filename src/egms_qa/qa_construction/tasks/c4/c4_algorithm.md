@@ -13,12 +13,25 @@ The 10k final table uses:
 
 `./data/encoder/manifest/split.parquet`
 
-The reference threshold is a corpus-relative value estimated from the full
-European candidate pool (83,323 tiles). That pool is not shipped, but the derived
-threshold ships in `outputs/tasks/c4/c4_bin_level_reference_thresholds.json` and
-is already applied in the released C4 table, so the `final` step is
-self-contained. Only re-deriving the threshold (the `reference` step) needs the
-full pool.
+The fast-motion threshold `T_fast` is **corpus-relative**: it is the p95 of the
+per-bin abs-velocity p90 over the full European candidate pool (83,323 tiles).
+Like the B-family European typicality cutoffs, its value is **baked into the
+script** (`FAST_THRESHOLD_MM_YR = 4.8`), so the `final` step is self-contained —
+no external pool or JSON is needed. Only re-deriving `T_fast` (the `reference`
+subcommand) needs the full pool, which is not shipped.
+
+Derived reference distribution over the pool (for provenance):
+
+| statistic | value (mm/yr) |
+|---|---|
+| p50 | 1.80 |
+| p90 | 3.72 |
+| **p95 (= `T_fast`)** | **4.80** |
+| p99 | 8.20 |
+| p99.9 | 18.60 |
+
+(log-bulk fit: mu=0.594, sigma=0.536, over log values trimmed to [p1, p99];
+n_tiles=83,323, n_valid_bins=3,351,762.)
 
 ## Reference Distribution
 

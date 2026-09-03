@@ -35,6 +35,13 @@ EPS = 1e-6
 
 REFERENCE_JSON = "c4_bin_level_reference_thresholds.json"
 
+# Corpus-relative fast-motion threshold, baked in like the B-family European
+# typicality cutoffs: the p95 of per-bin abs-velocity p90 over the full European
+# candidate pool (83,323 tiles) = 4.8 mm/yr. Re-derive with the `reference`
+# subcommand + the full pool if needed; the full derived distribution is recorded
+# in c4_algorithm.md.
+FAST_THRESHOLD_MM_YR = 4.8
+
 
 def _bin_index(coords: np.ndarray) -> np.ndarray:
     coords64 = coords.astype(np.float64, copy=False)
@@ -258,22 +265,16 @@ def _final_one(row: tuple[str, str, str], threshold: float) -> dict[str, object]
 def _resolve_threshold(args: argparse.Namespace) -> float:
     if args.fast_threshold is not None:
         return float(args.fast_threshold)
-
-    ref_path = Path(args.reference_json)
-    with ref_path.open() as f:
+    # Default: the baked-in corpus-relative threshold. Pass --reference-json to
+    # re-read a value derived by the `reference` step from the full pool.
+    if not args.reference_json:
+        return FAST_THRESHOLD_MM_YR
+    with open(args.reference_json) as f:
         ref = json.load(f)
-
     key = args.threshold_key
     if key.startswith("p"):
-        q = ref["raw_quantiles_mm_yr"]
-        if key not in q:
-            raise KeyError(f"{key} not found in raw_quantiles_mm_yr")
-        return float(q[key])
-
-    z = ref["log_bulk_fit"]["raw_thresholds_mm_yr"]
-    if key not in z:
-        raise KeyError(f"{key} not found in log_bulk_fit.raw_thresholds_mm_yr")
-    return float(z[key])
+        return float(ref["raw_quantiles_mm_yr"][key])
+    return float(ref["log_bulk_fit"]["raw_thresholds_mm_yr"][key])
 
 
 def run_final(args: argparse.Namespace) -> None:
@@ -346,7 +347,9 @@ def build_parser() -> argparse.ArgumentParser:
     final = sub.add_parser("final")
     final.add_argument("--manifest", default=str(VQA_MANIFEST))
     final.add_argument("--out-dir", default=str(OUT_DIR))
-    final.add_argument("--reference-json", default=str(OUT_DIR / REFERENCE_JSON))
+    final.add_argument("--reference-json", default=None,
+                       help="Optional: re-read the threshold from a reference JSON "
+                            "(from the `reference` step) instead of the baked-in value.")
     final.add_argument("--threshold-key", default="p95")
     final.add_argument("--fast-threshold", type=float, default=None)
     final.add_argument("--workers", type=int, default=int(os.environ.get("SLURM_CPUS_PER_TASK", "16")))

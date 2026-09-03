@@ -46,7 +46,9 @@ B36_european_velocity_typicality =
     extreme   if B33 > 4.781
 ```
 
-B36 is a European reference distribution label, not a causal anomaly claim.
+B36 is a European reference distribution label, not a causal anomaly claim. The
+cutoffs are **corpus-relative**: fixed quantiles of the full European
+candidate-pool distribution, baked into the compute script as constants.
 
 ## Final Counts
 
