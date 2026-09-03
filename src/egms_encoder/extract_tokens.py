@@ -30,9 +30,10 @@ import pandas as pd
 import torch
 
 
-# The encoder package (egms_encoder) is installed; the raw per-tile point store
-# lives in the separate EGMS encoder project, located via EGMS_ENCODER_HOME.
-from egms_qa.paths import ENCODER_HOME, ENCODER_CKPT, SPLIT_MANIFEST
+# The encoder package (egms_encoder) is installed. The checkpoint, split manifest,
+# data config and the raw tiles all ship with the release (see the data repo);
+# the split manifest's tile paths are relative, so run from the checkout root.
+from egms_qa.paths import ENCODER_CKPT, SPLIT_MANIFEST
 
 TILE_SIZE = 7000.0
 GRID = 8
@@ -43,7 +44,7 @@ def parse_args():
     p.add_argument("--checkpoint", default=str(ENCODER_CKPT))
     p.add_argument("--manifest", default=str(SPLIT_MANIFEST))
     p.add_argument("--data-config",
-                   default=str(ENCODER_HOME / "data/processed/v4/v4_data_config.json"))
+                   default=str(SPLIT_MANIFEST.parent / "data_config.json"))
     p.add_argument("--output-dir", default="outputs/tokens")
     p.add_argument("--grid", type=int, default=GRID)
     p.add_argument("--tile-size", type=float, default=TILE_SIZE)
