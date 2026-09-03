@@ -14,10 +14,11 @@ The 10k final table uses:
 `./data/encoder/manifest/split.parquet`
 
 The reference threshold is a corpus-relative value estimated from the full
-European candidate pool (not shipped; the derived threshold is already in the
-released c4 table). Only re-deriving it needs the encoder project:
-
-`../egms-encoder/data/processed/v4/v4_pool_candidates.parquet`
+European candidate pool (83,323 tiles). That pool is not shipped, but the derived
+threshold ships in `outputs/tasks/c4/c4_bin_level_reference_thresholds.json` and
+is already applied in the released C4 table, so the `final` step is
+self-contained. Only re-deriving the threshold (the `reference` step) needs the
+full pool.
 
 ## Reference Distribution
 

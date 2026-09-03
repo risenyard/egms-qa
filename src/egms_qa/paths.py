@@ -7,8 +7,6 @@ directory without editing source.
   EGMS_QA_ROOT       repository / working root (default: current directory)
   EGMS_QA_DATA       lightweight + downloaded heavy data   (default: <root>/data)
   EGMS_QA_OUTPUTS    generated artifacts (labels, QA, runs) (default: <root>/outputs)
-  EGMS_ENCODER_HOME  the EGMS encoder project; only needed to re-derive the C4
-                     corpus threshold from the full European pool (not shipped)
 
 Heavy artifacts (encoder checkpoint, token cache, QA records, adapters) are not
 in the git repository; download them from the data release and place them under
@@ -28,12 +26,6 @@ def _env_path(name: str, default: Path) -> Path:
 ROOT = _env_path("EGMS_QA_ROOT", Path.cwd())
 DATA_DIR = _env_path("EGMS_QA_DATA", ROOT / "data")
 OUTPUTS_DIR = _env_path("EGMS_QA_OUTPUTS", ROOT / "outputs")
-
-# The separate EGMS encoder project. Everything reproducible from the released
-# 10k tiles (token extraction, all task tables, encoder retraining) is
-# self-contained; this is only needed to re-derive the C4 corpus threshold from
-# the full European candidate pool, which is not shipped.
-ENCODER_HOME = _env_path("EGMS_ENCODER_HOME", ROOT.parent / "egms-encoder")
 
 # --- Encoder representation (heavy; from data release) ---
 ENCODER_CKPT = DATA_DIR / "encoder" / "checkpoint" / "encoder.pt"

@@ -82,7 +82,7 @@ hf download risenyard/egms-qa-dataset --repo-type dataset --local-dir .
 
 Run reproduction commands from the checkout root so the relative tile paths in the
 split manifest resolve. Paths are overridable via `EGMS_QA_ROOT`, `EGMS_QA_DATA`,
-`EGMS_QA_OUTPUTS`, `EGMS_ENCODER_HOME` (see [`src/egms_qa/paths.py`](src/egms_qa/paths.py)).
+`EGMS_QA_OUTPUTS` (see [`src/egms_qa/paths.py`](src/egms_qa/paths.py)).
 The raw tiles derive from the EGMS Level-3 product (© European Union, Copernicus
 Land Monitoring Service / EEA), redistributed under its free-and-open terms with
 attribution; see [`data/METADATA.md`](data/METADATA.md).
@@ -90,6 +90,9 @@ attribution; see [`data/METADATA.md`](data/METADATA.md).
 ## Reproduce
 
 ```bash
+# 0. (optional) retrain the frozen encoder from scratch on the released tiles
+python -m egms_encoder.train_tile_aware --output-dir outputs/encoder_pretrain
+
 # 1. tokens: either download the cache, or extract from the raw tile store
 python -m egms_encoder.extract_tokens --output-dir outputs/tokens
 

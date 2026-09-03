@@ -75,7 +75,7 @@ hf download risenyard/egms-qa-dataset --repo-type dataset --local-dir .
 ```
 
 复现命令请**从 checkout 根目录运行**,这样 split manifest 里的相对瓦片路径才能解析。
-路径均可通过 `EGMS_QA_ROOT`、`EGMS_QA_DATA`、`EGMS_QA_OUTPUTS`、`EGMS_ENCODER_HOME`
+路径均可通过 `EGMS_QA_ROOT`、`EGMS_QA_DATA`、`EGMS_QA_OUTPUTS`
 覆盖(见 [`src/egms_qa/paths.py`](src/egms_qa/paths.py))。原始瓦片源自 EGMS Level-3
 产品(© European Union, Copernicus / EEA),按其免费开放条款并署名后在此转发;见
 [`data/METADATA.md`](data/METADATA.md)。
@@ -83,6 +83,9 @@ hf download risenyard/egms-qa-dataset --repo-type dataset --local-dir .
 ## 复现
 
 ```bash
+# 0.(可选)在发布的瓦片上从零重训冻结编码器
+python -m egms_encoder.train_tile_aware --output-dir outputs/encoder_pretrain
+
 # 1. token:下载缓存,或从原始瓦片存储提取
 python -m egms_encoder.extract_tokens --output-dir outputs/tokens
 

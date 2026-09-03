@@ -24,10 +24,6 @@ import pandas as pd
 
 
 ROOT = Path(".")
-# Corpus-relative reference step only: the full European candidate pool is not
-# shipped (the derived threshold is baked into the released c4 table). Set
-# EGMS_ENCODER_HOME / this path to re-derive it.
-POOL_MANIFEST = Path("../egms-encoder/data/processed/v4/v4_pool_candidates.parquet")
 VQA_MANIFEST = ROOT / "data/encoder/manifest/split.parquet"
 OUT_DIR = ROOT / "outputs/tasks/c4"
 
@@ -335,7 +331,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     ref = sub.add_parser("reference")
-    ref.add_argument("--manifest", default=str(POOL_MANIFEST))
+    ref.add_argument("--manifest", required=True,
+                     help="Full European candidate-pool manifest (parquet). Not shipped; "
+                          "only needed to RE-derive the threshold. The released reference JSON "
+                          "(outputs/tasks/c4/c4_bin_level_reference_thresholds.json) already carries it.")
     ref.add_argument("--out-dir", default=str(OUT_DIR))
     ref.add_argument("--workers", type=int, default=int(os.environ.get("SLURM_CPUS_PER_TASK", "16")))
     ref.add_argument("--chunksize", type=int, default=32)

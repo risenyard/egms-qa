@@ -24,11 +24,12 @@ yielding 65 tokens (1 tile summary + 64 cells) with a validity mask.
 This directory vendors the encoder model and data code (`models/`, `data/`,
 `train_tile_aware.py`). Loading the checkpoint, extracting tokens, and
 **retraining the encoder from scratch** are all self-contained on the released
-data: the raw tiles (`data/tiles/`), split manifest, and normalization ship with
+data: the raw tiles (`data/tiles/`), split manifest and normalization ship with
 the dataset repo, and the encoder was trained on this 10k tile set's train split.
-`EGMS_ENCODER_HOME` is only needed to re-derive one corpus-relative threshold
-(family C4) from the full European candidate pool, which is not shipped; that
-threshold is already baked into the released C4 table.
+The release has no external dependency. (One family-C4 threshold is
+corpus-relative, derived from the full European candidate pool, but its value
+ships in the C4 reference JSON, so re-deriving it is optional and never required
+to reproduce the release.)
 
 ## Token extraction
 
