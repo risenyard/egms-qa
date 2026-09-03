@@ -22,10 +22,13 @@ pooling step assigns points to an 8×8 grid and mean-pools features per cell,
 yielding 65 tokens (1 tile summary + 64 cells) with a validity mask.
 
 This directory vendors the encoder model and data code (`models/`, `data/`,
-`train_tile_aware.py`) so the released checkpoint can be loaded and tokens can
-be extracted. Reproduction from raw tiles additionally needs the per-tile point
-store from the EGMS encoder project, located via `EGMS_ENCODER_HOME` (see
-`../egms_qa/paths.py`).
+`train_tile_aware.py`). Loading the checkpoint, extracting tokens, and
+**retraining the encoder from scratch** are all self-contained on the released
+data: the raw tiles (`data/tiles/`), split manifest, and normalization ship with
+the dataset repo, and the encoder was trained on this 10k tile set's train split.
+`EGMS_ENCODER_HOME` is only needed to re-derive one corpus-relative threshold
+(family C4) from the full European candidate pool, which is not shipped; that
+threshold is already baked into the released C4 table.
 
 ## Token extraction
 

@@ -11,7 +11,7 @@ A21 measures temporal masked reconstructability:
 For each tile:
 
 1. Load the EGMS encoder checkpoint from `data/encoder/checkpoint/encoder.pt`.
-2. Read V4 data directly from `../egms-encoder/data/processed/v4/v4_data_config.json`.
+2. Read the tile data config from `data/encoder/manifest/data_config.json`.
 3. Keep at most 4096 points per tile; oversized tiles use deterministic tile-id sampling.
 4. Mask the centered 30% synchronized temporal block:
 

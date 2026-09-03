@@ -154,6 +154,35 @@ class LazyTileStore:
             feature_columns_count=int(cfg["tile_field_layout"]["feature_columns_count"]),
         )
 
+    @classmethod
+    def from_manifest(cls, manifest_path: str | Path, data_config_path: str | Path | None = None) -> "LazyTileStore":
+        """Build from a released split manifest parquet.
+
+        The manifest has one row per tile with ``tile_id``, ``path`` (relative to
+        the checkout root), ``n_points``, centroids, and a ``split`` column. The
+        time window and tile-row layout are read from ``data_config.json`` when
+        given, else default to the released configuration (t=[8, 302), 294 steps).
+        """
+        manifest = pd.read_parquet(manifest_path)
+        t_start, t_end, feature_columns_count = 8, 302, 10
+        if data_config_path is not None and Path(data_config_path).exists():
+            with open(data_config_path) as f:
+                cfg = json.load(f)
+            t_start = int(cfg["time_window"]["t_start"])
+            t_end = int(cfg["time_window"]["t_end"])
+            feature_columns_count = int(cfg["tile_field_layout"]["feature_columns_count"])
+        split_assignments = None
+        if "split" in manifest.columns:
+            split_assignments = dict(
+                zip(manifest["tile_id"].astype(str), manifest["split"].astype(str))
+            )
+        return cls(
+            manifest=manifest,
+            time_window=TimeWindow(t_start=t_start, t_end=t_end),
+            split_assignments=split_assignments,
+            feature_columns_count=feature_columns_count,
+        )
+
     def get_tile(self, tile_index: int) -> np.ndarray:
         """Return ``[N, feature_columns_count + input_length]`` row matrix
         with the standard tile layout."""

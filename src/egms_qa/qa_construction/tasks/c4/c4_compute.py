@@ -24,6 +24,9 @@ import pandas as pd
 
 
 ROOT = Path(".")
+# Corpus-relative reference step only: the full European candidate pool is not
+# shipped (the derived threshold is baked into the released c4 table). Set
+# EGMS_ENCODER_HOME / this path to re-derive it.
 POOL_MANIFEST = Path("../egms-encoder/data/processed/v4/v4_pool_candidates.parquet")
 VQA_MANIFEST = ROOT / "data/encoder/manifest/split.parquet"
 OUT_DIR = ROOT / "outputs/tasks/c4"

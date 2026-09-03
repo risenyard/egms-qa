@@ -1,7 +1,7 @@
-"""Encoder pretraining entrypoint: self-supervised masked reconstruction of
-the all-Europe tile pool.
+"""Encoder pretraining entrypoint: self-supervised masked reconstruction of the released
+10k tile set (train split).
 
-Data loading uses LazyTileStore.from_config over per-tile npz files, with a
+Data loading uses LazyTileStore.from_manifest over per-tile npz files, with a
 precomputed train/val/test split and normalization. The input length is locked
 to the configured time window (default 294). See `TileEncoder` for the model.
 """
@@ -34,12 +34,14 @@ FEATURE_COLUMNS = ["easting", "northing", *STATIC_COLUMNS]
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Encoder masked-reconstruction pretraining (all-Europe tile pool).")
-    # Data config + precomputed split / normalization
-    p.add_argument("--v4-config", default="data/processed/v4/v4_data_config.json",
-                   help="Data config JSON (LazyTileStore + split + window).")
-    p.add_argument("--v4-normalization", default="data/processed/v4/v4_normalization.json",
-                   help="Precomputed normalization JSON (skip fit step).")
+    p = argparse.ArgumentParser(description="Encoder masked-reconstruction pretraining on the released 10k tile set.")
+    # Released tile data: split manifest + data config + normalization
+    p.add_argument("--manifest", default="data/encoder/manifest/split.parquet",
+                   help="Split manifest parquet (tile_id, path, split, ...).")
+    p.add_argument("--data-config", default="data/encoder/manifest/data_config.json",
+                   help="Data config JSON (time window + tile-row layout).")
+    p.add_argument("--normalization", default="data/encoder/checkpoint/normalization.json",
+                   help="Precomputed normalization JSON (mean/std/residual_std).")
     p.add_argument("--output-dir", default="outputs/encoder_pretrain")
     # Tile parameters
     p.add_argument("--tile-size", type=float, default=7000.0, help="Tile side length in metres")
@@ -156,7 +158,7 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load data via LazyTileStore
-    tile_store = LazyTileStore.from_config(args.v4_config)
+    tile_store = LazyTileStore.from_manifest(args.manifest, args.data_config)
     v4_input_length = tile_store.time_window.input_length
     if args.input_length is None:
         args.input_length = v4_input_length
@@ -177,13 +179,13 @@ def main() -> None:
     val_indices = tile_store.split_tile_indices("val")
     test_indices = tile_store.split_tile_indices("test")
     print(
-        f"tile split (precomputed from {args.v4_config}): "
+        f"tile split (precomputed from {args.manifest}): "
         f"train={len(train_indices)} val={len(val_indices)} test={len(test_indices)}",
         flush=True,
     )
 
     # Load precomputed normalization (skip the fit step)
-    with open(args.v4_normalization) as f:
+    with open(args.normalization) as f:
         normalizer = json.load(f)
     normalizer.pop("_meta", None)  # strip annotation block before passing into trainer
     with (output_dir / "normalization.json").open("w", encoding="utf-8") as f:

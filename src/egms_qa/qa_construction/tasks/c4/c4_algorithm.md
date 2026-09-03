@@ -13,7 +13,9 @@ The 10k final table uses:
 
 `./data/encoder/manifest/split.parquet`
 
-The reference threshold is estimated from the full V4 European candidate pool:
+The reference threshold is a corpus-relative value estimated from the full
+European candidate pool (not shipped; the derived threshold is already in the
+released c4 table). Only re-deriving it needs the encoder project:
 
 `../egms-encoder/data/processed/v4/v4_pool_candidates.parquet`
 
