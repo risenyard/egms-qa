@@ -35,8 +35,6 @@ from torch import nn
 from egms_encoder.data.lazy_tile_store import LazyTileStore
 from egms_encoder.data.tile_store import iter_tile_batches
 from egms_encoder.models.tile_encoder import TileEncoder
-from egms_encoder.models.tile_encoder_v2 import TileEncoderV2
-from egms_encoder.models.tile_encoder_v31 import TileEncoderV31
 
 STATIC_COLUMNS = [
     "height", "rmse", "mean_velocity", "mean_velocity_std",
@@ -391,39 +389,20 @@ def main() -> None:
 
 
 def build_model(args, normalizer):
-    """Construct the requested model version."""
-    if args.model_version in ("v3_1", "v3_3"):
-        residual_scale = float((normalizer or {}).get("residual_std", 1.0))
-        return TileEncoderV31(
-            input_length=args.input_length,
-            d_model=args.d_model,
-            patch_size=args.patch_size,
-            temporal_layers=args.temporal_layers,
-            temporal_heads=args.temporal_heads,
-            spatial_layers=args.num_layers,
-            spatial_heads=args.num_heads,
-            dropout=args.dropout,
-            residual_scale=residual_scale,
-            residual_head_mode=args.residual_head_mode,
-            coord_scale=getattr(args, "coord_scale", None),
-        )
-    if args.model_version in ("v2", "v3"):
-        return TileEncoderV2(
-            input_length=args.input_length,
-            d_model=args.d_model,
-            patch_size=args.patch_size,
-            temporal_layers=args.temporal_layers,
-            temporal_heads=args.temporal_heads,
-            spatial_layers=args.num_layers,
-            spatial_heads=args.num_heads,
-            dropout=args.dropout,
-        )
+    """Construct the EGMS tile encoder."""
+    residual_scale = float((normalizer or {}).get("residual_std", 1.0))
     return TileEncoder(
         input_length=args.input_length,
         d_model=args.d_model,
-        num_layers=args.num_layers,
-        num_heads=args.num_heads,
+        patch_size=args.patch_size,
+        temporal_layers=args.temporal_layers,
+        temporal_heads=args.temporal_heads,
+        spatial_layers=args.num_layers,
+        spatial_heads=args.num_heads,
         dropout=args.dropout,
+        residual_scale=residual_scale,
+        residual_head_mode=args.residual_head_mode,
+        coord_scale=getattr(args, "coord_scale", None),
     )
 
 

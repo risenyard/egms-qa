@@ -64,9 +64,9 @@ def angular_drift(cosine_value: float) -> float:
 def load_encoder(checkpoint_path: Path, device: torch.device):
     ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     train_args = ckpt["args"]
-    from egms_encoder.models.tile_encoder_v31 import TileEncoderV31
+    from egms_encoder.models.tile_encoder import TileEncoder
 
-    model = TileEncoderV31(
+    model = TileEncoder(
         input_length=train_args["input_length"],
         d_model=train_args["d_model"],
         patch_size=train_args.get("patch_size", 8),

@@ -61,7 +61,7 @@ def load_encoder(checkpoint_path: Path, device: torch.device):
     if train_args.get("model_version") != "v3_3":
         raise ValueError(f"unexpected model_version={train_args.get('model_version')}")
 
-    from egms_encoder.models.tile_encoder_v31 import TileEncoderV31
+    from egms_encoder.models.tile_encoder import TileEncoder
 
     # coord_scale is applied INSIDE the model's forward (coords / coord_scale
     # before the coord embedding). It MUST be reconstructed from the checkpoint
@@ -70,7 +70,7 @@ def load_encoder(checkpoint_path: Path, device: torch.device):
     # (backward compatible).
     coord_scale = train_args.get("coord_scale")
     print(f"[coord_scale] {coord_scale}", flush=True)
-    model = TileEncoderV31(
+    model = TileEncoder(
         input_length=train_args["input_length"],
         d_model=train_args["d_model"],
         patch_size=train_args.get("patch_size", 8),
