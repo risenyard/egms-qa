@@ -71,9 +71,7 @@ class D2TimeAxis:
             config = json.load(handle)
         try:
             raw = config["time_window"]
-            stored_steps = int(
-                raw["stored_steps"] if "stored_steps" in raw else raw["source_steps"]
-            )
+            stored_steps = int(raw["stored_steps"])
             axis = cls(
                 stored_steps=stored_steps,
                 t_start=int(raw["t_start"]),

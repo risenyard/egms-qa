@@ -53,14 +53,16 @@ class TimeWindow:
 
     @classmethod
     def from_config(cls, config: dict) -> "TimeWindow":
-        """Read and validate the stored-axis contract from ``data_config``."""
+        """Read and validate the stored-axis contract from ``data_config``.
+
+        ``stored_steps`` is required; the public release has no implicit or
+        compatibility time-axis fallback.
+        """
         try:
             raw = config["time_window"]
             t_start = int(raw["t_start"])
             t_end = int(raw["t_end"])
-            stored_steps = int(
-                raw["stored_steps"] if "stored_steps" in raw else raw["source_steps"]
-            )
+            stored_steps = int(raw["stored_steps"])
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError(
                 "data_config.json must define time_window.t_start, t_end, "

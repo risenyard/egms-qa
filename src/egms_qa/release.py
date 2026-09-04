@@ -127,7 +127,7 @@ def build_manifest(release_dir: Path, workers: int = 8) -> dict:
             "artifacts/representations": "frozen encoder token cache",
             "artifacts/labels": "canonical task labels",
             "artifacts/reference_tables": "deterministic per-family task tables",
-            "metadata": "provenance, split, audit, and integrity records",
+            "metadata": "current data contract, split, audit, and integrity records",
         },
         "components": component_stats,
         "file_extensions": dict(sorted(extension_counts.items())),
