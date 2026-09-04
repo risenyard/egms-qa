@@ -1,0 +1,4 @@
+interface:
+  display_name: "EGMS-QA Release"
+  short_description: "Safely prepare and publish EGMS-QA releases"
+  default_prompt: "Use $egms-qa-release to audit and prepare the current EGMS-QA release candidate without publishing it."
