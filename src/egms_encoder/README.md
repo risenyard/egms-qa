@@ -37,12 +37,13 @@ algorithm, so the larger pool is not required to reproduce EGMS-QA artifacts.
 
 ## Data support boundary
 
-The encoder accepts the EGMS-QA NPZ contract together with a split manifest,
-data config, and normalization file. It supports released-data reproduction and
-already prepared compatible tiles. It does not download official EGMS products,
-convert arbitrary EGMS ZIP/CSV releases, or infer the valid time window and
-normalization for a new reference period; those decisions require a separate
-empirical data audit before training.
+The public encoder code consumes the EGMS-QA NPZ tile contract together with a
+split manifest, data config, and normalization file. It supports reproducing
+the released encoder and training or inference on already prepared compatible
+tiles. It does not download official EGMS products, convert arbitrary EGMS
+ZIP/CSV releases, or infer a valid time window and normalization for another
+reference period. New product versions require a separate, empirically audited
+preparation step before this encoder entrypoint can be used.
 
 ## Token extraction
 

@@ -107,17 +107,27 @@ tracked in this Git repository; Hugging Face is the single source of truth.
 
 ## Supported data workflows
 
-This release supports reproducing the published pipeline on the released
-10,000-tile dataset, encoding new tiles that already follow the compatible
-EGMS-QA NPZ contract, and training on a user-prepared NPZ collection when a
-matching split manifest, data config, and train-fitted normalization are also
-provided.
+This release supports:
 
-It does not include official EGMS authentication/download, arbitrary EGMS
-ZIP/CSV conversion, or automatic time-axis alignment, missingness screening,
-window selection, spatial splitting, and normalization for another product
-version. Do not reuse `[8,302)` or the released normalization blindly for a
-different EGMS reference period.
+- reproducing encoder pretraining, token extraction, translator training, and
+  evaluation on the released 10,000-tile dataset;
+- encoding a new tile that already follows the documented EGMS-QA NPZ contract
+  and is compatible with the released 304-step source axis and `[8,302)` model
+  window;
+- training on a user-prepared NPZ tile collection when the user also supplies a
+  matching split manifest, data config, and train-fitted normalization file.
+
+This release does **not** include:
+
+- authentication or downloading from the official EGMS service;
+- conversion from arbitrary official EGMS ZIP/CSV products to EGMS-QA NPZ
+  tiles;
+- automatic time-axis alignment, missingness screening, window selection,
+  spatial splitting, or normalization for a new EGMS product version.
+
+Do not reuse the released `[8,302)` window or normalization blindly for another
+EGMS reference period. Those choices must be re-established from the new
+corpus before training.
 
 ## Reproduce
 

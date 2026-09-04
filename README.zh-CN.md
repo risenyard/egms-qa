@@ -98,13 +98,19 @@ Ortho Vertical 产品的修改与重打包衍生物(© European Union, Copernicu
 
 ## 数据支持范围
 
-当前 release 支持复现发布的 10,000-tile 流程、编码已经符合兼容 EGMS-QA NPZ 契约的
-新 tile,以及在用户同时提供匹配的 split manifest、data config 和仅由 train split
-拟合的 normalization 时训练自备 NPZ 数据集。
+当前 release 支持:
 
-当前不包含官方 EGMS 认证/下载、任意 EGMS ZIP/CSV 转换,也不自动为其他产品版本完成
-时间轴对齐、缺失率筛选、窗口选择、空间划分和 normalization。不同参考期不能直接照搬
-`[8,302)` 或发布版 normalization。
+- 在发布的 10,000-tile 数据集上复现 encoder 预训练、token 提取、translator 训练与评测;
+- 编码已经符合 EGMS-QA NPZ 契约,且与发布版 304 步源时间轴和 `[8,302)` 模型窗口兼容的新 tile;
+- 在用户自行准备的 NPZ tile 集合上训练,前提是用户同时提供匹配的 split manifest、data config 和仅由 train split 拟合的 normalization 文件。
+
+当前 release 不包含:
+
+- 官方 EGMS 服务的认证和下载;
+- 任意官方 EGMS ZIP/CSV 到 EGMS-QA NPZ tile 的转换;
+- 针对新 EGMS 产品版本的时间轴对齐、缺失率筛选、窗口选择、空间划分和 normalization 自动计算。
+
+不同 EGMS 参考期不能直接照搬发布版 `[8,302)` 窗口或 normalization;训练前必须根据新语料重新确定这些数据决策。
 
 ## 复现
 
