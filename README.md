@@ -30,7 +30,7 @@ tile (variable # points, 294-step histories)
    → 2-layer projector → prefix ; "Question: …\nAnswer:" → frozen host LLM + LoRA → answer
 ```
 
-![EGMS-QA method overview](docs/assets/egms_qa_method_overview.jpg)
+![EGMS-QA framework](docs/assets/egms-framework.png)
 
 ## The three blocks
 

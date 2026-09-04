@@ -29,7 +29,7 @@ token,再由一个宿主语言模型用自然语言回答监测类问题,并对�
    → 两层投影器 → 前缀 ; "Question: …\nAnswer:" → 冻结宿主 LLM + LoRA → 答案
 ```
 
-![EGMS-QA 方法概览](docs/assets/egms_qa_method_overview.jpg)
+![EGMS-QA 总体框架](docs/assets/egms-framework.png)
 
 ## 三个模块
 

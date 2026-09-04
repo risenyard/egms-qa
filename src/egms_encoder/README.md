@@ -6,6 +6,8 @@ The EGMS encoder maps a variable-size tile of persistent-scatterer displacement
 histories to a fixed 65-token representation used by the rest of EGMS-QA. It is a
 self-supervised spatio-temporal model:
 
+![EGMS Encoder framework](../../docs/assets/egms-encoder.png)
+
 - each point's 294-step history is normalized and split into 37 eight-step
   temporal patches; a temporal Transformer + mean pooling gives one temporal
   feature per point;
