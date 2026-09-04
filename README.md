@@ -28,7 +28,7 @@ plain language — with calibrated refusal for out-of-scope questions.
 
 ```
 tile (variable # points, 294-step histories)
-   → frozen EGMS encoder + 8×8 pooling → 65 × 256 tokens
+   → frozen EGMS Encoder 4.3 + 8×8 pooling → 65 × 256 EGMS tokens
    → 2-layer projector → prefix ; "Question: …\nAnswer:" → frozen host LLM + LoRA → answer
 ```
 
@@ -105,6 +105,20 @@ The `data/` and `outputs/` runtime paths are created locally by the release
 installer and model downloads. No release data or checkpoint metadata is
 tracked in this Git repository; Hugging Face is the single source of truth.
 
+## Supported data workflows
+
+This release supports reproducing the published pipeline on the released
+10,000-tile dataset, encoding new tiles that already follow the compatible
+EGMS-QA NPZ contract, and training on a user-prepared NPZ collection when a
+matching split manifest, data config, and train-fitted normalization are also
+provided.
+
+It does not include official EGMS authentication/download, arbitrary EGMS
+ZIP/CSV conversion, or automatic time-axis alignment, missingness screening,
+window selection, spatial splitting, and normalization for another product
+version. Do not reuse `[8,302)` or the released normalization blindly for a
+different EGMS reference period.
+
 ## Reproduce
 
 ```bash
@@ -120,14 +134,14 @@ python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 
 # 3. train and evaluate a host model
 python -m egms_qa.translator.train --host-model Qwen/Qwen3.5-9B \
-    --token-cache data/encoder/tokens/encoder_tokens_10k.pt --output-dir outputs/runs/qwen
+    --token-cache data/encoder/tokens/egms_tokens_10k.pt --output-dir outputs/runs/qwen
 python -m egms_qa.translator.evaluate --adapter-dir outputs/runs/qwen/best --split test
 
 # 4. combined four-model report
 python -m egms_qa.translator.summarize_results
 ```
 
-`pytest` runs the answer-extractor tests.
+`pytest` runs the data-contract, encoder, release, and answer-extractor tests.
 
 ## Licence
 

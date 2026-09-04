@@ -25,7 +25,7 @@ def iter_tile_batches(
     max_batches: int | None = None,
     max_points: int | None = None,
     feature_columns_count: int = 10,
-    input_length: int = 302,
+    input_length: int | None = None,
     point_sampling: str = "uniform",
     residual_sampling_alpha: float = 0.5,
 ) -> Iterable[dict]:
@@ -40,6 +40,15 @@ def iter_tile_batches(
     where B = tiles_per_batch and N_max = max points in this batch.
     max_points truncates tiles exceeding this size (for dense attention O(N^2)).
     """
+    if tiles_per_batch <= 0:
+        raise ValueError("tiles_per_batch must be positive")
+    if max_points is not None and max_points <= 0:
+        raise ValueError("max_points must be positive when provided")
+    if max_batches is not None and max_batches < 0:
+        raise ValueError("max_batches must be non-negative when provided")
+    if input_length is None:
+        input_length = store.time_window.input_length
+
     tile_indices = store.split_tile_indices(split)
     if tile_indices.size == 0:
         raise ValueError(f"No tiles available for split={split}")
@@ -97,7 +106,7 @@ def _build_tile_batch(
                         point_sampling=point_sampling,
                         residual_sampling_alpha=residual_sampling_alpha,
                     )
-                    idx.sort()  # preserve spatial ordering
+                    idx.sort()  # preserve the source-array order
                     subsampled.append(t[idx])
                 else:
                     subsampled.append(t[:max_points_cap])
@@ -115,6 +124,11 @@ def _build_tile_batch(
 
     for i, tile in enumerate(tiles_data):
         n = tile.shape[0]
+        required_columns = feature_columns_count + input_length
+        if tile.ndim != 2 or tile.shape[1] < required_columns:
+            raise ValueError(
+                f"tile must have at least {required_columns} columns, got {tile.shape}"
+            )
         # Columns: [easting, northing, static..., time_series...]
         series[i, :n, :] = tile[:, feature_columns_count : feature_columns_count + input_length]
         coords[i, :n, :] = tile[:, :2]
@@ -146,7 +160,9 @@ def sample_tile_points(
     if point_sampling != "residual_weighted":
         raise ValueError(f"Unknown point_sampling={point_sampling!r}")
 
-    alpha = float(np.clip(residual_sampling_alpha, 0.0, 1.0))
+    alpha = float(residual_sampling_alpha)
+    if not 0.0 <= alpha <= 1.0:
+        raise ValueError("residual_sampling_alpha must be in [0,1]")
     weighted_n = int(round(max_points * alpha))
     uniform_n = max_points - weighted_n
     series = tile[:, feature_columns_count : feature_columns_count + input_length]

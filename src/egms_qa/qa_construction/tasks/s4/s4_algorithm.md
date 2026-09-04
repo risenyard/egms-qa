@@ -23,7 +23,7 @@ Current tile tokens only:
 - `spatial_tokens[:, 1:65, :]`: the 64 patch tokens.
 - `token_mask[:, 1:65]`: valid patch-token mask.
 
-S4 does not use CLS, geographic neighbors, A/B/C/D labels, S11 anchors, or
+S4 does not use the tile-summary token, geographic neighbors, A/B/C/D labels, S11 anchors, or
 reference libraries.
 
 ## Interpretation Boundary

@@ -958,7 +958,7 @@ def main() -> None:
     if auxiliary_enabled:
         auxiliary_heads = NumericAuxiliaryHeads(llm_hidden, auxiliary_stats).to(device, torch.bfloat16)
 
-    cache = torch.load(args.token_cache, map_location="cpu", weights_only=False)
+    cache = torch.load(args.token_cache, map_location="cpu", weights_only=True)
     spatial = cache["spatial_tokens"].to(torch.float32)
     tok_mask = cache["token_mask"]
     tid2idx = {str(t): i for i, t in enumerate(cache["tile_ids"])}
@@ -967,7 +967,7 @@ def main() -> None:
 
     projector = EGMSProjector(egms_dim, llm_hidden, args.projector_dropout).to(device, torch.bfloat16)
     if args.warm_start_projector and args.warm_start_projector.lower() != "none":
-        ck = torch.load(args.warm_start_projector, map_location="cpu", weights_only=False)
+        ck = torch.load(args.warm_start_projector, map_location="cpu", weights_only=True)
         projector.load_state_dict(ck["projector_state"])
         print(f"warm-started projector from {args.warm_start_projector}", flush=True)
     else:

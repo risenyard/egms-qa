@@ -4,12 +4,12 @@ A11 asks one narrow question:
   Does the encoder's global tile representation drift under severe point loss?
 
 For each tile:
-  1. Use the cached full-tile CLS token as the reference.
+  1. Use the cached full-tile summary token as the reference.
   2. Keep a fixed severe fraction of points, by default 20%.
   3. Re-run the frozen encoder for several random seeds.
-  4. Compute angular drift between full CLS and subsampled CLS:
+  4. Compute angular drift between full and subsampled summary tokens:
 
-       drift = arccos(cosine(CLS_full, CLS_subsample)) / pi
+       drift = arccos(cosine(summary_full, summary_subsample)) / pi
 
 The tile-level target is the mean drift across seeds. Lower is more stable.
 No coverage, patch-token, scalar-probe, cluster, or manual threshold enters A11.
@@ -33,7 +33,7 @@ ENCODER_DATA = ROOT / "data/encoder"
 CKPT = ENCODER_DATA / "checkpoint/encoder.pt"
 MANIFEST = ENCODER_DATA / "manifest/split.parquet"
 DATA_CONFIG = ENCODER_DATA / "manifest/data_config.json"
-TOKEN_CACHE = ROOT / "data/encoder/tokens/encoder_tokens_10k.pt"
+TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
 
 FC = 10
 
@@ -60,40 +60,20 @@ def angular_drift(cosine_value: float) -> float:
     return float(np.arccos(np.clip(cosine_value, -1.0, 1.0)) / np.pi)
 
 
-def load_encoder(checkpoint_path: Path, device: torch.device):
-    ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    train_args = ckpt["args"]
-    from egms_encoder.models.tile_encoder import TileEncoder
+def load_encoder(checkpoint_path: Path, config_path: Path, device: torch.device):
+    from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
 
-    model = TileEncoder(
-        input_length=train_args["input_length"],
-        d_model=train_args["d_model"],
-        patch_size=train_args.get("patch_size", 8),
-        temporal_layers=train_args.get("temporal_layers", 2),
-        temporal_heads=train_args.get("temporal_heads", 4),
-        spatial_layers=train_args["num_layers"],
-        spatial_heads=train_args["num_heads"],
-        residual_head_mode=train_args.get("residual_head_mode", "additive"),
-        coord_scale=train_args.get("coord_scale"),
-    )
-    model.load_state_dict(ckpt["model"], strict=False)
-    model.eval().to(device)
-    norm = json.load(open(checkpoint_path.parent / "normalization.json"))
-    return model, train_args, float(norm["mean"]), float(norm["std"])
+    config_path = checkpoint_path.parent / "args.json"
+    model, config = load_encoder_checkpoint(checkpoint_path, config_path, device)
+    norm = load_normalization(checkpoint_path.parent / "normalization.json")
+    return model, config, float(norm["mean"]), float(norm["std"])
 
 
 def load_store(manifest_path: Path, data_config_path: Path):
-    from egms_encoder.data.tile_store import TileStore, TimeWindow
+    from egms_encoder.data.tile_store import TileStore
 
-    cfg = json.load(open(data_config_path))
-    tw = TimeWindow(t_start=cfg["time_window"]["t_start"], t_end=cfg["time_window"]["t_end"])
-    manifest = pd.read_parquet(manifest_path)
-    store = TileStore(
-        manifest=manifest,
-        time_window=tw,
-        split_assignments=dict(zip(manifest["tile_id"].astype(str), manifest["split"].astype(str))),
-    )
-    return store, manifest, tw
+    store = TileStore.from_manifest(manifest_path, data_config_path)
+    return store, store.manifest, store.time_window
 
 
 def choose_tiles(token_cache: dict, n: int, seed: int) -> list[str]:
@@ -135,6 +115,7 @@ def metric_summary(values: np.ndarray) -> dict[str, float]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--checkpoint", default=str(CKPT))
+    ap.add_argument("--encoder-config", default=str(CKPT.parent / "args.json"))
     ap.add_argument("--manifest", default=str(MANIFEST))
     ap.add_argument("--data-config", default=str(DATA_CONFIG))
     ap.add_argument("--token-cache", default=str(TOKEN_CACHE))
@@ -158,7 +139,7 @@ def main() -> None:
         device = torch.device(args.device if args.device != "cuda:0" or torch.cuda.is_available() else "cpu")
     print(f"[device] {device}", flush=True)
 
-    token_cache = torch.load(args.token_cache, map_location="cpu", weights_only=False)
+    token_cache = torch.load(args.token_cache, map_location="cpu", weights_only=True)
     token_metadata = token_cache.get("metadata", {})
     full_tokens = token_cache["spatial_tokens"].numpy().astype(np.float64)
     tile_ids = [str(t) for t in token_cache["tile_ids"]]
@@ -170,8 +151,10 @@ def main() -> None:
     chosen = shard_items(all_chosen, args.shard_index, args.num_shards)
     manifest_idx = {str(t): i for i, t in enumerate(manifest["tile_id"].astype(str))}
 
-    model, train_args, norm_mean, norm_std = load_encoder(Path(args.checkpoint), device)
-    input_length = int(train_args["input_length"])
+    model, encoder_config, norm_mean, norm_std = load_encoder(
+        Path(args.checkpoint), Path(args.encoder_config), device
+    )
+    input_length = int(encoder_config["architecture"]["input_length"])
     if tw.input_length != input_length:
         raise ValueError(f"time window length {tw.input_length} != checkpoint input_length {input_length}")
 
@@ -188,7 +171,7 @@ def main() -> None:
             series = td[:, FC:FC + input_length].copy()
             n_pts = int(series.shape[0])
             full_center = coords.mean(0, keepdims=True)
-            ref_cls = full_tokens[ci, 0]
+            reference_summary = full_tokens[ci, 0]
 
             k = max(8, int(round(n_pts * args.subsample_frac)))
             for seed in seeds:
@@ -204,9 +187,9 @@ def main() -> None:
                 pmask = torch.ones(1, series_sub.shape[0], dtype=torch.bool, device=device)
                 out = model(series_t, coords=coords_t, point_mask=pmask)
                 emb = out["embedding"].squeeze(0).float().cpu().numpy()
-                sub_cls = emb.mean(axis=0)
-                cls_cos = cosine(ref_cls, sub_cls)
-                drift = angular_drift(cls_cos)
+                subsampled_summary = emb.mean(axis=0)
+                summary_cosine = cosine(reference_summary, subsampled_summary)
+                drift = angular_drift(summary_cosine)
                 rows.append({
                     "tile_id": tile_id,
                     "split": splits[ci],
@@ -214,7 +197,7 @@ def main() -> None:
                     "subsample_frac": float(args.subsample_frac),
                     "seed": int(seed),
                     "n_subsample_points": int(len(idx)),
-                    "cls_cosine": cls_cos,
+                    "summary_cosine": summary_cosine,
                     "A11_global_angular_drift": drift,
                     "A11_global_stability": float(1.0 - drift) if np.isfinite(drift) else float("nan"),
                 })
@@ -229,8 +212,8 @@ def main() -> None:
     tile = (
         obs.groupby(["tile_id", "split", "n_points"], as_index=False)
         .agg(
-            cls_cosine_mean=("cls_cosine", "mean"),
-            cls_cosine_min=("cls_cosine", "min"),
+            summary_cosine_mean=("summary_cosine", "mean"),
+            summary_cosine_min=("summary_cosine", "min"),
             A11_global_angular_drift=("A11_global_angular_drift", "mean"),
             A11_global_angular_drift_p50=("A11_global_angular_drift", "median"),
             A11_global_angular_drift_max=("A11_global_angular_drift", "max"),
@@ -245,7 +228,7 @@ def main() -> None:
         "method": "severe global representation instability under point subsampling",
         "target": "A11_global_angular_drift",
         "target_type": "continuous_regression",
-        "target_definition": "mean over seeds of arccos(cosine(CLS_full, CLS_20pct_subsample)) / pi; lower is more stable.",
+        "target_definition": "mean over seeds of arccos(cosine(summary_full, summary_20pct_subsample)) / pi; lower is more stable.",
         "sample_tiles_total": int(len(all_chosen)),
         "sample_tiles_this_shard": int(len(chosen)),
         "num_shards": int(args.num_shards),
@@ -254,12 +237,12 @@ def main() -> None:
         "seeds": seeds,
         "checkpoint": str(Path(args.checkpoint).resolve()),
         "token_cache": str(Path(args.token_cache).resolve()),
-        "token_cache_checkpoint": token_metadata.get("encoder_checkpoint"),
-        "coord_scale": train_args.get("coord_scale"),
+        "token_cache_checkpoint_sha256": token_metadata.get("input_sha256", {}).get("checkpoint"),
+        "coord_scale": encoder_config["architecture"]["coord_scale_m"],
         "metric_diagnostics": {
             "A11_global_angular_drift": metric_summary(tile["A11_global_angular_drift"].to_numpy(dtype=float)),
             "A11_global_stability": metric_summary(tile["A11_global_stability"].to_numpy(dtype=float)),
-            "cls_cosine_mean": metric_summary(tile["cls_cosine_mean"].to_numpy(dtype=float)),
+            "summary_cosine_mean": metric_summary(tile["summary_cosine_mean"].to_numpy(dtype=float)),
         },
         "outputs": {
             "observations": str(obs_path),

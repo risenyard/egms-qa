@@ -1,11 +1,11 @@
-"""EGMS-QA token extraction with the EGMS encoder on Europe-wide 10k tiles.
+"""Extract EGMS tokens from the released 10,000-tile dataset.
 
-Applies the frozen encoder and ViT-style 65-token pooling (CLS + 8x8 spatial
-bins) over the per-tile point histories in the TileStore.
+Applies the frozen encoder and 65-token pooling (one tile summary plus an 8x8
+spatial grid) over the per-tile point histories in the TileStore.
 
 Output
 ------
-outputs/tokens/encoder_tokens_10k.pt
+outputs/tokens/egms_tokens_10k.pt
   - spatial_tokens [T, 65, 256] float32
   - token_mask [T, 65] bool
   - tile_indices [T] int32 (index into manifest)
@@ -19,112 +19,105 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import time
 from pathlib import Path
+from typing import Any
 
 import numpy as np
-import pandas as pd
 import torch
 
+from egms_encoder import __version__
+from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
+from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT, TileStore
 
-# The encoder package (egms_encoder) is installed. The checkpoint, split manifest,
-# data config and processed source tiles all ship with the release (see the data repo);
-# the split manifest's tile paths are relative, so run from the checkout root.
-from egms_qa.paths import ENCODER_CKPT, SPLIT_MANIFEST
-
-TILE_SIZE = 7000.0
-GRID = 8
+DEFAULT_CHECKPOINT = Path("data/encoder/checkpoint/encoder.pt")
+DEFAULT_ENCODER_CONFIG = Path("data/encoder/checkpoint/args.json")
+DEFAULT_MANIFEST = Path("data/encoder/manifest/split.parquet")
+DEFAULT_DATA_CONFIG = Path("data/encoder/manifest/data_config.json")
+DEFAULT_GRID_SIZE = 8
 
 
-def parse_args():
-    p = argparse.ArgumentParser()
-    p.add_argument("--checkpoint", default=str(ENCODER_CKPT))
-    p.add_argument("--manifest", default=str(SPLIT_MANIFEST))
-    p.add_argument("--data-config",
-                   default=str(SPLIT_MANIFEST.parent / "data_config.json"))
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Run EGMS Encoder 4.3 over the released 10k tiles and export EGMS tokens."
+    )
+    p.add_argument("--checkpoint", default=str(DEFAULT_CHECKPOINT))
+    p.add_argument("--encoder-config", default=str(DEFAULT_ENCODER_CONFIG))
+    p.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
+    p.add_argument("--data-config", default=str(DEFAULT_DATA_CONFIG))
     p.add_argument("--output-dir", default="outputs/tokens")
-    p.add_argument("--grid", type=int, default=GRID)
-    p.add_argument("--tile-size", type=float, default=TILE_SIZE)
+    p.add_argument("--output-name", default="")
+    p.add_argument("--grid-size", type=int, default=DEFAULT_GRID_SIZE)
+    p.add_argument("--tile-size", type=float, default=None)
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--max-tiles", type=int, default=None)
     p.add_argument("--log-every", type=int, default=500)
-    return p.parse_args()
+    return p.parse_args(argv)
 
 
-def load_encoder(checkpoint_path: Path, device: torch.device):
-    print(f"[load] {checkpoint_path}", flush=True)
-    ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    train_args = ckpt["args"]
-
-    from egms_encoder.models.tile_encoder import TileEncoder
-
-    # coord_scale is applied INSIDE the model's forward (coords / coord_scale
-    # before the coord embedding), so it must match the value the checkpoint was
-    # trained with (recorded in its args); otherwise the coordinate branch sees
-    # raw-scale coords and produces garbage tokens.
-    coord_scale = train_args.get("coord_scale")
-    print(f"[coord_scale] {coord_scale}", flush=True)
-    model = TileEncoder(
-        input_length=train_args["input_length"],
-        d_model=train_args["d_model"],
-        patch_size=train_args.get("patch_size", 8),
-        temporal_layers=train_args.get("temporal_layers", 2),
-        temporal_heads=train_args.get("temporal_heads", 4),
-        spatial_layers=train_args["num_layers"],
-        spatial_heads=train_args["num_heads"],
-        residual_head_mode=train_args.get("residual_head_mode", "additive"),
-        coord_scale=coord_scale,
-    )
-    missing, unexpected = model.load_state_dict(ckpt["model"], strict=False)
-    if unexpected:
-        print(f"  unexpected: {unexpected[:5]}", flush=True)
-    if missing:
-        print(f"  missing: {missing[:5]}", flush=True)
-    model.eval().to(device)
-    return model, train_args
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
-def load_tile_store(manifest_path: Path, data_config_path: Path):
-    from egms_encoder.data.tile_store import TileStore, TimeWindow
-
-    with open(data_config_path) as f:
-        cfg = json.load(f)
-    tw = TimeWindow(t_start=cfg["time_window"]["t_start"],
-                      t_end=cfg["time_window"]["t_end"])
+def load_tile_store(manifest_path: Path, data_config_path: Path) -> tuple[TileStore, Any]:
     print(f"[manifest] reading {manifest_path}", flush=True)
-    manifest = pd.read_parquet(manifest_path)
-    split_assignments = dict(zip(manifest["tile_id"].astype(str),
-                                 manifest["split"].astype(str)))
-    store = TileStore(
-        manifest=manifest,
-        time_window=tw,
-        split_assignments=split_assignments,
+    store = TileStore.from_manifest(manifest_path, data_config_path)
+    print(
+        f"[manifest] {store.num_tiles} tiles, input_length={store.time_window.input_length}",
+        flush=True,
     )
-    print(f"[manifest] {store.num_tiles} tiles, input_length={tw.input_length}", flush=True)
-    return store, tw, manifest
+    return store, store.manifest
 
 
-def pool_to_vit_tokens(embedding, coords_centered, grid, tile_size):
+def pool_to_spatial_tokens(
+    embedding: np.ndarray,
+    centered_coords: np.ndarray,
+    grid_size: int,
+    tile_size: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    if embedding.ndim != 2 or embedding.shape[0] == 0:
+        raise ValueError(f"embedding must have shape [N,D] with N>0, got {embedding.shape}")
+    if centered_coords.shape != (embedding.shape[0], 2):
+        raise ValueError(
+            f"centered_coords must have shape [{embedding.shape[0]},2], "
+            f"got {centered_coords.shape}"
+        )
+    if grid_size <= 0 or tile_size <= 0:
+        raise ValueError("grid_size and tile_size must be positive")
     d = embedding.shape[1]
-    n_tok = grid * grid + 1
+    n_tok = grid_size * grid_size + 1
     tokens = np.zeros((n_tok, d), dtype=np.float32)
     mask = np.zeros(n_tok, dtype=bool)
     tokens[0] = embedding.mean(axis=0)
     mask[0] = True
     half = tile_size * 0.5
-    bx = np.clip(np.floor((coords_centered[:, 0] + half) / tile_size * grid).astype(np.int64), 0, grid - 1)
-    by = np.clip(np.floor((coords_centered[:, 1] + half) / tile_size * grid).astype(np.int64), 0, grid - 1)
-    bidx = by * grid + bx
-    for b in range(grid * grid):
+    bx = np.clip(
+        np.floor((centered_coords[:, 0] + half) / tile_size * grid_size).astype(np.int64),
+        0,
+        grid_size - 1,
+    )
+    by = np.clip(
+        np.floor((centered_coords[:, 1] + half) / tile_size * grid_size).astype(np.int64),
+        0,
+        grid_size - 1,
+    )
+    bidx = by * grid_size + bx
+    counts = np.bincount(bidx, minlength=grid_size * grid_size).astype(np.int32)
+    for b in range(grid_size * grid_size):
         sel = bidx == b
         if sel.any():
             tokens[1 + b] = embedding[sel].mean(axis=0)
             mask[1 + b] = True
-    return tokens, mask
+    return tokens, mask, counts
 
 
-def main():
+def main() -> None:
     args = parse_args()
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     if str(device) == "cpu":
@@ -134,26 +127,47 @@ def main():
 
     ckpt_path = Path(args.checkpoint)
     norm_path = ckpt_path.parent / "normalization.json"
-    with open(norm_path) as f:
-        norm = json.load(f)
-    norm_mean = float(norm["mean"]); norm_std = float(norm["std"])
+    norm = load_normalization(norm_path)
+    norm_mean = float(norm["mean"])
+    norm_std = float(norm["std"])
     print(f"[norm] mean={norm_mean:.4f} std={norm_std:.4f}", flush=True)
 
-    model, train_args = load_encoder(ckpt_path, device)
-    print(f"[encoder] d_model={train_args['d_model']}, "
-          f"layers={train_args['num_layers']}, heads={train_args['num_heads']}", flush=True)
-    input_length = train_args["input_length"]
-    fc = 10  # FEATURE_COLUMNS_COUNT in TileStore
+    encoder_config_path = Path(args.encoder_config)
+    print(f"[load] {ckpt_path}", flush=True)
+    model, encoder_config = load_encoder_checkpoint(
+        ckpt_path, encoder_config_path, device
+    )
+    architecture = encoder_config["architecture"]
+    print(
+        f"[encoder] d_model={architecture['d_model']}, "
+        f"layers={architecture['spatial_layers']}, heads={architecture['spatial_heads']}",
+        flush=True,
+    )
+    input_length = int(architecture["input_length"])
+    tile_size = float(args.tile_size or encoder_config["data"]["tile_size_m"])
+    if tile_size <= 0:
+        raise ValueError("--tile-size must be positive")
 
-    store, tw, manifest = load_tile_store(Path(args.manifest), Path(args.data_config))
-    if tw.input_length != input_length:
-        raise ValueError(f"time_window len {tw.input_length} != checkpoint input_length {input_length}")
+    manifest_path = Path(args.manifest)
+    data_config_path = Path(args.data_config)
+    store, manifest = load_tile_store(manifest_path, data_config_path)
+    time_window = store.time_window
+    if time_window.input_length != input_length:
+        raise ValueError(
+            f"time_window length {time_window.input_length} != encoder input_length {input_length}"
+        )
 
     n_total = store.num_tiles
     n_tiles = n_total if args.max_tiles is None else min(n_total, args.max_tiles)
-    n_patch = args.grid * args.grid
+    if n_tiles <= 0:
+        raise ValueError("--max-tiles must select at least one tile")
+    if args.grid_size <= 0:
+        raise ValueError("--grid-size must be positive")
+    if args.log_every <= 0:
+        raise ValueError("--log-every must be positive")
+    n_patch = args.grid_size * args.grid_size
     n_tok = n_patch + 1
-    d_model = int(train_args["d_model"])
+    d_model = int(architecture["d_model"])
 
     spatial_tokens = np.zeros((n_tiles, n_tok, d_model), dtype=np.float32)
     token_mask = np.zeros((n_tiles, n_tok), dtype=bool)
@@ -168,40 +182,40 @@ def main():
     t0 = time.monotonic()
     with torch.no_grad(), torch.amp.autocast(autocast_device, dtype=torch.bfloat16,
                                               enabled=autocast_enabled):
-        for ti in range(n_tiles):
-            td = store.get_tile(ti)
-            n_pts = td.shape[0]
-            n_points_per_tile[ti] = n_pts
+        for tile_index in range(n_tiles):
+            tile_data = store.get_tile(tile_index)
+            n_pts = tile_data.shape[0]
+            n_points_per_tile[tile_index] = n_pts
 
-            coords_np = td[:, :2].copy()
-            series_np = td[:, fc:fc + input_length].copy()
+            coords_np = tile_data[:, :2].copy()
+            series_np = tile_data[
+                :, FEATURE_COLUMNS_COUNT : FEATURE_COLUMNS_COUNT + input_length
+            ].copy()
 
             series_np = (series_np - norm_mean) / norm_std
             series_np = np.nan_to_num(series_np, nan=0.0, posinf=0.0, neginf=0.0)
             center = coords_np.mean(axis=0, keepdims=True)
-            cc = (coords_np - center).astype(np.float32)
+            centered_coords = (coords_np - center).astype(np.float32)
 
             series_t = torch.from_numpy(series_np).unsqueeze(0).to(device)
-            coords_t = torch.from_numpy(cc).unsqueeze(0).to(device)
+            coords_t = torch.from_numpy(centered_coords).unsqueeze(0).to(device)
             pmask_t = torch.ones(1, n_pts, dtype=torch.bool, device=device)
 
             out = model(series_t, coords=coords_t, point_mask=pmask_t)
             emb = out["embedding"].squeeze(0).float().cpu().numpy()
 
-            tokens, mask = pool_to_vit_tokens(emb, cc, args.grid, args.tile_size)
-            spatial_tokens[ti] = tokens
-            token_mask[ti] = mask
+            tokens, mask, counts = pool_to_spatial_tokens(
+                emb, centered_coords, args.grid_size, tile_size
+            )
+            spatial_tokens[tile_index] = tokens
+            token_mask[tile_index] = mask
+            point_count_per_bin[tile_index] = counts
 
-            half = args.tile_size * 0.5
-            bx = np.clip(np.floor((cc[:, 0] + half) / args.tile_size * args.grid).astype(np.int64), 0, args.grid - 1)
-            by = np.clip(np.floor((cc[:, 1] + half) / args.tile_size * args.grid).astype(np.int64), 0, args.grid - 1)
-            np.add.at(point_count_per_bin[ti], by * args.grid + bx, 1)
-
-            if (ti + 1) % args.log_every == 0 or ti == n_tiles - 1:
+            if (tile_index + 1) % args.log_every == 0 or tile_index == n_tiles - 1:
                 elapsed = time.monotonic() - t0
-                rate = (ti + 1) / elapsed
-                eta = (n_tiles - ti - 1) / max(rate, 1e-6)
-                print(f"  {ti+1}/{n_tiles}  elapsed={elapsed:.1f}s  "
+                rate = (tile_index + 1) / elapsed
+                eta = (n_tiles - tile_index - 1) / max(rate, 1e-6)
+                print(f"  {tile_index+1}/{n_tiles}  elapsed={elapsed:.1f}s  "
                       f"rate={rate:.2f} tiles/s  eta={eta:.0f}s", flush=True)
 
     occ = (point_count_per_bin > 0).mean(axis=1)
@@ -209,31 +223,48 @@ def main():
     print(f"n_points mean={n_points_per_tile.mean():.1f}  "
           f"min={n_points_per_tile.min()}  max={n_points_per_tile.max()}", flush=True)
 
-    out_pt = out_dir / "encoder_tokens.pt"
+    output_name = args.output_name or (
+        "egms_tokens_10k.pt" if n_tiles == 10_000 else f"egms_tokens_{n_tiles}.pt"
+    )
+    out_pt = out_dir / output_name
     metadata = {
-        "encoder_checkpoint": str(ckpt_path.resolve()),
-        "coord_scale": train_args.get("coord_scale"),
-        "encoder_args": dict(train_args),
-        "manifest_path": str(Path(args.manifest).resolve()),
-        "data_config_path": str(Path(args.data_config).resolve()),
+        "schema_version": "egms-tokens-1.0",
+        "encoder_release": "EGMS Encoder 4.3",
+        "code_version": __version__,
+        "source_repositories": {
+            "encoder": "risenyard/egms-qa-encoder",
+            "tiles": "risenyard/egms-qa-dataset/artifacts/source_tiles",
+        },
+        "input_sha256": {
+            "checkpoint": _sha256(ckpt_path),
+            "encoder_config": _sha256(encoder_config_path),
+            "normalization": _sha256(norm_path),
+            "manifest": _sha256(manifest_path),
+            "data_config": _sha256(data_config_path),
+        },
+        "encoder_config": encoder_config,
         "normalizer_mean": norm_mean,
         "normalizer_std": norm_std,
-        "tile_size": float(args.tile_size),
-        "grid_size": int(args.grid),
+        "tile_size_m": tile_size,
+        "grid_size": int(args.grid_size),
         "n_tokens": int(n_tok),
         "n_tiles": int(n_tiles),
         "d_model": int(d_model),
         "input_length": int(input_length),
-        "time_window_start": int(tw.t_start),
-        "time_window_end": int(tw.t_end),
-        "token_layout": f"index 0 = CLS, 1..{n_patch} = {args.grid}x{args.grid} bins row-major",
-        "extraction_script": str(Path(__file__).resolve()),
-        "extraction_date_utc": dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "time_window_start": int(time_window.t_start),
+        "time_window_end": int(time_window.t_end),
+        "token_layout": (
+            f"index 0 = tile summary; 1..{n_patch} = "
+            f"{args.grid_size}x{args.grid_size} spatial cells in row-major order"
+        ),
+        "extraction_module": "egms_encoder.extract_tokens",
+        "extraction_date_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "bin_occupancy_mean": float(occ.mean()),
         "bin_occupancy_median": float(np.median(occ)),
         "n_points_per_tile_mean": float(n_points_per_tile.mean()),
         "n_points_per_tile_min": int(n_points_per_tile.min()),
         "n_points_per_tile_max": int(n_points_per_tile.max()),
+        "output_file": output_name,
     }
     torch.save({
         "spatial_tokens": torch.from_numpy(spatial_tokens),
@@ -245,7 +276,8 @@ def main():
         "n_points_per_tile": torch.from_numpy(n_points_per_tile),
         "metadata": metadata,
     }, out_pt)
-    with open(out_dir / "extraction_metadata.json", "w") as f:
+    metadata_name = f"{Path(output_name).stem}_metadata.json"
+    with open(out_dir / metadata_name, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, default=str)
     print(f"\nwrote {out_pt}", flush=True)
 

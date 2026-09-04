@@ -29,7 +29,7 @@ OUTPUTS_DIR = _env_path("EGMS_QA_OUTPUTS", ROOT / "outputs")
 
 # --- Encoder representation (heavy; from data release) ---
 ENCODER_CKPT = DATA_DIR / "encoder" / "checkpoint" / "encoder.pt"
-ENCODER_TOKENS = DATA_DIR / "encoder" / "tokens" / "encoder_tokens_10k.pt"
+ENCODER_TOKENS = DATA_DIR / "encoder" / "tokens" / "egms_tokens_10k.pt"
 SPLIT_MANIFEST = DATA_DIR / "encoder" / "manifest" / "split.parquet"
 
 # --- Task reference values and QA records (generated / from data release) ---

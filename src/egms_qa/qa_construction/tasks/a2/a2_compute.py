@@ -11,7 +11,6 @@ import hashlib
 import json
 import time
 from pathlib import Path
-from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -25,8 +24,8 @@ CKPT = ENCODER_DATA / "checkpoint/encoder.pt"
 MANIFEST = ENCODER_DATA / "manifest/split.parquet"
 DATA_CONFIG = ENCODER_DATA / "manifest/data_config.json"
 
-from egms_encoder.data.tile_store import TileStore  # noqa: E402
-from egms_encoder.pretrain import FEATURE_COLUMNS, build_model  # noqa: E402
+from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization  # noqa: E402
+from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT, TileStore  # noqa: E402
 
 
 def stable_seed(text: str) -> int:
@@ -69,6 +68,7 @@ def summarize(values: np.ndarray) -> dict[str, float]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--checkpoint", default=str(CKPT))
+    ap.add_argument("--encoder-config", default=str(CKPT.parent / "args.json"))
     ap.add_argument("--manifest", default=str(MANIFEST))
     ap.add_argument("--data-config", default=str(DATA_CONFIG))
     ap.add_argument("--out-dir", default="outputs/tasks/a2/work")
@@ -88,25 +88,22 @@ def main() -> None:
     print(f"[device] {device}", flush=True)
 
     ckpt_path = Path(args.checkpoint)
-    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-    train_args = SimpleNamespace(**ckpt["args"])
-    norm = json.load(open(ckpt_path.parent / "normalization.json"))
+    model, encoder_config = load_encoder_checkpoint(
+        ckpt_path, Path(args.encoder_config), device
+    )
+    norm = load_normalization(ckpt_path.parent / "normalization.json")
     norm_mean = float(norm["mean"])
     norm_std = float(norm["std"])
     residual_std = float(norm.get("residual_std", 1.0))
 
-    model = build_model(train_args, norm)
-    model.load_state_dict(ckpt["model"])
-    model.to(device).eval()
-
     store = TileStore.from_manifest(args.manifest, args.data_config)
     input_length = int(store.time_window.input_length)
-    max_points = int(getattr(train_args, "max_tile_points", 4096))
-    mask_ratio = float(getattr(train_args, "eval_mask_ratio", getattr(train_args, "mask_ratio", 0.3)))
+    max_points = int(encoder_config["data"]["maximum_points_per_tile"])
+    mask_ratio = float(encoder_config["masking"]["evaluation_ratio"])
     block_len = max(1, int(round(input_length * mask_ratio)))
     mask_start = (input_length - block_len) // 2
     mask_end = mask_start + block_len
-    fc = len(FEATURE_COLUMNS)
+    feature_columns_count = FEATURE_COLUMNS_COUNT
 
     all_indices = np.arange(store.num_tiles, dtype=np.int64)[: args.sample_tiles]
     indices = shard_items(all_indices, args.shard_index, args.num_shards)
@@ -134,7 +131,7 @@ def main() -> None:
             else:
                 sub = tile
 
-            series = sub[:, fc:fc + input_length].copy()
+            series = sub[:, feature_columns_count:feature_columns_count + input_length].copy()
             finite = np.isfinite(series)
             norm_series = np.nan_to_num(
                 (series - norm_mean) / norm_std,

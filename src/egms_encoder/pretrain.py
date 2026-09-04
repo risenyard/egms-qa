@@ -21,6 +21,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from egms_encoder.checkpoint import load_encoder_config, load_normalization
 from egms_encoder.data.tile_batching import iter_tile_batches
 from egms_encoder.data.tile_store import TileStore
 from egms_encoder.models.tile_encoder import TileEncoder
@@ -30,11 +31,19 @@ STATIC_COLUMNS = [
     "acceleration", "acceleration_std", "seasonality", "seasonality_std",
 ]
 FEATURE_COLUMNS = ["easting", "northing", *STATIC_COLUMNS]
+DEFAULT_ENCODER_CONFIG = "data/encoder/checkpoint/args.json"
 
 
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Encoder masked-reconstruction pretraining on the released 10k tile set.")
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="EGMS Encoder 4.3 masked-reconstruction pretraining on the released 10k tiles."
+    )
     # Released tile data: split manifest + data config + normalization
+    p.add_argument(
+        "--encoder-config",
+        default=DEFAULT_ENCODER_CONFIG,
+        help="Encoder 4.3 configuration downloaded from the HF encoder repository.",
+    )
     p.add_argument("--manifest", default="data/encoder/manifest/split.parquet",
                    help="Split manifest parquet (tile_id, path, split, ...).")
     p.add_argument("--data-config", default="data/encoder/manifest/data_config.json",
@@ -43,76 +52,158 @@ def parse_args() -> argparse.Namespace:
                    help="Precomputed normalization JSON (mean/std/residual_std).")
     p.add_argument("--output-dir", default="outputs/encoder_pretrain")
     # Tile parameters
-    p.add_argument("--tile-size", type=float, default=7000.0, help="Tile side length in metres")
-    p.add_argument("--min-tile-points", type=int, default=200, help="Discard tiles with fewer points")
-    p.add_argument("--max-tile-points", type=int, default=2048, help="Truncate tiles larger than this (dense attention is O(N^2))")
-    p.add_argument("--tiles-per-batch", type=int, default=16, help="Number of tiles per GPU batch")
+    p.add_argument(
+        "--max-tile-points",
+        type=int,
+        default=None,
+        help="Maximum points sampled from a tile; dense attention is O(N^2).",
+    )
+    p.add_argument(
+        "--tiles-per-batch",
+        type=int,
+        default=None,
+        help="Number of tiles per GPU batch.",
+    )
     # Model parameters
-    p.add_argument("--d-model", type=int, default=256)
-    p.add_argument("--num-layers", type=int, default=6)
-    p.add_argument("--num-heads", type=int, default=8)
-    p.add_argument("--dropout", type=float, default=0.1)
+    p.add_argument("--d-model", type=int, default=None)
+    p.add_argument("--num-layers", type=int, default=None)
+    p.add_argument("--num-heads", type=int, default=None)
+    p.add_argument("--dropout", type=float, default=None)
     p.add_argument("--input-length", type=int, default=None,
-                   help="Number of time steps to use; defaults to all metadata time columns")
+                   help="Number of time steps; defaults to the configured [8,302) window.")
     # Masking
-    p.add_argument("--mask-ratio", type=float, default=0.3)
-    p.add_argument("--mask-strategy", default="block", choices=["random", "block"])
-    p.add_argument("--sync-mask", dest="sync_mask", action=argparse.BooleanOptionalAction, default=True,
+    p.add_argument("--mask-ratio", type=float, default=None)
+    p.add_argument("--mask-strategy", default=None, choices=["random", "block"])
+    p.add_argument("--sync-mask", dest="sync_mask", action=argparse.BooleanOptionalAction, default=None,
                    help="Synchronized masking: all points in a tile share the same time mask. "
                         "Default: on. Disabling lets points 'borrow' masked-position values from "
                         "neighbors, which drops reconstruction loss but corrupts embedding quality "
                         "(experiments confirmed ACC probe R^2 collapsed from 0.84 to 0.45).")
-    p.add_argument("--mask-schedule", default="fixed", choices=["fixed", "short_mix"],
+    p.add_argument("--mask-schedule", default=None, choices=["fixed", "short_mix"],
                    help="training mask schedule; validation uses eval_mask_ratio")
-    p.add_argument("--eval-mask-ratio", type=float, default=0.30,
+    p.add_argument("--eval-mask-ratio", type=float, default=None,
                    help="fixed validation mask ratio")
-    p.add_argument("--patch-size", type=int, default=16, help="time patch size")
-    p.add_argument("--temporal-layers", type=int, default=2, help="temporal Transformer layers")
-    p.add_argument("--temporal-heads", type=int, default=4, help="temporal attention heads")
-    p.add_argument("--residual-loss-weight", type=float, default=0.0,
+    p.add_argument("--patch-size", type=int, default=None, help="Time patch size.")
+    p.add_argument("--temporal-layers", type=int, default=None)
+    p.add_argument("--temporal-heads", type=int, default=None)
+    p.add_argument("--residual-loss-weight", type=float, default=None,
                    help="residual auxiliary loss weight")
-    p.add_argument("--residual-consistency-weight", type=float, default=0.1,
+    p.add_argument("--residual-consistency-weight", type=float, default=None,
                    help="weight for final reconstruction residual consistency")
-    p.add_argument("--residual-head-mode", default="additive", choices=["additive", "aux_only"],
+    p.add_argument("--residual-head-mode", default=None, choices=["additive", "aux_only"],
                    help="add residual correction to reconstruction or train it only as an auxiliary head")
     p.add_argument("--coord-scale", type=float, default=None,
-                   help="Divide centered coords by this before coord_embedding (e.g. 3500 = tile half-width). "
-                        "None keeps unscaled raw-metre coordinates (~+-3700).")
+                   help="Positive coordinate divisor; defaults to the Encoder 4.3 HF configuration.")
     p.add_argument("--residual-head-lr", type=float, default=None,
                    help="optional learning rate for residual head parameters")
     p.add_argument("--init-from-checkpoint", default=None,
                    help="Warm-start compatible model weights without loading optimizer/scaler state")
-    p.add_argument("--point-sampling", default="uniform", choices=["uniform", "residual_weighted"],
+    p.add_argument("--point-sampling", default=None, choices=["uniform", "residual_weighted"],
                    help="point sampling strategy for oversized training tiles")
-    p.add_argument("--residual-sampling-alpha", type=float, default=0.5,
+    p.add_argument("--residual-sampling-alpha", type=float, default=None,
                    help="fraction of oversized tile points sampled by residual RMS")
     # Training
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--duration-hours", type=float, default=None)
-    p.add_argument("--lr", type=float, default=3e-4)
-    p.add_argument("--min-lr", type=float, default=3e-5)
-    p.add_argument("--lr-scheduler", default="cosine", choices=["none", "cosine"])
-    p.add_argument("--scheduler-total-steps", type=int, default=20000)
-    p.add_argument("--warmup-steps", type=int, default=1000)
-    p.add_argument("--weight-decay", type=float, default=1e-2)
-    p.add_argument("--precision", default="bf16", choices=["fp32", "bf16", "fp16"])
+    p.add_argument("--lr", type=float, default=None)
+    p.add_argument("--min-lr", type=float, default=None)
+    p.add_argument("--lr-scheduler", default=None, choices=["none", "cosine"])
+    p.add_argument("--scheduler-total-steps", type=int, default=None)
+    p.add_argument("--warmup-steps", type=int, default=None)
+    p.add_argument("--weight-decay", type=float, default=None)
+    p.add_argument("--precision", default=None, choices=["fp32", "bf16", "fp16"])
     p.add_argument("--device", default="cuda:0")
-    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--seed", type=int, default=None)
     # Validation (train/val/test split is precomputed in the manifest)
-    p.add_argument("--val-batches", type=int, default=16)
+    p.add_argument("--val-batches", type=int, default=None)
     p.add_argument(
         "--resample-val-batches",
         action="store_true",
         help="Draw a new, reproducible set of non-overlapping validation batches at each validation step.",
     )
-    p.add_argument("--val-every-steps", type=int, default=500)
-    p.add_argument("--val-seed", type=int, default=1729)
+    p.add_argument("--val-every-steps", type=int, default=None)
+    p.add_argument("--val-seed", type=int, default=None)
     # Logging / checkpointing
-    p.add_argument("--checkpoint-every-steps", type=int, default=1000)
-    p.add_argument("--log-every-steps", type=int, default=20)
-    p.add_argument("--train-window-steps", type=int, default=1000)
+    p.add_argument("--checkpoint-every-steps", type=int, default=None)
+    p.add_argument("--log-every-steps", type=int, default=None)
+    p.add_argument("--train-window-steps", type=int, default=None)
     p.add_argument("--resume-from", default=None)
-    return p.parse_args()
+    return p.parse_args(argv)
+
+
+def apply_encoder_43_config(args: argparse.Namespace, config: dict) -> argparse.Namespace:
+    """Fill unspecified CLI options from the HF Encoder 4.3 configuration."""
+    architecture = config["architecture"]
+    data = config["data"]
+    masking = config["masking"]
+    point_sampling = config["point_sampling"]
+    loss = config["loss"]
+    optimization = config["optimization"]
+    validation = config["validation"]
+    checkpointing = config["checkpointing"]
+    strategy = str(masking["strategy"])
+    defaults = {
+        "max_tile_points": data["maximum_points_per_tile"],
+        "tiles_per_batch": optimization["tiles_per_batch"],
+        "d_model": architecture["d_model"],
+        "num_layers": architecture["spatial_layers"],
+        "num_heads": architecture["spatial_heads"],
+        "dropout": architecture["dropout"],
+        "mask_ratio": masking["train_ratio"],
+        "mask_strategy": "block" if strategy == "synchronized_block" else strategy,
+        "sync_mask": strategy == "synchronized_block",
+        "mask_schedule": masking["schedule"],
+        "eval_mask_ratio": masking["evaluation_ratio"],
+        "patch_size": architecture["patch_size"],
+        "temporal_layers": architecture["temporal_layers"],
+        "temporal_heads": architecture["temporal_heads"],
+        "residual_loss_weight": loss["residual_loss_weight"],
+        "residual_consistency_weight": loss["residual_consistency_weight"],
+        "residual_head_mode": architecture["residual_head_mode"],
+        "coord_scale": architecture["coord_scale_m"],
+        "residual_head_lr": optimization["residual_head_learning_rate"],
+        "point_sampling": point_sampling["method"],
+        "residual_sampling_alpha": point_sampling["residual_sampling_alpha"],
+        "max_steps": optimization["maximum_steps"],
+        "lr": optimization["learning_rate"],
+        "min_lr": optimization["minimum_learning_rate"],
+        "lr_scheduler": optimization["scheduler"],
+        "scheduler_total_steps": optimization["scheduler_total_steps"],
+        "warmup_steps": optimization["warmup_steps"],
+        "weight_decay": optimization["weight_decay"],
+        "precision": optimization["precision"],
+        "seed": optimization["seed"],
+        "val_batches": validation["batches"],
+        "val_every_steps": validation["interval_steps"],
+        "val_seed": validation["seed"],
+        "checkpoint_every_steps": checkpointing["interval_steps"],
+        "log_every_steps": checkpointing["log_interval_steps"],
+        "train_window_steps": checkpointing["rolling_window_steps"],
+    }
+    for name, value in defaults.items():
+        if getattr(args, name) is None:
+            setattr(args, name, value)
+    return args
+
+
+def validate_training_args(args: argparse.Namespace) -> None:
+    positive = (
+        "max_tile_points", "tiles_per_batch", "d_model", "num_layers", "num_heads",
+        "patch_size", "temporal_layers", "temporal_heads", "max_steps",
+        "scheduler_total_steps", "val_batches", "checkpoint_every_steps",
+        "log_every_steps", "train_window_steps",
+    )
+    for name in positive:
+        if int(getattr(args, name)) <= 0:
+            raise ValueError(f"--{name.replace('_', '-')} must be positive")
+    for name in ("mask_ratio", "eval_mask_ratio", "residual_sampling_alpha"):
+        value = float(getattr(args, name))
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"--{name.replace('_', '-')} must be in [0,1]")
+    if float(args.coord_scale) <= 0:
+        raise ValueError("--coord-scale must be positive")
+    if float(args.lr) <= 0 or float(args.min_lr) < 0:
+        raise ValueError("learning rates must be non-negative and --lr must be positive")
 
 
 def collect_validation_batches(args, tile_store, rng, *, resampled: bool) -> list[dict]:
@@ -136,6 +227,15 @@ def validation_tile_ids(val_batches) -> list[int]:
 
 def main() -> None:
     args = parse_args()
+    encoder_config_path = Path(args.encoder_config)
+    if not encoder_config_path.is_file():
+        raise FileNotFoundError(
+            f"Encoder config not found: {encoder_config_path}. "
+            "Download risenyard/egms-qa-encoder into data/encoder/checkpoint first."
+        )
+    encoder_config = load_encoder_config(encoder_config_path)
+    args = apply_encoder_43_config(args, encoder_config)
+    validate_training_args(args)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
@@ -172,8 +272,7 @@ def main() -> None:
     )
 
     # Load precomputed normalization (skip the fit step)
-    with open(args.normalization) as f:
-        normalizer = json.load(f)
+    normalizer = load_normalization(args.normalization)
     normalizer.pop("_meta", None)  # strip annotation block before passing into trainer
     with (output_dir / "normalization.json").open("w", encoding="utf-8") as f:
         json.dump(normalizer, f, indent=2)
@@ -200,7 +299,7 @@ def main() -> None:
     resume_elapsed_hours = 0.0
     resume_train_losses: list[float] = []
     if args.resume_from:
-        checkpoint = torch.load(args.resume_from, map_location=device)
+        checkpoint = torch.load(args.resume_from, map_location=device, weights_only=True)
         model.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         if "scaler" in checkpoint:
@@ -407,7 +506,7 @@ def set_optimizer_lrs(args, optimizer, current_lr: float) -> None:
 
 def load_init_checkpoint(model, checkpoint_path: Path, device) -> None:
     """Warm-start weights without loading optimizer/scaler state."""
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
     state = checkpoint["model"]
     incompatible = model.load_state_dict(state, strict=False)
     allowed_missing = {
@@ -618,8 +717,8 @@ def evaluate(args, model, val_batches, device, normalizer):
     model.eval()
     total_se, total_ae, total_residual_se, total_base_se = 0.0, 0.0, 0.0, 0.0
     total_residual_head_se, total_weighted_loss, count = 0.0, 0.0, 0
+    rng = np.random.default_rng(args.val_seed)
     for tile_batch in val_batches:
-        rng = np.random.default_rng(args.val_seed)
         series, coords, pmask, loss_mask, target = prepare_batch(
             tile_batch, args, rng, normalizer, device, is_eval=True,
         )
@@ -655,71 +754,6 @@ def evaluate(args, model, val_batches, device, normalizer):
         "global_rmse": rmse,
         "global_mae": mae,
     }
-
-
-def fit_tile_normalizer(tile_store, args):
-    """Compute global mean/std from training tiles."""
-    train_indices = tile_store.split_tile_indices("train")
-    total, sq_total, residual_sq_total, count, residual_count = 0.0, 0.0, 0.0, 0, 0
-    fc = len(FEATURE_COLUMNS)
-    for idx in train_indices:
-        tile = tile_store.get_tile(int(idx))
-        series = tile[:, fc : fc + args.input_length]
-        finite = np.isfinite(series)
-        vals = np.where(finite, series, 0.0).astype(np.float64)
-        n = int(finite.sum())
-        total += float(vals.sum())
-        sq_total += float((vals ** 2).sum())
-        count += n
-        res_sq, res_count = residual_sum_squares_np(series)
-        residual_sq_total += res_sq
-        residual_count += res_count
-    if count == 0:
-        return None
-    mean = total / count
-    std = max(math.sqrt(sq_total / count - mean * mean), 1e-6)
-    normalizer = {"mean": float(mean), "std": float(std), "count": count}
-    if residual_count > 0:
-        residual_raw_std = max(math.sqrt(residual_sq_total / residual_count), 1e-6)
-        normalizer["residual_std"] = float(residual_raw_std / std)
-        normalizer["residual_raw_std"] = float(residual_raw_std)
-        normalizer["residual_count"] = int(residual_count)
-    print(
-        f"fitted tile normalizer: mean={mean:.6f} std={std:.6f} "
-        f"residual_std={normalizer.get('residual_std', 1.0):.6f} from {count:,} values",
-        flush=True,
-    )
-    return normalizer
-
-
-def residual_sum_squares_np(series: np.ndarray) -> tuple[float, int]:
-    """Sum squared linear-detrended residuals for raw series values."""
-    values = series.astype(np.float64, copy=False)
-    finite = np.isfinite(values)
-    counts = finite.sum(axis=1)
-    valid = counts > 1
-    if not valid.any():
-        return 0.0, 0
-
-    t = np.linspace(-1.0, 1.0, values.shape[1], dtype=np.float64)
-    sub = values[valid]
-    sub_finite = finite[valid]
-    sub_counts = counts[valid].astype(np.float64)
-    y_sum = np.where(sub_finite, sub, 0.0).sum(axis=1, keepdims=True)
-    t_sum = np.where(sub_finite, t, 0.0).sum(axis=1, keepdims=True)
-    y_mean = y_sum / sub_counts[:, None]
-    t_mean = t_sum / sub_counts[:, None]
-    centered_t = np.where(sub_finite, t - t_mean, 0.0)
-    centered_y = np.where(sub_finite, sub - y_mean, 0.0)
-    denom = np.square(centered_t).sum(axis=1, keepdims=True)
-    slope = np.divide(
-        (centered_y * centered_t).sum(axis=1, keepdims=True),
-        denom,
-        out=np.zeros_like(denom),
-        where=denom > 1e-12,
-    )
-    residual = np.where(sub_finite, sub - (y_mean + slope * (t - t_mean)), 0.0)
-    return float(np.square(residual).sum()), int(sub_counts.sum())
 
 
 def get_lr(args, step):

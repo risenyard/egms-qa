@@ -1,8 +1,8 @@
 """Compute EGMS-QA S1 reference-anchor attributes.
 
-S1 uses train-defined CLS representation anchors:
+S1 uses train-defined summary-token representation anchors:
 
-1. Fit StandardScaler and PCA25 on train CLS embeddings only.
+1. Fit StandardScaler and PCA25 on train summary embeddings only.
 2. L2-normalize PCA features.
 3. Fit HDBSCAN(min_cluster_size=50, min_samples=80) on train features.
 4. Use each train dense-core cluster medoid as a reference anchor.
@@ -32,7 +32,7 @@ from sklearn.preprocessing import StandardScaler, normalize
 
 
 ROOT = Path(".")
-DEFAULT_TOKEN_CACHE = ROOT / "data/encoder/tokens/encoder_tokens_10k.pt"
+DEFAULT_TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
 DEFAULT_OUT_DIR = ROOT / "outputs/tasks/s1"
 
 PROFILE_MAP = {
@@ -64,7 +64,7 @@ PROFILE_MAP = {
 
 
 def load_cls(token_cache: Path) -> tuple[np.ndarray, pd.DataFrame]:
-    obj = torch.load(token_cache, map_location="cpu")
+    obj = torch.load(token_cache, map_location="cpu", weights_only=True)
     cls = obj["spatial_tokens"][:, 0, :].float().numpy().astype(np.float32)
     meta = pd.DataFrame({"tile_id": obj["tile_ids"], "split": obj["splits"]})
     return cls, meta
@@ -274,7 +274,7 @@ def build_outputs(token_cache: Path, out_dir: Path) -> None:
         "token_cache": str(token_cache),
         "n_tiles": int(len(final)),
         "train_tiles": int(train_mask.sum()),
-        "selected_algorithm": "StandardScaler(train) + PCA25(train) + L2 + HDBSCAN(min_cluster_size=50,min_samples=80) on train CLS",
+        "selected_algorithm": "StandardScaler(train) + PCA25(train) + L2 + HDBSCAN(min_cluster_size=50,min_samples=80) on train summary tokens",
         "s14_algorithm": "train-only 2D GaussianMixture over [S12 distance, S13 margin], BIC-selected k=6, merged into three states",
         "status_counts": status_counts.to_dict(orient="records"),
         "anchor_counts": anchor_counts.to_dict(orient="records"),

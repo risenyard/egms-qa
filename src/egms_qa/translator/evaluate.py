@@ -234,7 +234,7 @@ def load_model(
     from transformers import AutoTokenizer
 
     device = torch.device("cuda:0")
-    ck = torch.load(Path(adapter_dir) / "projector.pt", map_location="cpu", weights_only=False)
+    ck = torch.load(Path(adapter_dir) / "projector.pt", map_location="cpu", weights_only=True)
     base = resolve_host_model(adapter_dir, ck, host_model_override)
     tokenizer = AutoTokenizer.from_pretrained(base, trust_remote_code=True)
     if tokenizer.pad_token_id is None:
@@ -277,7 +277,7 @@ def load_model(
     projector.load_state_dict(ck["projector_state"])
     projector.eval()
 
-    cache = torch.load(token_cache, map_location="cpu", weights_only=False)
+    cache = torch.load(token_cache, map_location="cpu", weights_only=True)
     spatial = cache["spatial_tokens"].float()
     token_mask = cache["token_mask"]
     if ck.get("args", {}).get("cls_only"):

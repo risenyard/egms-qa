@@ -27,7 +27,7 @@ token,再由一个宿主语言模型用自然语言回答监测类问题,并对�
 
 ```
 瓦片(点数可变,294 步历史)
-   → 冻结的 EGMS 编码器 + 8×8 池化 → 65 × 256 token
+   → 冻结的 EGMS Encoder 4.3 + 8×8 池化 → 65 × 256 EGMS token
    → 两层投影器 → 前缀 ; "Question: …\nAnswer:" → 冻结宿主 LLM + LoRA → 答案
 ```
 
@@ -96,6 +96,16 @@ Ortho Vertical 产品的修改与重打包衍生物(© European Union, Copernicu
 `data/` 与 `outputs/` 是 release installer 和模型下载在本地创建的运行路径。GitHub
 不再跟踪发布数据或 checkpoint 元数据;Hugging Face 是唯一发布源。
 
+## 数据支持范围
+
+当前 release 支持复现发布的 10,000-tile 流程、编码已经符合兼容 EGMS-QA NPZ 契约的
+新 tile,以及在用户同时提供匹配的 split manifest、data config 和仅由 train split
+拟合的 normalization 时训练自备 NPZ 数据集。
+
+当前不包含官方 EGMS 认证/下载、任意 EGMS ZIP/CSV 转换,也不自动为其他产品版本完成
+时间轴对齐、缺失率筛选、窗口选择、空间划分和 normalization。不同参考期不能直接照搬
+`[8,302)` 或发布版 normalization。
+
 ## 复现
 
 ```bash
@@ -111,14 +121,14 @@ python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 
 # 3. 训练并评测一个宿主模型
 python -m egms_qa.translator.train --host-model Qwen/Qwen3.5-9B \
-    --token-cache data/encoder/tokens/encoder_tokens_10k.pt --output-dir outputs/runs/qwen
+    --token-cache data/encoder/tokens/egms_tokens_10k.pt --output-dir outputs/runs/qwen
 python -m egms_qa.translator.evaluate --adapter-dir outputs/runs/qwen/best --split test
 
 # 4. 四模型汇总报告
 python -m egms_qa.translator.summarize_results
 ```
 
-`pytest` 运行答案提取器的测试。
+`pytest` 运行数据契约、encoder、release 与答案提取器测试。
 
 ## 许可
 

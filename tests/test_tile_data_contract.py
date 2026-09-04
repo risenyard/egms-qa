@@ -5,8 +5,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
-from egms_encoder.data.tile_store import STATIC_KEYS, TileStore
+from egms_encoder.data.tile_store import STATIC_KEYS, TileStore, TimeWindow
 
 
 def test_installed_release_contract_constructs_tile_store(
@@ -56,4 +57,44 @@ def test_installed_release_contract_constructs_tile_store(
     assert store.num_tiles == 1
     assert store.time_window.input_length == 294
     assert len(store.split_tile_indices("train")) == 1
+    assert np.array_equal(
+        store.split_tile_indices("validation"), store.split_tile_indices("val")
+    )
     assert store.get_tile(0).shape == (n_points, 10 + 294)
+
+
+def test_tile_store_rejects_missing_contract_field(tmp_path: Path) -> None:
+    tile_path = tmp_path / "tile.npz"
+    arrays = {
+        "coords": np.zeros((2, 2), dtype=np.float32),
+        "time_series": np.zeros((2, 304), dtype=np.float32),
+        **{key: np.zeros(2, dtype=np.float32) for key in STATIC_KEYS if key != "rmse"},
+    }
+    np.savez_compressed(tile_path, **arrays)
+    manifest = pd.DataFrame([{
+        "tile_id": "tile", "path": "tile.npz", "n_points": 2,
+        "centroid_x": 0.0, "centroid_y": 0.0,
+    }])
+    store = TileStore(manifest, TimeWindow(8, 302), data_root=tmp_path)
+    with pytest.raises(ValueError, match="missing fields.*rmse"):
+        store.get_tile(0)
+
+
+def test_tile_store_rejects_incomplete_split_assignment(tmp_path: Path) -> None:
+    manifest = pd.DataFrame([
+        {"tile_id": "a", "path": "a.npz", "n_points": 2, "centroid_x": 0, "centroid_y": 0},
+        {"tile_id": "b", "path": "b.npz", "n_points": 2, "centroid_x": 0, "centroid_y": 0},
+    ])
+    with pytest.raises(ValueError, match="missing tile_id: b"):
+        TileStore(
+            manifest,
+            TimeWindow(8, 302),
+            split_assignments={"a": "train"},
+            data_root=tmp_path,
+        )
+
+
+@pytest.mark.parametrize("start,end", [(-1, 10), (10, 10), (11, 10)])
+def test_time_window_is_validated(start: int, end: int) -> None:
+    with pytest.raises(ValueError):
+        TimeWindow(start, end)

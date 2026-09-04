@@ -212,10 +212,10 @@ def install_release(release_dir: Path, target_root: Path) -> None:
             target_root / "data/encoder/manifest/data_config.json",
         release_dir / "metadata/split_manifest.parquet":
             target_root / "data/encoder/manifest/split.parquet",
-        release_dir / "artifacts/representations/encoder_tokens_10k.pt":
-            target_root / "data/encoder/tokens/encoder_tokens_10k.pt",
-        release_dir / "artifacts/representations/encoder_tokens_10k_metadata.json":
-            target_root / "data/encoder/tokens/encoder_tokens_10k_metadata.json",
+        release_dir / "artifacts/representations/egms_tokens_10k.pt":
+            target_root / "data/encoder/tokens/egms_tokens_10k.pt",
+        release_dir / "artifacts/representations/egms_tokens_10k_metadata.json":
+            target_root / "data/encoder/tokens/egms_tokens_10k_metadata.json",
         release_dir / "artifacts/labels/labels.parquet":
             target_root / "outputs/qa/labels.parquet",
         release_dir / "metadata/labels_meta.json":

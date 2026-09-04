@@ -1,8 +1,8 @@
-# Encoder (tile representation)
+# EGMS Encoder 4.3 (tile representation)
 
 > 🤗 Released weights & token cache: [`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder)
 
-The EGMS encoder maps a variable-size tile of persistent-scatterer displacement
+EGMS Encoder 4.3 maps a variable-size tile of persistent-scatterer displacement
 histories to a fixed 65-token representation used by the rest of EGMS-QA. It is a
 self-supervised spatio-temporal model:
 
@@ -29,11 +29,20 @@ This directory vendors the encoder model and data code (`models/`, `data/`,
 data: the processed source tiles ship as NPZ under
 `artifacts/source_tiles/` in `risenyard/egms-qa-dataset`; the release installer
 links them to `data/tiles/`. The split manifest and normalization ship with the
-code/model release. The encoder was trained on this 10k tile set's train split.
-The release has no external dependency. (One family-C4 threshold is
-corpus-relative, derived from the full European candidate pool, but its value
-ships in the C4 reference JSON, so re-deriving it is optional and never required
-to reproduce the release.)
+HF repositories. The encoder was trained on this 10k tile set's train split.
+The code does not depend on a private repository or machine-specific path. One
+family-C4 threshold is corpus-relative and was derived from the larger European
+candidate pool; its frozen value is documented and built into the released C4
+algorithm, so the larger pool is not required to reproduce EGMS-QA artifacts.
+
+## Data support boundary
+
+The encoder accepts the EGMS-QA NPZ contract together with a split manifest,
+data config, and normalization file. It supports released-data reproduction and
+already prepared compatible tiles. It does not download official EGMS products,
+convert arbitrary EGMS ZIP/CSV releases, or infer the valid time window and
+normalization for a new reference period; those decisions require a separate
+empirical data audit before training.
 
 ## Token extraction
 
@@ -43,10 +52,10 @@ python -m egms_encoder.extract_tokens \
     --checkpoint data/encoder/checkpoint/encoder.pt \
     --manifest   data/encoder/manifest/split.parquet \
     --output-dir outputs/tokens
-# -> outputs/tokens/encoder_tokens_10k.pt   (spatial_tokens [10000, 65, 256], mask, ids, splits)
+# -> outputs/tokens/egms_tokens_10k.pt   (spatial_tokens [10000, 65, 256], mask, ids, splits)
 ```
 
-The released token cache (`data/encoder/tokens/encoder_tokens_10k.pt`) lets you
+The released token cache (`data/encoder/tokens/egms_tokens_10k.pt`) lets you
 skip this step and train/evaluate the translator directly. Encoder provenance is
 documented in the
 [dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset) and
@@ -59,5 +68,7 @@ hf download risenyard/egms-qa-dataset \
     --repo-type dataset --local-dir release/egms-qa-dataset
 python -m egms_qa.release install \
     --release-dir release/egms-qa-dataset --target-root .
+hf download risenyard/egms-qa-encoder \
+    --local-dir data/encoder/checkpoint
 python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
 ```

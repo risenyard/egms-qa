@@ -3,8 +3,8 @@
 S21 is a continuous local isolation score in the same representation coordinate
 system as S1:
 
-1. Extract EGMS encoder CLS embeddings.
-2. Fit StandardScaler and PCA25 on train CLS embeddings only.
+1. Extract EGMS encoder summary-token embeddings.
+2. Fit StandardScaler and PCA25 on train summary embeddings only.
 3. L2-normalize PCA features.
 4. Use train tiles as the reference library.
 5. For every tile, compute the mean cosine distance to its nearest k train
@@ -32,13 +32,13 @@ from sklearn.preprocessing import StandardScaler, normalize
 
 
 ROOT = Path(".")
-DEFAULT_TOKEN_CACHE = ROOT / "data/encoder/tokens/encoder_tokens_10k.pt"
+DEFAULT_TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
 DEFAULT_OUT_DIR = ROOT / "outputs/tasks/s2"
 S22_LABELS = ("common", "unusual", "rare", "extreme")
 
 
 def load_cls(token_cache: Path) -> tuple[np.ndarray, pd.DataFrame]:
-    obj = torch.load(token_cache, map_location="cpu")
+    obj = torch.load(token_cache, map_location="cpu", weights_only=True)
     cls = obj["spatial_tokens"][:, 0, :].float().numpy().astype(np.float32)
     meta = pd.DataFrame({"tile_id": obj["tile_ids"], "split": obj["splits"]})
     return cls, meta
@@ -135,7 +135,7 @@ def summarize(final: pd.DataFrame, train_mask: np.ndarray, out_dir: Path, k: int
         "computed_tasks": ["S21_local_isolation_score", "S22_representation_rarity_class"],
         "n_tiles": int(len(final)),
         "train_tiles": int(train_mask.sum()),
-        "algorithm": "train-only StandardScaler + PCA25 + L2 CLS features; S21 = mean cosine distance to nearest k train neighbors, excluding self for train queries",
+        "algorithm": "train-only StandardScaler + PCA25 + L2 summary-token features; S21 = mean cosine distance to nearest k train neighbors, excluding self for train queries",
         "k": int(k),
         "s22_algorithm": "train-only p75/p95/p99 thresholds on S21; corpus-relative rarity tail labels",
         "s22_thresholds": s22_thresholds,

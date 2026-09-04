@@ -16,7 +16,7 @@ import torch
 
 
 ROOT = Path(".")
-TOKEN_CACHE = ROOT / "data/encoder/tokens/encoder_tokens_10k.pt"
+TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
 OUT_PATH = ROOT / "outputs/tasks/a3/a3_final_table.csv"
 GRID_BINS = 64
 
@@ -37,7 +37,7 @@ def main() -> None:
     ap.add_argument("--out-path", default=str(OUT_PATH))
     args = ap.parse_args()
 
-    cache = torch.load(args.token_cache, map_location="cpu", weights_only=False)
+    cache = torch.load(args.token_cache, map_location="cpu", weights_only=True)
     counts = cache["point_count_per_bin"]
     tile_ids = [str(x) for x in cache["tile_ids"]]
     splits = [str(x) for x in cache["splits"]]

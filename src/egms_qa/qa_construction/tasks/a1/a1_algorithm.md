@@ -10,13 +10,13 @@ A11 measures severe global representation instability:
 
 For each tile:
 
-1. Use the cached full-tile EGMS encoder CLS token as `CLS_full`.
+1. Use the cached full-tile EGMS summary token as `summary_full`.
 2. Keep 20% of points with deterministic random seeds `0,1,2,3,4`.
 3. Re-run the frozen EGMS encoder on each subsampled tile, using the original full-tile center.
 4. Compute per-seed angular drift:
 
 ```text
-drift_seed = arccos(clip(cosine(CLS_full, CLS_sub), -1, 1)) / pi
+drift_seed = arccos(clip(cosine(summary_full, summary_sub), -1, 1)) / pi
 ```
 
 5. Average across seeds:
@@ -58,4 +58,4 @@ Class counts in the final table:
 - `a1_combine_shards.py`: shard combiner; writes only `a1_final_table.csv` and removes temporary `work/` by default.
 
 Current EGMS encoder package: `data/encoder/`.
-Current EGMS encoder token cache: `data/encoder/tokens/encoder_tokens_10k.pt`.
+Current EGMS token cache: `data/encoder/tokens/egms_tokens_10k.pt`.

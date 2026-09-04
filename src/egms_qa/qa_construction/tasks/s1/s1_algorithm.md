@@ -2,7 +2,7 @@
 
 ## Task Scope
 
-S1 describes where each tile sits relative to train-defined encoder CLS reference anchors. It is a representation construct, not an external geophysical class.
+S1 describes where each tile sits relative to train-defined encoder summary-token reference anchors. It is a representation construct, not an external geophysical class.
 
 Official leaf tasks:
 
@@ -21,13 +21,13 @@ Official leaf tasks:
 Input token cache:
 
 ```text
-data/encoder/tokens/encoder_tokens_10k.pt
+data/encoder/tokens/egms_tokens_10k.pt
 ```
 
 Steps:
 
-1. Extract CLS embeddings from `spatial_tokens[:, 0, :]`.
-2. Fit `StandardScaler` on train CLS embeddings only.
+1. Extract summary embeddings from `spatial_tokens[:, 0, :]`.
+2. Fit `StandardScaler` on train summary embeddings only.
 3. Fit `PCA(n_components=25)` on train embeddings only.
 4. L2-normalize PCA features.
 5. Fit `sklearn.cluster.HDBSCAN(min_cluster_size=50, min_samples=80)` on train features.
