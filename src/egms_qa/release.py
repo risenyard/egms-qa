@@ -123,7 +123,7 @@ def build_manifest(release_dir: Path, workers: int = 8) -> dict:
         "code_repository": "https://github.com/risenyard/egms-qa",
         "layout": {
             "data/qa": "Hugging Face-loadable natural-language QA splits",
-            "artifacts/source_tiles": "10,000 processed EGMS source tiles (NPZ)",
+            "artifacts/source_tiles": "10,000 model-ready 294-step EGMS tiles (NPZ)",
             "artifacts/representations": "frozen encoder token cache",
             "artifacts/labels": "canonical task labels",
             "artifacts/reference_tables": "deterministic per-family task tables",
@@ -207,14 +207,20 @@ def install_release(release_dir: Path, target_root: Path) -> None:
         release_dir / "artifacts/source_tiles": target_root / "data/tiles",
         release_dir / "artifacts/reference_tables": target_root / "outputs/tasks",
     }
+    token_file = release_dir / "artifacts/representations/egms_tokens_10k.pt"
+    token_metadata = release_dir / "artifacts/representations/egms_tokens_10k_metadata.json"
+    if not token_file.exists():
+        token_file = release_dir / "artifacts/representations/encoder_tokens_10k.pt"
+    if not token_metadata.exists():
+        token_metadata = release_dir / "artifacts/representations/encoder_tokens_10k_metadata.json"
     file_links = {
         release_dir / "metadata/data_config.json":
             target_root / "data/encoder/manifest/data_config.json",
         release_dir / "metadata/split_manifest.parquet":
             target_root / "data/encoder/manifest/split.parquet",
-        release_dir / "artifacts/representations/encoder_tokens_10k.pt":
+        token_file:
             target_root / "data/encoder/tokens/encoder_tokens_10k.pt",
-        release_dir / "artifacts/representations/encoder_tokens_10k_metadata.json":
+        token_metadata:
             target_root / "data/encoder/tokens/encoder_tokens_10k_metadata.json",
         release_dir / "artifacts/labels/labels.parquet":
             target_root / "outputs/qa/labels.parquet",

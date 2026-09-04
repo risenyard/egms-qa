@@ -109,9 +109,8 @@ This release supports:
 
 - reproducing encoder pretraining, token extraction, translator training, and
   evaluation on the released 10,000-tile dataset;
-- encoding a new tile that already follows the documented EGMS-QA NPZ contract
-  and is compatible with the released 304-step source axis and `[8,302)` model
-  window;
+- encoding a new tile that already follows the documented model-ready EGMS-QA
+  NPZ contract with a stored 294-step `[0,294)` model window;
 - training on a user-prepared NPZ tile collection when the user also supplies a
   matching split manifest, data config, and train-fitted normalization file.
 
@@ -123,9 +122,10 @@ This release does **not** include:
 - automatic time-axis alignment, missingness screening, window selection,
   spatial splitting, or normalization for a new EGMS product version.
 
-Do not reuse the released `[8,302)` window or normalization blindly for another
-EGMS reference period. Those choices must be re-established from the new
-corpus before training.
+The released stored `[0,294)` window corresponds to `[8,302)` on the original
+304-step prepared axis. Do not reuse this alignment or normalization blindly
+for another EGMS reference period; those choices must be re-established from
+the new corpus before training.
 
 ## Reproduce
 

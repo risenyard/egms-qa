@@ -26,7 +26,7 @@ yielding 65 tokens (1 tile summary + 64 cells) with a validity mask.
 This directory vendors the encoder model and data code (`models/`, `data/`,
 `pretrain.py`). Loading the checkpoint, extracting tokens, and
 **retraining the encoder from scratch** are all self-contained on the released
-data: the processed source tiles ship as NPZ under
+data: the model-ready 294-step EGMS tiles ship as NPZ under
 `artifacts/source_tiles/` in `risenyard/egms-qa-dataset`; the release installer
 links them to `data/tiles/`. The split manifest and normalization ship with the
 code/model release. The encoder was trained on this 10k tile set's train split.
@@ -40,7 +40,9 @@ to reproduce the release.)
 The public encoder code consumes the EGMS-QA NPZ tile contract together with a
 split manifest, data config, and normalization file. It supports reproducing
 the released encoder and training or inference on already prepared compatible
-tiles. It does not download official EGMS products, convert arbitrary EGMS
+tiles. The released NPZ files store `[N,294]` displacement arrays and the
+encoder reads `[0,294)` directly; this is the same physical window as
+`[8,302)` on the original 304-step prepared axis. It does not download official EGMS products, convert arbitrary EGMS
 ZIP/CSV releases, or infer a valid time window and normalization for another
 reference period. New product versions require a separate, empirically audited
 preparation step before this encoder entrypoint can be used.

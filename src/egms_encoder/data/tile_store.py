@@ -39,10 +39,50 @@ STATIC_KEYS = (
 class TimeWindow:
     t_start: int
     t_end: int  # exclusive
+    stored_steps: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.t_start < 0 or self.t_end <= self.t_start:
+            raise ValueError(
+                f"invalid time window [{self.t_start},{self.t_end})"
+            )
+        if self.stored_steps is not None and self.t_end > self.stored_steps:
+            raise ValueError(
+                f"time window [{self.t_start},{self.t_end}) exceeds "
+                f"stored_steps={self.stored_steps}"
+            )
 
     @property
     def input_length(self) -> int:
         return self.t_end - self.t_start
+
+    @classmethod
+    def from_config(cls, config: dict) -> "TimeWindow":
+        """Read and validate the stored-axis contract from ``data_config``.
+
+        ``stored_steps`` is the current field name. ``source_steps`` remains a
+        read-only compatibility alias for the original 304-step release.
+        """
+        try:
+            raw = config["time_window"]
+            t_start = int(raw["t_start"])
+            t_end = int(raw["t_end"])
+            stored_steps = int(
+                raw["stored_steps"] if "stored_steps" in raw else raw["source_steps"]
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                "data_config.json must define time_window.t_start, t_end, "
+                "and stored_steps"
+            ) from exc
+        window = cls(t_start=t_start, t_end=t_end, stored_steps=stored_steps)
+        declared_length = int(raw.get("input_length", window.input_length))
+        if declared_length != window.input_length:
+            raise ValueError(
+                f"time_window.input_length={declared_length} does not match "
+                f"[{t_start},{t_end}) ({window.input_length})"
+            )
+        return window
 
 
 class TileStore:
@@ -117,22 +157,24 @@ class TileStore:
         )
 
     @classmethod
-    def from_manifest(cls, manifest_path: str | Path, data_config_path: str | Path | None = None) -> "TileStore":
+    def from_manifest(cls, manifest_path: str | Path, data_config_path: str | Path) -> "TileStore":
         """Build from a released split manifest parquet.
 
         The manifest has one row per tile with ``tile_id``, ``path`` (relative to
         the checkout root), ``n_points``, centroids, and a ``split`` column. The
-        time window and tile-row layout are read from ``data_config.json`` when
-        given, else default to the released configuration (t=[8, 302), 294 steps).
+        time window and tile-row layout are read from ``data_config.json``.
+        There is intentionally no implicit time-axis default: the same code can
+        read legacy 304-step stores and the model-ready 294-step release only
+        when their respective contracts are supplied.
         """
         manifest = pd.read_parquet(manifest_path)
-        t_start, t_end, feature_columns_count = 8, 302, 10
-        if data_config_path is not None and Path(data_config_path).exists():
-            with open(data_config_path) as f:
-                cfg = json.load(f)
-            t_start = int(cfg["time_window"]["t_start"])
-            t_end = int(cfg["time_window"]["t_end"])
-            feature_columns_count = int(cfg["tile_field_layout"]["feature_columns_count"])
+        config_path = Path(data_config_path)
+        if not config_path.is_file():
+            raise FileNotFoundError(f"data config is required: {config_path}")
+        with config_path.open(encoding="utf-8") as f:
+            cfg = json.load(f)
+        time_window = TimeWindow.from_config(cfg)
+        feature_columns_count = int(cfg["tile_field_layout"]["feature_columns_count"])
         split_assignments = None
         if "split" in manifest.columns:
             split_assignments = dict(
@@ -140,7 +182,7 @@ class TileStore:
             )
         return cls(
             manifest=manifest,
-            time_window=TimeWindow(t_start=t_start, t_end=t_end),
+            time_window=time_window,
             split_assignments=split_assignments,
             feature_columns_count=feature_columns_count,
         )
@@ -149,22 +191,34 @@ class TileStore:
         """Return ``[N, feature_columns_count + input_length]`` row matrix
         with the standard tile layout."""
         meta = self.tile_metadata[tile_index]
-        z = np.load(meta["path"])
-        coords = z["coords"]                  # (N, 2) easting, northing
-        ts = z["time_series"][:, self.time_window.t_start:self.time_window.t_end]
-        n = coords.shape[0]
+        with np.load(meta["path"], allow_pickle=False) as z:
+            coords = z["coords"]                  # (N, 2) easting, northing
+            full_ts = z["time_series"]
+            if full_ts.ndim != 2:
+                raise ValueError(
+                    f"{meta['path']}: time_series must be 2-D, got {full_ts.shape}"
+                )
+            expected_steps = self.time_window.stored_steps
+            if expected_steps is not None and full_ts.shape[1] != expected_steps:
+                raise ValueError(
+                    f"{meta['path']}: stored time_series has {full_ts.shape[1]} steps; "
+                    f"data_config requires {expected_steps}. Refusing implicit or "
+                    "repeated cropping."
+                )
+            ts = full_ts[:, self.time_window.t_start:self.time_window.t_end]
+            n = coords.shape[0]
 
-        static = np.empty((n, len(STATIC_KEYS)), dtype=np.float32)
-        for j, key in enumerate(STATIC_KEYS):
-            if key in z.files:
-                static[:, j] = z[key].astype(np.float32, copy=False)
-            else:
-                static[:, j] = 0.0
+            static = np.empty((n, len(STATIC_KEYS)), dtype=np.float32)
+            for j, key in enumerate(STATIC_KEYS):
+                if key in z.files:
+                    static[:, j] = z[key].astype(np.float32, copy=False)
+                else:
+                    static[:, j] = 0.0
 
-        out = np.empty((n, self.feature_columns_count + ts.shape[1]), dtype=np.float32)
-        out[:, 0:2] = coords.astype(np.float32, copy=False)
-        out[:, 2:self.feature_columns_count] = static
-        out[:, self.feature_columns_count:] = ts.astype(np.float32, copy=False)
+            out = np.empty((n, self.feature_columns_count + ts.shape[1]), dtype=np.float32)
+            out[:, 0:2] = coords.astype(np.float32, copy=False)
+            out[:, 2:self.feature_columns_count] = static
+            out[:, self.feature_columns_count:] = ts.astype(np.float32, copy=False)
         return out
 
     def split_tile_indices(self, split: str) -> np.ndarray:

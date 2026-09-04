@@ -86,7 +86,7 @@ def load_store(manifest_path: Path, data_config_path: Path):
     from egms_encoder.data.tile_store import TileStore, TimeWindow
 
     cfg = json.load(open(data_config_path))
-    tw = TimeWindow(t_start=cfg["time_window"]["t_start"], t_end=cfg["time_window"]["t_end"])
+    tw = TimeWindow.from_config(cfg)
     manifest = pd.read_parquet(manifest_path)
     store = TileStore(
         manifest=manifest,
