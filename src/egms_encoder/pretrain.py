@@ -77,7 +77,7 @@ def parse_args() -> argparse.Namespace:
                    help="add residual correction to reconstruction or train it only as an auxiliary head")
     p.add_argument("--coord-scale", type=float, default=None,
                    help="Divide centered coords by this before coord_embedding (e.g. 3500 = tile half-width). "
-                        "None keeps legacy raw-metre coords (~+-3700).")
+                        "None keeps unscaled raw-metre coordinates (~+-3700).")
     p.add_argument("--residual-head-lr", type=float, default=None,
                    help="optional learning rate for residual head parameters")
     p.add_argument("--init-from-checkpoint", default=None,
@@ -144,16 +144,18 @@ def main() -> None:
 
     # Load data via TileStore
     tile_store = TileStore.from_manifest(args.manifest, args.data_config)
-    v4_input_length = tile_store.time_window.input_length
+    configured_input_length = tile_store.time_window.input_length
     if args.input_length is None:
-        args.input_length = v4_input_length
-    elif args.input_length > v4_input_length:
+        args.input_length = configured_input_length
+    elif args.input_length > configured_input_length:
         raise ValueError(
-            f"Requested input_length={args.input_length} exceeds the configured window {v4_input_length}"
+            f"Requested input_length={args.input_length} exceeds the configured window "
+            f"{configured_input_length}"
         )
-    elif args.input_length < v4_input_length:
+    elif args.input_length < configured_input_length:
         print(
-            f"NOTE: --input-length={args.input_length} < the configured window {v4_input_length} "
+            f"NOTE: --input-length={args.input_length} < the configured window "
+            f"{configured_input_length} "
             f"(trailing steps will be unused)",
             flush=True,
         )
@@ -217,7 +219,7 @@ def main() -> None:
             flush=True,
         )
 
-    # Fixed validation batches preserve the legacy protocol. Resampled validation
+    # Fixed validation batches preserve the release protocol. Resampled validation
     # draws a reproducible subset from a fresh permutation at every validation step.
     seen_val_tile_ids: set[int] = set()
     if args.resample_val_batches:

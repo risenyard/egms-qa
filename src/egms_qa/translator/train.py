@@ -1,7 +1,7 @@
 """Sampled EGMS-QA instruction tuning over canonical EGMS-QA task values.
 
-Unlike the older JSONL trainer, this does not materialize every train row.
-It samples from the logical pool on the fly:
+Training samples from the logical pool on the fly without materializing every
+possible rendered row:
 
   tile x delivered task x 20 user-facing phrasings
 

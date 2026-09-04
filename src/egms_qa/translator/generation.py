@@ -68,9 +68,7 @@ def greedy_decode_one(row, spatial, tok_mask, tid2idx, tokenizer, projector, hos
 if __name__ == "__main__":
     import sys
     sys.exit(
-        "eval_training_generation.py is now a PURE decode-utils module (EGMSProjector, "
-        "greedy_decode_one, build_prompt_q, parse_number, match_region).\n"
-        "The old G-task evaluator __main__ was removed in the A-X refactor.\n"
-        "==> For evaluation use egms_qa.translator.evaluate "
+        "This module provides decoding utilities and has no command-line entry point.\n"
+        "For evaluation use egms_qa.translator.evaluate "
         "(python -m egms_qa.translator.evaluate --adapter-dir <dir>)."
     )

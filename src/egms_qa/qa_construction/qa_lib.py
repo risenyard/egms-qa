@@ -734,8 +734,8 @@ def _grid_point_text(token: str) -> str | None:
     row = int(match.group(1))
     col_text = match.group(2)
     col = int(col_text)
-    # Some legacy C32 labels contain a trailing direction digit, for example
-    # r4c11 for grid column 1. Grid coordinates themselves are always 0..7.
+    # The released C32 vocabulary can append a direction code to the first grid
+    # token, for example r4c11 for grid column 1. Coordinates remain 0..7.
     if col > 7 and col_text.endswith("1") and int(col_text[:-1]) <= 7:
         col = int(col_text[:-1])
     if not (0 <= row <= 7 and 0 <= col <= 7):

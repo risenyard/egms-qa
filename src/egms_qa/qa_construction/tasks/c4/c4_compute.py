@@ -4,7 +4,7 @@ The family has two stages:
 
 1. reference:
    Build a European reference distribution over valid-bin
-   ``bin_abs_velocity_p90`` values from the full V4 candidate pool.
+   ``bin_abs_velocity_p90`` values from the full European candidate pool.
 
 2. final:
    Use a frozen ``T_fast`` from that reference distribution to compute

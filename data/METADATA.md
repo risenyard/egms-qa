@@ -28,9 +28,6 @@ i.e. 294 steps. Tiles overlap, so a persistent-scatterer `pid` can intentionally
 occur in multiple tiles. The files are processed source tiles, not untouched
 official EGMS archives.
 
-The old local `egms_merged_U_no_tail.parquet` belongs to a smaller regional
-experiment and is not the source of the all-Europe EGMS-QA release.
-
 ## Install the full release
 
 ```bash
