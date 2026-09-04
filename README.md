@@ -30,6 +30,8 @@ tile (variable # points, 294-step histories)
    → 2-layer projector → prefix ; "Question: …\nAnswer:" → frozen host LLM + LoRA → answer
 ```
 
+![EGMS-QA method overview](docs/assets/egms_qa_method_overview.jpg)
+
 ## The three blocks
 
 Each block pairs a code module here with its released artifacts on 🤗 Hugging Face:

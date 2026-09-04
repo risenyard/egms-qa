@@ -29,6 +29,8 @@ token,再由一个宿主语言模型用自然语言回答监测类问题,并对�
    → 两层投影器 → 前缀 ; "Question: …\nAnswer:" → 冻结宿主 LLM + LoRA → 答案
 ```
 
+![EGMS-QA 方法概览](docs/assets/egms_qa_method_overview.jpg)
+
 ## 三个模块
 
 每一块都由本仓库的代码模块与其在 🤗 Hugging Face 上发布的产物配对:
