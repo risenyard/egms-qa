@@ -27,7 +27,7 @@ token,再由一个宿主语言模型用自然语言回答监测类问题,并对�
 
 ```
 瓦片(点数可变,294 步历史)
-   → 冻结的 EGMS Encoder 4.3 + 8×8 池化 → 65 × 256 EGMS token
+   → 冻结的 EGMS-QA Encoder + 8×8 池化 → 65 × 256 EGMS token
    → 两层投影器 → 前缀 ; "Question: …\nAnswer:" → 冻结宿主 LLM + LoRA → 答案
 ```
 
@@ -101,7 +101,7 @@ Ortho Vertical 产品的修改与重打包衍生物(© European Union, Copernicu
 当前 release 支持:
 
 - 在发布的 10,000-tile 数据集上复现 encoder 预训练、token 提取、translator 训练与评测;
-- 编码已经符合 EGMS-QA NPZ 契约,且与发布版 304 步源时间轴和 `[8,302)` 模型窗口兼容的新 tile;
+- 编码已经符合 EGMS-QA NPZ 契约、直接存储 294 步 `[0,294)` 模型窗口的新 tile;
 - 在用户自行准备的 NPZ tile 集合上训练,前提是用户同时提供匹配的 split manifest、data config 和仅由 train split 拟合的 normalization 文件。
 
 当前 release 不包含:
@@ -110,7 +110,7 @@ Ortho Vertical 产品的修改与重打包衍生物(© European Union, Copernicu
 - 任意官方 EGMS ZIP/CSV 到 EGMS-QA NPZ tile 的转换;
 - 针对新 EGMS 产品版本的时间轴对齐、缺失率筛选、窗口选择、空间划分和 normalization 自动计算。
 
-不同 EGMS 参考期不能直接照搬发布版 `[8,302)` 窗口或 normalization;训练前必须根据新语料重新确定这些数据决策。
+发布文件中的 `[0,294)` 对应原始 304 步准备时间轴的 `[8,302)`。不同 EGMS 参考期不能直接照搬这一对齐或 normalization;训练前必须根据新语料重新确定这些数据决策。
 
 ## 复现
 

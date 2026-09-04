@@ -110,9 +110,10 @@ For the exact reference-value algorithm of any task, see the matching
 - **Unit**: a 7 km tile; 10,000 tiles across Europe, split 8,000 / 1,000 / 1,000
   (train / validation / test) by spatial unit.
 - **Source**: EGMS Level-3 Ortho Vertical displacement (2019–2023). The 10,000
-  processed source tiles are released as NPZ under
-  `artifacts/source_tiles/` in `risenyard/egms-qa-dataset`. They contain 304
-  prepared steps; the encoder uses `[8,302)` (294 steps). See the
+  model-ready source tiles are released as NPZ under
+  `artifacts/source_tiles/` in `risenyard/egms-qa-dataset`. They store 294
+  model steps and the encoder reads `[0,294)` directly. This corresponds to
+  `[8,302)` on the original 304-step prepared axis. See the
   [HF provenance record](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/SOURCE_PROVENANCE.md).
 - **Representation**: each tile is encoded to 65 tokens (1 summary + 8×8 spatial
   cells) of dimension 256 by the frozen EGMS encoder (see `egms_encoder`).

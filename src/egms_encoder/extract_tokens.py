@@ -31,22 +31,27 @@ import torch
 from egms_encoder import __version__
 from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
 from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT, TileStore
+from egms_qa.paths import (
+    ENCODER_CKPT,
+    ENCODER_CONFIG,
+    ENCODER_NORMALIZATION,
+    SPLIT_MANIFEST,
+)
 
-DEFAULT_CHECKPOINT = Path("data/encoder/checkpoint/encoder.pt")
-DEFAULT_ENCODER_CONFIG = Path("data/encoder/checkpoint/args.json")
-DEFAULT_MANIFEST = Path("data/encoder/manifest/split.parquet")
-DEFAULT_DATA_CONFIG = Path("data/encoder/manifest/data_config.json")
+DEFAULT_TILE_SIZE = 7000.0
 DEFAULT_GRID_SIZE = 8
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Run EGMS Encoder 4.3 over the released 10k tiles and export EGMS tokens."
+        description="Run the released EGMS-QA Encoder and export pooled EGMS tokens."
     )
-    p.add_argument("--checkpoint", default=str(DEFAULT_CHECKPOINT))
-    p.add_argument("--encoder-config", default=str(DEFAULT_ENCODER_CONFIG))
-    p.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
-    p.add_argument("--data-config", default=str(DEFAULT_DATA_CONFIG))
+    p.add_argument("--checkpoint", default=str(ENCODER_CKPT))
+    p.add_argument("--model-config", default=str(ENCODER_CONFIG))
+    p.add_argument("--normalization", default=str(ENCODER_NORMALIZATION))
+    p.add_argument("--manifest", default=str(SPLIT_MANIFEST))
+    p.add_argument("--data-config",
+                   default=str(SPLIT_MANIFEST.parent / "data_config.json"))
     p.add_argument("--output-dir", default="outputs/tokens")
     p.add_argument("--output-name", default="")
     p.add_argument("--grid-size", type=int, default=DEFAULT_GRID_SIZE)
@@ -126,25 +131,24 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     ckpt_path = Path(args.checkpoint)
-    norm_path = ckpt_path.parent / "normalization.json"
+    norm_path = Path(args.normalization)
     norm = load_normalization(norm_path)
     norm_mean = float(norm["mean"])
     norm_std = float(norm["std"])
     print(f"[norm] mean={norm_mean:.4f} std={norm_std:.4f}", flush=True)
 
-    encoder_config_path = Path(args.encoder_config)
+    model_config_path = Path(args.model_config)
     print(f"[load] {ckpt_path}", flush=True)
-    model, encoder_config = load_encoder_checkpoint(
-        ckpt_path, encoder_config_path, device
+    model, model_config = load_encoder_checkpoint(
+        ckpt_path, model_config_path, device
     )
-    architecture = encoder_config["architecture"]
     print(
-        f"[encoder] d_model={architecture['d_model']}, "
-        f"layers={architecture['spatial_layers']}, heads={architecture['spatial_heads']}",
+        f"[encoder] d_model={model_config['d_model']}, "
+        f"layers={model_config['spatial_layers']}, heads={model_config['spatial_heads']}",
         flush=True,
     )
-    input_length = int(architecture["input_length"])
-    tile_size = float(args.tile_size or encoder_config["data"]["tile_size_m"])
+    input_length = int(model_config["input_length"])
+    tile_size = float(args.tile_size or DEFAULT_TILE_SIZE)
     if tile_size <= 0:
         raise ValueError("--tile-size must be positive")
 
@@ -167,7 +171,7 @@ def main() -> None:
         raise ValueError("--log-every must be positive")
     n_patch = args.grid_size * args.grid_size
     n_tok = n_patch + 1
-    d_model = int(architecture["d_model"])
+    d_model = int(model_config["d_model"])
 
     spatial_tokens = np.zeros((n_tiles, n_tok, d_model), dtype=np.float32)
     token_mask = np.zeros((n_tiles, n_tok), dtype=bool)
@@ -228,8 +232,8 @@ def main() -> None:
     )
     out_pt = out_dir / output_name
     metadata = {
-        "schema_version": "egms-tokens-1.0",
-        "encoder_release": "EGMS Encoder 4.3",
+        "schema_version": "egms-qa-tokens-1.0",
+        "encoder_model_type": model_config["model_type"],
         "code_version": __version__,
         "source_repositories": {
             "encoder": "risenyard/egms-qa-encoder",
@@ -237,12 +241,13 @@ def main() -> None:
         },
         "input_sha256": {
             "checkpoint": _sha256(ckpt_path),
-            "encoder_config": _sha256(encoder_config_path),
+            "model_config": _sha256(model_config_path),
             "normalization": _sha256(norm_path),
             "manifest": _sha256(manifest_path),
             "data_config": _sha256(data_config_path),
         },
-        "encoder_config": encoder_config,
+        "encoder_config": model_config,
+        "coord_scale_m": float(model_config["coord_scale_m"]),
         "normalizer_mean": norm_mean,
         "normalizer_std": norm_std,
         "tile_size_m": tile_size,

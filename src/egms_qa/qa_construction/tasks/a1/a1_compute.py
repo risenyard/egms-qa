@@ -26,11 +26,16 @@ import numpy as np
 import pandas as pd
 import torch
 
+from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
+from egms_qa.paths import ENCODER_CKPT, ENCODER_CONFIG, ENCODER_NORMALIZATION
+
 
 ROOT = Path(".")
 ENCODER_DATA = ROOT / "data/encoder"
 
-CKPT = ENCODER_DATA / "checkpoint/encoder.pt"
+CKPT = ENCODER_CKPT
+MODEL_CONFIG = ENCODER_CONFIG
+NORMALIZATION = ENCODER_NORMALIZATION
 MANIFEST = ENCODER_DATA / "manifest/split.parquet"
 DATA_CONFIG = ENCODER_DATA / "manifest/data_config.json"
 TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
@@ -60,12 +65,14 @@ def angular_drift(cosine_value: float) -> float:
     return float(np.arccos(np.clip(cosine_value, -1.0, 1.0)) / np.pi)
 
 
-def load_encoder(checkpoint_path: Path, config_path: Path, device: torch.device):
-    from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
-
-    config_path = checkpoint_path.parent / "args.json"
+def load_encoder(
+    checkpoint_path: Path,
+    config_path: Path,
+    normalization_path: Path,
+    device: torch.device,
+):
     model, config = load_encoder_checkpoint(checkpoint_path, config_path, device)
-    norm = load_normalization(checkpoint_path.parent / "normalization.json")
+    norm = load_normalization(normalization_path)
     return model, config, float(norm["mean"]), float(norm["std"])
 
 
@@ -115,7 +122,8 @@ def metric_summary(values: np.ndarray) -> dict[str, float]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--checkpoint", default=str(CKPT))
-    ap.add_argument("--encoder-config", default=str(CKPT.parent / "args.json"))
+    ap.add_argument("--model-config", default=str(MODEL_CONFIG))
+    ap.add_argument("--normalization", default=str(NORMALIZATION))
     ap.add_argument("--manifest", default=str(MANIFEST))
     ap.add_argument("--data-config", default=str(DATA_CONFIG))
     ap.add_argument("--token-cache", default=str(TOKEN_CACHE))
@@ -151,10 +159,10 @@ def main() -> None:
     chosen = shard_items(all_chosen, args.shard_index, args.num_shards)
     manifest_idx = {str(t): i for i, t in enumerate(manifest["tile_id"].astype(str))}
 
-    model, encoder_config, norm_mean, norm_std = load_encoder(
-        Path(args.checkpoint), Path(args.encoder_config), device
+    model, model_config, norm_mean, norm_std = load_encoder(
+        Path(args.checkpoint), Path(args.model_config), Path(args.normalization), device
     )
-    input_length = int(encoder_config["architecture"]["input_length"])
+    input_length = int(model_config["input_length"])
     if tw.input_length != input_length:
         raise ValueError(f"time window length {tw.input_length} != checkpoint input_length {input_length}")
 
@@ -238,7 +246,7 @@ def main() -> None:
         "checkpoint": str(Path(args.checkpoint).resolve()),
         "token_cache": str(Path(args.token_cache).resolve()),
         "token_cache_checkpoint_sha256": token_metadata.get("input_sha256", {}).get("checkpoint"),
-        "coord_scale": encoder_config["architecture"]["coord_scale_m"],
+        "coord_scale": model_config["coord_scale_m"],
         "metric_diagnostics": {
             "A11_global_angular_drift": metric_summary(tile["A11_global_angular_drift"].to_numpy(dtype=float)),
             "A11_global_stability": metric_summary(tile["A11_global_stability"].to_numpy(dtype=float)),

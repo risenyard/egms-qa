@@ -31,18 +31,24 @@ STATIC_COLUMNS = [
     "acceleration", "acceleration_std", "seasonality", "seasonality_std",
 ]
 FEATURE_COLUMNS = ["easting", "northing", *STATIC_COLUMNS]
-DEFAULT_ENCODER_CONFIG = "data/encoder/checkpoint/args.json"
+DEFAULT_MODEL_CONFIG = "data/encoder/checkpoint/config.json"
+DEFAULT_TRAINING_ARGS = "data/encoder/checkpoint/training_args.json"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="EGMS Encoder 4.3 masked-reconstruction pretraining on the released 10k tiles."
+        description="EGMS-QA Encoder masked-reconstruction pretraining."
     )
     # Released tile data: split manifest + data config + normalization
     p.add_argument(
-        "--encoder-config",
-        default=DEFAULT_ENCODER_CONFIG,
-        help="Encoder 4.3 configuration downloaded from the HF encoder repository.",
+        "--model-config",
+        default=DEFAULT_MODEL_CONFIG,
+        help="Public encoder architecture config.json.",
+    )
+    p.add_argument(
+        "--training-args",
+        default=DEFAULT_TRAINING_ARGS,
+        help="Public training recipe training_args.json.",
     )
     p.add_argument("--manifest", default="data/encoder/manifest/split.parquet",
                    help="Split manifest parquet (tile_id, path, split, ...).")
@@ -70,7 +76,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--num-heads", type=int, default=None)
     p.add_argument("--dropout", type=float, default=None)
     p.add_argument("--input-length", type=int, default=None,
-                   help="Number of time steps; defaults to the configured [8,302) window.")
+                   help="Number of time steps; defaults to config.json.")
     # Masking
     p.add_argument("--mask-ratio", type=float, default=None)
     p.add_argument("--mask-strategy", default=None, choices=["random", "block"])
@@ -93,7 +99,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--residual-head-mode", default=None, choices=["additive", "aux_only"],
                    help="add residual correction to reconstruction or train it only as an auxiliary head")
     p.add_argument("--coord-scale", type=float, default=None,
-                   help="Positive coordinate divisor; defaults to the Encoder 4.3 HF configuration.")
+                   help="Positive coordinate divisor; defaults to config.json.")
     p.add_argument("--residual-head-lr", type=float, default=None,
                    help="optional learning rate for residual head parameters")
     p.add_argument("--init-from-checkpoint", default=None,
@@ -131,36 +137,44 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return p.parse_args(argv)
 
 
-def apply_encoder_43_config(args: argparse.Namespace, config: dict) -> argparse.Namespace:
-    """Fill unspecified CLI options from the HF Encoder 4.3 configuration."""
-    architecture = config["architecture"]
-    data = config["data"]
-    masking = config["masking"]
-    point_sampling = config["point_sampling"]
-    loss = config["loss"]
-    optimization = config["optimization"]
-    validation = config["validation"]
-    checkpointing = config["checkpointing"]
+def apply_release_config(
+    args: argparse.Namespace,
+    model_config: dict,
+    training_args: dict,
+) -> argparse.Namespace:
+    """Fill unspecified CLI options from the public model and training files."""
+    if training_args.get("schema_version") != "egms-qa-encoder-training-1.0":
+        raise ValueError("unsupported encoder training_args schema")
+    data = training_args["data"]
+    masking = training_args["masking"]
+    point_sampling = training_args["point_sampling"]
+    loss = training_args["loss"]
+    optimization = training_args["optimization"]
+    validation = training_args["validation"]
+    checkpointing = training_args.get("checkpointing", {})
+    if int(data["model_input_steps"]) != int(model_config["input_length"]):
+        raise ValueError("training_args model_input_steps does not match config.json")
     strategy = str(masking["strategy"])
     defaults = {
         "max_tile_points": data["maximum_points_per_tile"],
         "tiles_per_batch": optimization["tiles_per_batch"],
-        "d_model": architecture["d_model"],
-        "num_layers": architecture["spatial_layers"],
-        "num_heads": architecture["spatial_heads"],
-        "dropout": architecture["dropout"],
+        "d_model": model_config["d_model"],
+        "num_layers": model_config["spatial_layers"],
+        "num_heads": model_config["spatial_heads"],
+        "dropout": model_config["dropout"],
+        "input_length": model_config["input_length"],
         "mask_ratio": masking["train_ratio"],
         "mask_strategy": "block" if strategy == "synchronized_block" else strategy,
         "sync_mask": strategy == "synchronized_block",
         "mask_schedule": masking["schedule"],
         "eval_mask_ratio": masking["evaluation_ratio"],
-        "patch_size": architecture["patch_size"],
-        "temporal_layers": architecture["temporal_layers"],
-        "temporal_heads": architecture["temporal_heads"],
+        "patch_size": model_config["patch_size"],
+        "temporal_layers": model_config["temporal_layers"],
+        "temporal_heads": model_config["temporal_heads"],
         "residual_loss_weight": loss["residual_loss_weight"],
         "residual_consistency_weight": loss["residual_consistency_weight"],
-        "residual_head_mode": architecture["residual_head_mode"],
-        "coord_scale": architecture["coord_scale_m"],
+        "residual_head_mode": model_config["residual_head_mode"],
+        "coord_scale": model_config["coord_scale_m"],
         "residual_head_lr": optimization["residual_head_learning_rate"],
         "point_sampling": point_sampling["method"],
         "residual_sampling_alpha": point_sampling["residual_sampling_alpha"],
@@ -176,9 +190,9 @@ def apply_encoder_43_config(args: argparse.Namespace, config: dict) -> argparse.
         "val_batches": validation["batches"],
         "val_every_steps": validation["interval_steps"],
         "val_seed": validation["seed"],
-        "checkpoint_every_steps": checkpointing["interval_steps"],
-        "log_every_steps": checkpointing["log_interval_steps"],
-        "train_window_steps": checkpointing["rolling_window_steps"],
+        "checkpoint_every_steps": checkpointing.get("interval_steps", 5_000),
+        "log_every_steps": checkpointing.get("log_interval_steps", 200),
+        "train_window_steps": checkpointing.get("rolling_window_steps", 1_000),
     }
     for name, value in defaults.items():
         if getattr(args, name) is None:
@@ -227,14 +241,18 @@ def validation_tile_ids(val_batches) -> list[int]:
 
 def main() -> None:
     args = parse_args()
-    encoder_config_path = Path(args.encoder_config)
-    if not encoder_config_path.is_file():
+    model_config_path = Path(args.model_config)
+    if not model_config_path.is_file():
         raise FileNotFoundError(
-            f"Encoder config not found: {encoder_config_path}. "
+            f"Encoder config not found: {model_config_path}. "
             "Download risenyard/egms-qa-encoder into data/encoder/checkpoint first."
         )
-    encoder_config = load_encoder_config(encoder_config_path)
-    args = apply_encoder_43_config(args, encoder_config)
+    training_args_path = Path(args.training_args)
+    if not training_args_path.is_file():
+        raise FileNotFoundError(f"Training recipe not found: {training_args_path}")
+    model_config = load_encoder_config(model_config_path)
+    training_args = json.loads(training_args_path.read_text(encoding="utf-8"))
+    args = apply_release_config(args, model_config, training_args)
     validate_training_args(args)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -245,21 +263,12 @@ def main() -> None:
     # Load data via TileStore
     tile_store = TileStore.from_manifest(args.manifest, args.data_config)
     configured_input_length = tile_store.time_window.input_length
-    if args.input_length is None:
-        args.input_length = configured_input_length
-    elif args.input_length > configured_input_length:
+    if args.input_length != configured_input_length:
         raise ValueError(
-            f"Requested input_length={args.input_length} exceeds the configured window "
-            f"{configured_input_length}"
+            f"Model input_length={args.input_length} does not match the data contract "
+            f"({configured_input_length})"
         )
-    elif args.input_length < configured_input_length:
-        print(
-            f"NOTE: --input-length={args.input_length} < the configured window "
-            f"{configured_input_length} "
-            f"(trailing steps will be unused)",
-            flush=True,
-        )
-    with (output_dir / "args.json").open("w", encoding="utf-8") as f:
+    with (output_dir / "training_args.json").open("w", encoding="utf-8") as f:
         json.dump(vars(args), f, indent=2, sort_keys=True)
 
     train_indices = tile_store.split_tile_indices("train")
@@ -506,8 +515,13 @@ def set_optimizer_lrs(args, optimizer, current_lr: float) -> None:
 
 def load_init_checkpoint(model, checkpoint_path: Path, device) -> None:
     """Warm-start weights without loading optimizer/scaler state."""
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
-    state = checkpoint["model"]
+    if checkpoint_path.suffix == ".safetensors":
+        from safetensors.torch import load_file
+
+        state = load_file(str(checkpoint_path), device=str(device))
+    else:
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
+        state = checkpoint["model"]
     incompatible = model.load_state_dict(state, strict=False)
     allowed_missing = {
         "residual_scale",

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from egms_encoder.pretrain import apply_encoder_43_config, parse_args, validate_training_args
+from egms_encoder.pretrain import apply_release_config, parse_args, validate_training_args
 
 
-EXPECTED_ENCODER_43_DEFAULTS = {
+EXPECTED_RELEASE_DEFAULTS = {
     "max_tile_points": 4096,
     "tiles_per_batch": 8,
     "d_model": 256,
     "num_layers": 6,
     "num_heads": 8,
     "dropout": 0.1,
+    "input_length": 294,
     "mask_ratio": 0.3,
     "eval_mask_ratio": 0.3,
     "patch_size": 8,
@@ -41,16 +42,18 @@ EXPECTED_ENCODER_43_DEFAULTS = {
 
 
 def test_pretrain_defaults_match_public_encoder_recipe() -> None:
-    config = {
-        "schema_version": "egms-qa-encoder-training-config-1.0",
-        "encoder_version": "4.3",
-        "architecture": {
-            "d_model": 256, "spatial_layers": 6, "spatial_heads": 8,
-            "dropout": 0.1, "patch_size": 8, "temporal_layers": 2,
-            "temporal_heads": 4, "residual_head_mode": "additive",
-            "coord_scale_m": 3500.0,
-        },
-        "data": {"maximum_points_per_tile": 4096},
+    model_config = {
+        "schema_version": "egms-qa-encoder-config-1.0",
+        "model_type": "egms_encoder",
+        "input_length": 294,
+        "d_model": 256, "spatial_layers": 6, "spatial_heads": 8,
+        "dropout": 0.1, "patch_size": 8, "temporal_layers": 2,
+        "temporal_heads": 4, "residual_head_mode": "additive",
+        "coord_scale_m": 3500.0,
+    }
+    training_args = {
+        "schema_version": "egms-qa-encoder-training-1.0",
+        "data": {"model_input_steps": 294, "maximum_points_per_tile": 4096},
         "masking": {
             "strategy": "synchronized_block", "train_ratio": 0.3,
             "evaluation_ratio": 0.3, "schedule": "fixed",
@@ -71,10 +74,12 @@ def test_pretrain_defaults_match_public_encoder_recipe() -> None:
         },
     }
     args = parse_args([])
-    args = apply_encoder_43_config(args, config)
+    args = apply_release_config(args, model_config, training_args)
     assert {
-        key: getattr(args, key) for key in EXPECTED_ENCODER_43_DEFAULTS
-    } == EXPECTED_ENCODER_43_DEFAULTS
+        key: getattr(args, key) for key in EXPECTED_RELEASE_DEFAULTS
+    } == EXPECTED_RELEASE_DEFAULTS
+    assert args.model_config == "data/encoder/checkpoint/config.json"
+    assert args.training_args == "data/encoder/checkpoint/training_args.json"
     assert args.manifest == "data/encoder/manifest/split.parquet"
     assert args.data_config == "data/encoder/manifest/data_config.json"
     assert args.normalization == "data/encoder/checkpoint/normalization.json"

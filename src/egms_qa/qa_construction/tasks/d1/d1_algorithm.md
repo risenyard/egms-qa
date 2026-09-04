@@ -5,7 +5,11 @@ geometry table.
 
 ## Inputs
 
-For each tile, read the EGMS encoder EGMS displacement time series, slice epochs 8:302, and take the median displacement over all points at each epoch. The epoch cadence is 6 days.
+For each tile, read the stored model-ready EGMS displacement interval `[0,294)`
+and take the median displacement over all points at each epoch. This stored
+interval corresponds exactly to `[8,302)` on the original 304-step prepared
+axis. The epoch cadence is 6 days and the original index offset is retained in
+the data config for physical-time calculations.
 
 ## Fitted Geometry
 

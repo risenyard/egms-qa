@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib
@@ -29,15 +30,11 @@ import pandas as pd
 
 ROOT = Path(".")
 MANIFEST = ROOT / "data/encoder/manifest/split.parquet"
+DATA_CONFIG = ROOT / "data/encoder/manifest/data_config.json"
 B51_TABLE = ROOT / "outputs/tasks/b5/b5_final_table.csv"
 OUT_DIR = ROOT / "outputs/tasks/d2"
 
-T_START = 8
-T_END = 302
-CADENCE_DAYS = 6.0
 YEAR_DAYS = 365.25
-START_YEAR = 2019.0 + T_START * CADENCE_DAYS / YEAR_DAYS
-DELTA_T = CADENCE_DAYS / YEAR_DAYS
 MIN_VALID_EPOCHS = 50
 D24_MIN_VALID_WINDOW_EPOCHS = 50
 MIN_VALID_POINTS = 30
@@ -45,10 +42,86 @@ EPS = 1e-9
 D21_B51_MIN = 1.0
 D21_COHERENCE_MIN = 0.20
 
-TIME_YEARS = START_YEAR + np.arange(T_END - T_START, dtype=np.float64) * DELTA_T
-ANNUAL_COS = np.cos(2.0 * np.pi * TIME_YEARS)
-ANNUAL_SIN = np.sin(2.0 * np.pi * TIME_YEARS)
-D24_MID = (T_END - T_START) // 2
+
+@dataclass(frozen=True)
+class D2TimeAxis:
+    stored_steps: int
+    t_start: int
+    t_end: int
+    original_source_steps: int
+    original_index_offset: int
+    original_epoch_year: float
+    cadence_days: float
+
+    @property
+    def input_length(self) -> int:
+        return self.t_end - self.t_start
+
+    @property
+    def start_year(self) -> float:
+        return (
+            self.original_epoch_year
+            + self.original_index_offset * self.cadence_days / YEAR_DAYS
+        )
+
+    @classmethod
+    def from_file(cls, path: str | Path) -> "D2TimeAxis":
+        path = Path(path)
+        with path.open(encoding="utf-8") as handle:
+            config = json.load(handle)
+        try:
+            raw = config["time_window"]
+            stored_steps = int(
+                raw["stored_steps"] if "stored_steps" in raw else raw["source_steps"]
+            )
+            axis = cls(
+                stored_steps=stored_steps,
+                t_start=int(raw["t_start"]),
+                t_end=int(raw["t_end"]),
+                original_source_steps=int(raw["original_source_steps"]),
+                original_index_offset=int(raw["original_index_offset"]),
+                original_epoch_year=float(raw["original_epoch_year"]),
+                cadence_days=float(raw["cadence_days"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"{path}: D2 requires explicit stored_steps, original_source_steps, "
+                "original_index_offset, original_epoch_year, and cadence_days"
+            ) from exc
+        declared_length = int(raw.get("input_length", axis.input_length))
+        if not (0 <= axis.t_start < axis.t_end <= axis.stored_steps):
+            raise ValueError(
+                f"{path}: invalid stored window [{axis.t_start},{axis.t_end}) "
+                f"for {axis.stored_steps} stored steps"
+            )
+        if declared_length != axis.input_length:
+            raise ValueError(
+                f"{path}: input_length={declared_length} does not match "
+                f"[{axis.t_start},{axis.t_end})"
+            )
+        if axis.input_length != 294:
+            raise ValueError(
+                f"{path}: D2 release contract requires 294 input steps, "
+                f"got {axis.input_length}"
+            )
+        return axis
+
+
+TIME_AXIS: D2TimeAxis | None = None
+TIME_YEARS = np.empty(0, dtype=np.float64)
+ANNUAL_COS = np.empty(0, dtype=np.float64)
+ANNUAL_SIN = np.empty(0, dtype=np.float64)
+D24_MID = 0
+
+
+def _configure_time_axis(axis: D2TimeAxis) -> None:
+    global TIME_AXIS, TIME_YEARS, ANNUAL_COS, ANNUAL_SIN, D24_MID
+    TIME_AXIS = axis
+    delta_t = axis.cadence_days / YEAR_DAYS
+    TIME_YEARS = axis.start_year + np.arange(axis.input_length, dtype=np.float64) * delta_t
+    ANNUAL_COS = np.cos(2.0 * np.pi * TIME_YEARS)
+    ANNUAL_SIN = np.sin(2.0 * np.pi * TIME_YEARS)
+    D24_MID = axis.input_length // 2
 
 
 def _annual_phasors(ts: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -204,8 +277,16 @@ def _dominant_peak_phase(ts: np.ndarray) -> tuple[float, float, str]:
 
 def _read_one(row: tuple[str, str, str]) -> dict[str, object]:
     tile_id, split, path = row
-    with np.load(path) as z:
-        ts = z["time_series"][:, T_START:T_END]
+    if TIME_AXIS is None:
+        raise RuntimeError("D2 time axis was not configured")
+    with np.load(path, allow_pickle=False) as z:
+        full_ts = z["time_series"]
+        if full_ts.ndim != 2 or full_ts.shape[1] != TIME_AXIS.stored_steps:
+            raise ValueError(
+                f"{path}: expected time_series [N,{TIME_AXIS.stored_steps}], "
+                f"got {full_ts.shape}"
+            )
+        ts = full_ts[:, TIME_AXIS.t_start:TIME_AXIS.t_end]
     coherence, valid_points, median_amp = _phase_coherence(ts)
     dispersion = _phase_dispersion_days(ts)
     peak_phase, peak_day, peak_season = _dominant_peak_phase(ts)
@@ -275,10 +356,10 @@ def _apply_d21_gate(row: object) -> tuple[str, str]:
     return str(row.D21_raw_peak_season), "clear"
 
 
-def _add_d21_labels(df_full: pd.DataFrame) -> pd.DataFrame:
-    if not B51_TABLE.exists():
-        raise FileNotFoundError(f"Missing B51 table: {B51_TABLE}")
-    b51 = pd.read_csv(B51_TABLE)
+def _add_d21_labels(df_full: pd.DataFrame, b51_table: Path = B51_TABLE) -> pd.DataFrame:
+    if not b51_table.exists():
+        raise FileNotFoundError(f"Missing B51 table: {b51_table}")
+    b51 = pd.read_csv(b51_table)
     out = df_full.merge(b51, on=["tile_id", "split"], how="left")
     labels = [_apply_d21_gate(row) for row in out.itertuples(index=False)]
     out["D21_dominant_seasonal_peak"] = [x[0] for x in labels]
@@ -332,12 +413,17 @@ def _plot_d21_distribution(df: pd.DataFrame, out_path: Path) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--manifest", default=str(MANIFEST))
+    ap.add_argument("--data-config", default=str(DATA_CONFIG))
+    ap.add_argument("--b51-table", default=str(B51_TABLE))
     ap.add_argument("--out-dir", default=str(OUT_DIR))
     ap.add_argument("--workers", type=int, default=int(os.environ.get("SLURM_CPUS_PER_TASK", "8")))
     ap.add_argument("--chunksize", type=int, default=16)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--reuse-diagnostics", action="store_true")
     args = ap.parse_args()
+
+    time_axis = D2TimeAxis.from_file(args.data_config)
+    _configure_time_axis(time_axis)
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -358,11 +444,15 @@ def main() -> None:
             manifest = manifest.head(args.limit).copy()
         rows = [(str(r.tile_id), str(r.split), str(r.path)) for r in manifest.itertuples(index=False)]
 
-        with ProcessPoolExecutor(max_workers=args.workers) as ex:
+        with ProcessPoolExecutor(
+            max_workers=args.workers,
+            initializer=_configure_time_axis,
+            initargs=(time_axis,),
+        ) as ex:
             records = list(ex.map(_read_one, rows, chunksize=args.chunksize))
         df_full = pd.DataFrame.from_records(records)
 
-    df = _add_d21_labels(df_full)
+    df = _add_d21_labels(df_full, Path(args.b51_table))
 
     df.to_csv(table_path, index=False)
     df_full.to_csv(detail_path, index=False)
@@ -378,7 +468,11 @@ def main() -> None:
             "D21_dominant_seasonal_peak": "raw peak season from angle(sum_i z_i), set to no_clear_seasonal_peak when B51_seasonality_p90 < 1.0 or D22_phase_coherence < 0.20",
             "D22_phase_coherence": "|sum_i z_i| / (sum_i |z_i| + eps), z_i = annual residual phasor per valid point",
             "D23_phase_dispersion_days": "sqrt(-2 ln Rbar) / (2pi) * 365.25, Rbar = amplitude-weighted circular resultant after excluding the lowest-amplitude 10% of valid points",
-            "D24_seasonal_amplitude_change_mm": "median_i(late annual amplitude_i - early annual amplitude_i), with early=time_series[:, 8:155] and late=time_series[:, 155:302]",
+            "D24_seasonal_amplitude_change_mm": (
+                "median_i(late annual amplitude_i - early annual amplitude_i), "
+                f"with early=stored time_series[:, {time_axis.t_start}:{time_axis.t_start + D24_MID}] "
+                f"and late=stored time_series[:, {time_axis.t_start + D24_MID}:{time_axis.t_end}]"
+            ),
         },
         "d21_gates": {
             "B51_seasonality_p90_min": D21_B51_MIN,
@@ -388,10 +482,13 @@ def main() -> None:
         "d21_gate_reason_counts": df["D21_gate_reason"].value_counts().to_dict(),
         "d21_raw_peak_season_counts": df["D21_raw_peak_season"].value_counts().to_dict(),
         "time_window": {
-            "t_start": T_START,
-            "t_end": T_END,
-            "start_year": START_YEAR,
-            "cadence_days": CADENCE_DAYS,
+            "stored_steps": time_axis.stored_steps,
+            "t_start": time_axis.t_start,
+            "t_end": time_axis.t_end,
+            "original_source_steps": time_axis.original_source_steps,
+            "original_index_offset": time_axis.original_index_offset,
+            "start_year": time_axis.start_year,
+            "cadence_days": time_axis.cadence_days,
         },
         "validity": {
             "min_valid_epochs_per_point": MIN_VALID_EPOCHS,

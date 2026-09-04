@@ -21,10 +21,11 @@ def test_spatial_pooling_uses_summary_token_and_row_major_cells() -> None:
 
 def test_extract_defaults_target_hf_installed_inputs() -> None:
     args = parse_args([])
-    assert args.checkpoint == "data/encoder/checkpoint/encoder.pt"
-    assert args.encoder_config == "data/encoder/checkpoint/args.json"
-    assert args.manifest == "data/encoder/manifest/split.parquet"
-    assert args.data_config == "data/encoder/manifest/data_config.json"
+    assert args.checkpoint.endswith("data/encoder/checkpoint/encoder.safetensors")
+    assert args.model_config.endswith("data/encoder/checkpoint/config.json")
+    assert args.normalization.endswith("data/encoder/checkpoint/normalization.json")
+    assert args.manifest.endswith("data/encoder/manifest/split.parquet")
+    assert args.data_config.endswith("data/encoder/manifest/data_config.json")
     assert args.output_name == ""
 
 

@@ -24,7 +24,10 @@ of the observation window.
 
 ## Input
 
-For each tile, read point displacement `time_series[:, 8:302]`.
+For each tile, read the stored model-ready displacement
+`time_series[:, 0:294]`. The data config records that this is identical to
+`[8,302)` on the original 304-step prepared axis. D2 uses the stored window but
+adds the original index offset when constructing the physical time axis.
 
 ## D21 Formula
 
@@ -129,8 +132,8 @@ Window split:
 
 | window | input epochs |
 |---|---|
-| early | `time_series[:, 8:155]` |
-| late | `time_series[:, 155:302]` |
+| early | stored `time_series[:, 0:147]` |
+| late | stored `time_series[:, 147:294]` |
 
 For each point and each window, fit and remove a linear trend. Then fit annual
 cosine/sine coefficients by least squares:

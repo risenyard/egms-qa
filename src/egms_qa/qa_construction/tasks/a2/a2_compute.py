@@ -16,15 +16,24 @@ import numpy as np
 import pandas as pd
 import torch
 
+from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
+from egms_qa.paths import (
+    ENCODER_CKPT,
+    ENCODER_CONFIG,
+    ENCODER_NORMALIZATION,
+    ENCODER_TRAINING_ARGS,
+)
 
 ROOT = Path(".")
 ENCODER_DATA = ROOT / "data/encoder"
 
-CKPT = ENCODER_DATA / "checkpoint/encoder.pt"
+CKPT = ENCODER_CKPT
+MODEL_CONFIG = ENCODER_CONFIG
+NORMALIZATION = ENCODER_NORMALIZATION
+TRAINING_ARGS = ENCODER_TRAINING_ARGS
 MANIFEST = ENCODER_DATA / "manifest/split.parquet"
 DATA_CONFIG = ENCODER_DATA / "manifest/data_config.json"
 
-from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization  # noqa: E402
 from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT, TileStore  # noqa: E402
 
 
@@ -68,7 +77,9 @@ def summarize(values: np.ndarray) -> dict[str, float]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--checkpoint", default=str(CKPT))
-    ap.add_argument("--encoder-config", default=str(CKPT.parent / "args.json"))
+    ap.add_argument("--model-config", default=str(MODEL_CONFIG))
+    ap.add_argument("--normalization", default=str(NORMALIZATION))
+    ap.add_argument("--training-args", default=str(TRAINING_ARGS))
     ap.add_argument("--manifest", default=str(MANIFEST))
     ap.add_argument("--data-config", default=str(DATA_CONFIG))
     ap.add_argument("--out-dir", default="outputs/tasks/a2/work")
@@ -88,18 +99,19 @@ def main() -> None:
     print(f"[device] {device}", flush=True)
 
     ckpt_path = Path(args.checkpoint)
-    model, encoder_config = load_encoder_checkpoint(
-        ckpt_path, Path(args.encoder_config), device
-    )
-    norm = load_normalization(ckpt_path.parent / "normalization.json")
+    model, model_config = load_encoder_checkpoint(ckpt_path, args.model_config, device)
+    training_args = json.loads(Path(args.training_args).read_text(encoding="utf-8"))
+    norm = load_normalization(args.normalization)
     norm_mean = float(norm["mean"])
     norm_std = float(norm["std"])
     residual_std = float(norm.get("residual_std", 1.0))
 
     store = TileStore.from_manifest(args.manifest, args.data_config)
     input_length = int(store.time_window.input_length)
-    max_points = int(encoder_config["data"]["maximum_points_per_tile"])
-    mask_ratio = float(encoder_config["masking"]["evaluation_ratio"])
+    if input_length != int(model_config["input_length"]):
+        raise ValueError("data time window does not match encoder config")
+    max_points = int(training_args["data"]["maximum_points_per_tile"])
+    mask_ratio = float(training_args["masking"]["evaluation_ratio"])
     block_len = max(1, int(round(input_length * mask_ratio)))
     mask_start = (input_length - block_len) // 2
     mask_end = mask_start + block_len
@@ -181,8 +193,8 @@ def main() -> None:
 
             total_loss = (
                 global_mse
-                + float(getattr(train_args, "residual_loss_weight", 1.0)) * residual_head_mse
-                + float(getattr(train_args, "residual_consistency_weight", 0.1)) * residual_mse
+                + float(training_args["loss"]["residual_loss_weight"]) * residual_head_mse
+                + float(training_args["loss"]["residual_consistency_weight"]) * residual_mse
             )
             rows.append({
                 "tile_idx": tile_idx,
