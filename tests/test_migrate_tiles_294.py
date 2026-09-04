@@ -6,7 +6,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from egms_qa.migrate_tiles_294 import crop_one
+from egms_qa.migrate_tiles_294 import (
+    crop_one,
+    update_token_metadata_for_rebased_release,
+)
 from egms_qa.qa_construction.tasks.d2.d2_compute import (
     D2TimeAxis,
     _configure_time_axis,
@@ -117,3 +120,39 @@ def test_d2_values_match_before_and_after_rebasing(tmp_path: Path) -> None:
             assert old[key] == pytest.approx(new[key], abs=1e-12, nan_ok=True)
         else:
             assert old[key] == new[key]
+
+
+def test_token_metadata_preserves_historical_extraction_contract(
+    tmp_path: Path,
+) -> None:
+    metadata_path = (
+        tmp_path / "artifacts/representations/egms_tokens_10k_metadata.json"
+    )
+    metadata_path.parent.mkdir(parents=True)
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "egms-tokens-1.0",
+                "input_sha256": {
+                    "checkpoint": "old-checkpoint",
+                    "data_config": "old-data-config",
+                },
+                "input_length": 294,
+                "time_window_start": 8,
+                "time_window_end": 302,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    update_token_metadata_for_rebased_release(tmp_path, "new-data-config")
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["schema_version"] == "egms-tokens-1.1"
+    assert "input_sha256" not in metadata
+    assert metadata["historical_extraction_input_sha256"]["checkpoint"] == "old-checkpoint"
+    assert metadata["historical_extraction"]["time_window_start"] == 8
+    assert metadata["historical_extraction"]["time_window_end"] == 302
+    assert metadata["input_contract"]["stored_window"] == "[0,294)"
+    assert metadata["time_window_start"] == 0
+    assert metadata["time_window_end"] == 294
+    assert metadata["current_release"]["data_config_sha256"] == "new-data-config"

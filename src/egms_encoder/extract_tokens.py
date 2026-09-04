@@ -181,7 +181,11 @@ def main():
           f"min={n_points_per_tile.min()}  max={n_points_per_tile.max()}", flush=True)
 
     out_pt = out_dir / "encoder_tokens.pt"
+    with Path(args.data_config).open(encoding="utf-8") as handle:
+        data_config = json.load(handle)
+    configured_axis = data_config["time_window"]
     metadata = {
+        "schema_version": "egms-tokens-1.1",
         "encoder_checkpoint": str(ckpt_path.resolve()),
         "encoder_config_path": str(Path(args.model_config).resolve()),
         "coord_scale": float(model_config["coord_scale_m"]),
@@ -198,6 +202,21 @@ def main():
         "input_length": int(input_length),
         "time_window_start": int(tw.t_start),
         "time_window_end": int(tw.t_end),
+        "input_contract": {
+            "stored_steps": int(tw.stored_steps),
+            "stored_window": f"[{tw.t_start},{tw.t_end})",
+            "original_source_steps": int(
+                configured_axis.get("original_source_steps", tw.stored_steps)
+            ),
+            "original_window": (
+                f"[{configured_axis.get('original_t_start', tw.t_start)},"
+                f"{configured_axis.get('original_t_end', tw.t_end)})"
+            ),
+            "original_index_offset": int(
+                configured_axis.get("original_index_offset", tw.t_start)
+            ),
+            "cadence_days": configured_axis.get("cadence_days"),
+        },
         "token_layout": f"index 0 = CLS, 1..{n_patch} = {args.grid}x{args.grid} bins row-major",
         "extraction_script": str(Path(__file__).resolve()),
         "extraction_date_utc": dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",

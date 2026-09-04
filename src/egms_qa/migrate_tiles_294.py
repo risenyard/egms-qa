@@ -39,6 +39,7 @@ CHANGED_RELEASE_PATHS = {
     "metadata/migration_304_to_294.json",
     "metadata/migration_304_to_294_audit.parquet",
     "metadata/migration_304_to_294_regression.json",
+    "artifacts/representations/egms_tokens_10k_metadata.json",
 }
 
 
@@ -202,6 +203,70 @@ def _write_json_atomic(path: Path, payload: dict) -> None:
         raise
 
 
+def update_token_metadata_for_rebased_release(
+    release_dir: Path, data_config_sha256: str
+) -> None:
+    """Describe the current stored axis without erasing extraction provenance."""
+    metadata_path = (
+        release_dir / "artifacts/representations/egms_tokens_10k_metadata.json"
+    )
+    if not metadata_path.exists():
+        return
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    historical_hashes = metadata.pop("input_sha256", None)
+    if historical_hashes is None:
+        historical_hashes = metadata.get("historical_extraction_input_sha256")
+    if historical_hashes is None:
+        raise ValueError(f"{metadata_path}: missing extraction input hashes")
+
+    historical_start = int(metadata.get("time_window_start", SOURCE_START))
+    historical_end = int(metadata.get("time_window_end", SOURCE_END))
+    historical = metadata.get("historical_extraction", {})
+    historical.update(
+        {
+            "dataset_revision": ROLLBACK_REVISION,
+            "stored_source_steps": SOURCE_STEPS,
+            "time_window_start": historical.get(
+                "time_window_start", historical_start
+            ),
+            "time_window_end": historical.get("time_window_end", historical_end),
+            "note": (
+                "Tokens were extracted before storage-axis rebasing. The model "
+                "input values are bitwise identical to the current stored window."
+            ),
+        }
+    )
+    metadata.update(
+        {
+            "schema_version": "egms-tokens-1.1",
+            "historical_extraction_input_sha256": historical_hashes,
+            "input_contract": {
+                "stored_steps": STORED_STEPS,
+                "stored_window": "[0,294)",
+                "original_source_steps": SOURCE_STEPS,
+                "original_window": "[8,302)",
+                "original_index_offset": SOURCE_START,
+                "cadence_days": 6,
+            },
+            "historical_extraction": historical,
+            "current_release": {
+                "dataset_repository": "risenyard/egms-qa-dataset",
+                "data_config": "metadata/data_config.json",
+                "data_config_sha256": data_config_sha256,
+                "encoder_repository": "risenyard/egms-qa-encoder",
+                "encoder_checkpoint": "encoder.safetensors",
+                "encoder_config": "config.json",
+            },
+            "time_window_start": 0,
+            "time_window_end": STORED_STEPS,
+            "original_time_window_start": SOURCE_START,
+            "original_time_window_end": SOURCE_END,
+            "original_index_offset": SOURCE_START,
+        }
+    )
+    _write_json_atomic(metadata_path, metadata)
+
+
 def _update_release_metadata(release_dir: Path) -> None:
     config_path = release_dir / "metadata/data_config.json"
     config = json.loads(config_path.read_text(encoding="utf-8"))
@@ -259,6 +324,9 @@ def _update_release_metadata(release_dir: Path) -> None:
         "previous_huggingface_revision": ROLLBACK_REVISION,
     }
     _write_json_atomic(config_path, config)
+    update_token_metadata_for_rebased_release(
+        release_dir, data_config_sha256=sha256_file(config_path)
+    )
 
     readme_path = release_dir / "README.md"
     readme = readme_path.read_text(encoding="utf-8")
@@ -277,6 +345,11 @@ def _update_release_metadata(release_dir: Path) -> None:
     readme = readme.replace(
         "training split only, over the `[8,302)` window.",
         "training split only, over the stored `[0,294)` window (original `[8,302)`).",
+    )
+    readme = readme.replace(
+        "The identical file is mirrored\nbeside `encoder.pt` in `risenyard/egms-qa-encoder`",
+        "The identical file is mirrored beside `encoder.safetensors` and\n"
+        "`config.json` in `risenyard/egms-qa-encoder`",
     )
     readme_path.write_text(readme, encoding="utf-8")
 
