@@ -25,8 +25,8 @@ Files:
 
 ## Host models
 
-EGMS-QA trains four host models with the identical projector + LoRA recipe
-(ids in `../paths.py`):
+EGMS-QA provides four variants with the same projector-plus-LoRA architecture
+and model-specific training configurations (ids in `../paths.py`):
 
 | key | base LLM |
 |---|---|
@@ -54,6 +54,7 @@ python -m egms_qa.translator.evaluate \
 python -m egms_qa.translator.summarize_results
 ```
 
-Released adapters (one per host model) can be placed under
-`outputs/runs/<key>/best/` to evaluate without retraining; see the top-level
-README for the download link.
+Training writes compatible checkpoints under `outputs/runs/<key>/best/`.
+Released variants download directly to `outputs/runs/<key>/` and contain
+`projector.safetensors`, `translator_config.json`, and `adapter/`; see the
+top-level README for the download link.

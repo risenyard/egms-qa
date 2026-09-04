@@ -1,7 +1,7 @@
 """EGMS-QA translator modeling: projector, batch construction, loss, evaluation.
 
 Shared building blocks for the translator. ``train.py`` imports these to jointly
-train the ``EGMSProjector`` and a QLoRA adapter on a frozen host language model:
+train the ``EGMSProjector`` and a LoRA adapter on a frozen host language model:
 cross-entropy on answer tokens only, with
 inputs_embeds = [projector(tile tokens) ; embed(question)].
 """
