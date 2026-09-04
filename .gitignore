@@ -28,9 +28,6 @@ env/
 # Generated outputs (regenerate from scripts)
 /outputs/
 
-# Downloaded heavy data (keep only the lightweight metadata tracked in data/)
-/data/encoder/tokens/
-/data/encoder/checkpoint/*.pt
-/data/adapters/
-/data/tiles/
+# Runtime data installed from Hugging Face; no release data is tracked in Git.
+/data/
 /release/

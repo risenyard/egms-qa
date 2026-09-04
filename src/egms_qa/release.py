@@ -208,6 +208,10 @@ def install_release(release_dir: Path, target_root: Path) -> None:
         release_dir / "artifacts/reference_tables": target_root / "outputs/tasks",
     }
     file_links = {
+        release_dir / "metadata/data_config.json":
+            target_root / "data/encoder/manifest/data_config.json",
+        release_dir / "metadata/split_manifest.parquet":
+            target_root / "data/encoder/manifest/split.parquet",
         release_dir / "artifacts/representations/encoder_tokens_10k.pt":
             target_root / "data/encoder/tokens/encoder_tokens_10k.pt",
         release_dir / "artifacts/representations/encoder_tokens_10k_metadata.json":

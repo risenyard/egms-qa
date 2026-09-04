@@ -23,6 +23,7 @@ def test_release_manifest_audit_and_install(tmp_path: Path) -> None:
     _write(release / "artifacts/reference_tables/a1/a1_final_table.csv", b"tile_id\n")
     _write(release / "metadata/labels_meta.json", b"{}")
     _write(release / "metadata/qa_audit.json", b"{}")
+    _write(release / "metadata/data_config.json", b"{}")
     for split in ("train", "validation", "test"):
         _write(release / f"data/qa/{split}.jsonl", b"{}\n")
     pd.DataFrame(
@@ -41,5 +42,7 @@ def test_release_manifest_audit_and_install(tmp_path: Path) -> None:
     target = tmp_path / "checkout"
     install_release(release, target)
     assert (target / "data/tiles/E00N00/tile_0.npz").read_bytes() == b"tile"
+    assert (target / "data/encoder/manifest/data_config.json").read_bytes() == b"{}"
+    assert (target / "data/encoder/manifest/split.parquet").is_symlink()
     assert (target / "outputs/qa/v1_val.jsonl").read_bytes() == b"{}\n"
     assert (target / "outputs/tasks/a1/a1_final_table.csv").exists()
