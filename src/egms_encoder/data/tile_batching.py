@@ -25,7 +25,7 @@ def iter_tile_batches(
     max_batches: int | None = None,
     max_points: int | None = None,
     feature_columns_count: int = 10,
-    input_length: int = 302,
+    input_length: int = 294,
     point_sampling: str = "uniform",
     residual_sampling_alpha: float = 0.5,
 ) -> Iterable[dict]:

@@ -47,10 +47,7 @@ def main() -> None:
     from egms_encoder.data.tile_store import TileStore, TimeWindow
 
     cfg = json.load(open(args.data_config))
-    tw = TimeWindow(
-        t_start=int(cfg["time_window"]["t_start"]),
-        t_end=int(cfg["time_window"]["t_end"]),
-    )
+    tw = TimeWindow.from_config(cfg)
     manifest = pd.read_parquet(args.manifest)
     split_assignments = dict(zip(manifest["tile_id"].astype(str), manifest["split"].astype(str)))
     store = TileStore(manifest=manifest, time_window=tw, split_assignments=split_assignments)

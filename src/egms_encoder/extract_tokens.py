@@ -24,7 +24,6 @@ import time
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import torch
 
 
@@ -68,21 +67,12 @@ def load_encoder(checkpoint_path: Path, config_path: Path, device: torch.device)
 
 
 def load_tile_store(manifest_path: Path, data_config_path: Path):
-    from egms_encoder.data.tile_store import TileStore, TimeWindow
+    from egms_encoder.data.tile_store import TileStore
 
-    with open(data_config_path) as f:
-        cfg = json.load(f)
-    tw = TimeWindow(t_start=cfg["time_window"]["t_start"],
-                      t_end=cfg["time_window"]["t_end"])
     print(f"[manifest] reading {manifest_path}", flush=True)
-    manifest = pd.read_parquet(manifest_path)
-    split_assignments = dict(zip(manifest["tile_id"].astype(str),
-                                 manifest["split"].astype(str)))
-    store = TileStore(
-        manifest=manifest,
-        time_window=tw,
-        split_assignments=split_assignments,
-    )
+    store = TileStore.from_manifest(manifest_path, data_config_path)
+    tw = store.time_window
+    manifest = store.manifest
     print(f"[manifest] {store.num_tiles} tiles, input_length={tw.input_length}", flush=True)
     return store, tw, manifest
 
