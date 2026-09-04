@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: If you use EGMS-QA, please cite this software and the EGMS source product.
+title: "EGMS-QA: Natural-language question answering over European ground-motion time series"
+type: software
+authors:
+  - family-names: Li
+    given-names: Senyang
+version: 1.0.0
+date-released: 2026-09-04
+repository-code: https://github.com/risenyard/egms-qa
+url: https://huggingface.co/risenyard
+license: MIT
+keywords:
+  - European Ground Motion Service
+  - InSAR
+  - remote sensing
+  - question answering
+  - vision-language model
+references:
+  - type: dataset
+    title: European Ground Motion Service Level-3 Ortho Vertical
+    doi: 10.2909/4a14a29b-7db7-40e4-81ad-df3aa8dfbc6f
