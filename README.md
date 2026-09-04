@@ -75,7 +75,7 @@ uses a publication-oriented layout and is linked into the runtime paths by
 
 - **Encoder** — frozen checkpoint + normalization: [`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) → into `data/encoder/checkpoint/`
 - **Dataset** — QA, processed NPZ source tiles, encoder-token cache, labels, reference tables, and integrity metadata: [`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
-- **Translators** — 4 LoRA adapters + projectors, one dir per host model: [`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) → into `outputs/runs/` (→ `<key>/best/`)
+- **Translators** — 4 LoRA adapters + projectors, one dir per host model: [`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) → into `outputs/runs/` (→ `<key>/`)
 
 ```bash
 # download, audit, and link the structured dataset release into this checkout

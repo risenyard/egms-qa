@@ -17,7 +17,7 @@ from typing import Any
 
 import torch
 
-from egms_qa.translator.modeling import EGMSProjector
+from egms_qa.translator.checkpoint import load_projector, load_translator_config
 from egms_qa.translator.generation import build_prompt_q
 from egms_qa.translator.answer_extractor import (
     AMBIGUOUS,
@@ -53,11 +53,15 @@ HOST_MODEL_DEFAULT = DEFAULT_HOST_MODEL
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--adapter-dir", required=True, help="Checkpoint dir containing projector.pt and lora_adapter/.")
+    p.add_argument(
+        "--adapter-dir",
+        required=True,
+        help="Translator variant directory containing translator_config.json, projector.safetensors, and adapter/.",
+    )
     p.add_argument(
         "--host-model",
         default="",
-        help="Optional Hugging Face id or local base-model path; defaults to lora_adapter/adapter_config.json.",
+        help="Optional Hugging Face id or local base-model path; defaults to translator_config.json.",
     )
     p.add_argument("--token-cache", default=TOK_DEFAULT)
     p.add_argument("--labels", default=str(DEFAULT_LABELS))
@@ -209,16 +213,23 @@ def build_eval_rows(args: argparse.Namespace, tasks: list[TaskRecord]):
     return all_rows, labels
 
 
-def resolve_host_model(adapter_dir: str | Path, checkpoint: dict[str, Any], override: str = "") -> str:
+def resolve_host_model(
+    adapter_dir: str | Path,
+    config: dict[str, Any],
+    override: str = "",
+) -> str:
     if override:
         return override
-    adapter_config = Path(adapter_dir) / "lora_adapter" / "adapter_config.json"
+    candidate = str(config["base_model"]["name_or_path"]).strip()
+    adapter_path = str(config.get("adapter", {}).get("path", "adapter"))
+    adapter_config = Path(adapter_dir) / adapter_path / "adapter_config.json"
     if adapter_config.is_file():
-        config = json.loads(adapter_config.read_text(encoding="utf-8"))
-        candidate = str(config.get("base_model_name_or_path", "")).strip()
-        if candidate:
-            return candidate
-    candidate = str(checkpoint.get("args", {}).get("host_model", "")).strip()
+        adapter_values = json.loads(adapter_config.read_text(encoding="utf-8"))
+        adapter_base = str(adapter_values.get("base_model_name_or_path", "")).strip()
+        if adapter_base and adapter_base != candidate:
+            raise ValueError(
+                "adapter base_model_name_or_path does not match translator_config.json"
+            )
     return candidate or HOST_MODEL_DEFAULT
 
 
@@ -234,15 +245,27 @@ def load_model(
     from transformers import AutoTokenizer
 
     device = torch.device("cuda:0")
-    ck = torch.load(Path(adapter_dir) / "projector.pt", map_location="cpu", weights_only=False)
-    base = resolve_host_model(adapter_dir, ck, host_model_override)
-    tokenizer = AutoTokenizer.from_pretrained(base, trust_remote_code=True)
+    variant_dir = Path(adapter_dir)
+    config_path = variant_dir / "translator_config.json"
+    translator_config = load_translator_config(config_path)
+    base = resolve_host_model(variant_dir, translator_config, host_model_override)
+    revision = None if host_model_override else translator_config["base_model"].get("revision")
+    tokenizer = AutoTokenizer.from_pretrained(
+        base,
+        revision=revision,
+        trust_remote_code=True,
+    )
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     model_type = ""
     try:
-        model_type = json.load(open(Path(base) / "config.json")).get("model_type", "").lower()
+        base_config = transformers.AutoConfig.from_pretrained(
+            base,
+            revision=revision,
+            trust_remote_code=True,
+        )
+        model_type = str(getattr(base_config, "model_type", "")).lower()
     except Exception:
         pass
     if "gemma" in model_type:
@@ -251,7 +274,13 @@ def load_model(
         order = ["AutoModelForImageTextToText", "AutoModelForCausalLM"]
     else:
         order = ["AutoModelForCausalLM", "AutoModelForImageTextToText"]
-    kw = dict(trust_remote_code=True, torch_dtype=torch.bfloat16, device_map={"": 0})
+    kw = dict(
+        trust_remote_code=True,
+        torch_dtype=torch.bfloat16,
+        device_map={"": 0},
+    )
+    if revision:
+        kw["revision"] = revision
     model = None
     used = None
     last = None
@@ -268,21 +297,33 @@ def load_model(
         raise RuntimeError(f"could not load base={base} model_type={model_type}: {last}")
     print(f"[eval] loaded base model_type={model_type or '?'} via {used}", flush=True)
 
-    model = PeftModel.from_pretrained(model, str(Path(adapter_dir) / "lora_adapter"))
+    adapter_path = variant_dir / translator_config["adapter"]["path"]
+    model = PeftModel.from_pretrained(model, str(adapter_path))
     model.eval()
     model.config.use_cache = True
     model._needs_tti = any("vision" in n for n, _ in model.named_modules())
 
-    projector = EGMSProjector(ck["egms_dim"], ck["llm_hidden"]).to(device, torch.bfloat16)
-    projector.load_state_dict(ck["projector_state"])
-    projector.eval()
+    projector, translator_config = load_projector(
+        variant_dir / "projector.safetensors",
+        config_path,
+        device=device,
+        dtype=torch.bfloat16,
+    )
 
-    cache = torch.load(token_cache, map_location="cpu", weights_only=False)
+    cache = torch.load(token_cache, map_location="cpu", weights_only=True)
     spatial = cache["spatial_tokens"].float()
     token_mask = cache["token_mask"]
-    if ck.get("args", {}).get("cls_only"):
-        spatial = spatial[:, :1]
-        token_mask = token_mask[:, :1]
+    expected_tokens = int(translator_config["input"]["token_count"])
+    expected_width = int(translator_config["input"]["token_width"])
+    if spatial.ndim != 3 or tuple(spatial.shape[1:]) != (expected_tokens, expected_width):
+        raise ValueError(
+            f"token cache has shape {tuple(spatial.shape)}; expected "
+            f"[tiles,{expected_tokens},{expected_width}]"
+        )
+    if token_mask.shape != spatial.shape[:2]:
+        raise ValueError(
+            f"token mask has shape {tuple(token_mask.shape)}; expected {tuple(spatial.shape[:2])}"
+        )
     if token_mode == "summary_only":
         spatial = spatial[:, :1]
         token_mask = token_mask[:, :1]

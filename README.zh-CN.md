@@ -69,7 +69,7 @@ pip install -e ".[tasks]"        # + 任务参考值计算
 
 - **编码器** —— 冻结 checkpoint + 归一化参数:[`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) → 下载进 `data/encoder/checkpoint/`
 - **数据集** —— QA、处理后的 NPZ 源瓦片、encoder token、标签、参考值表与完整性元数据:[`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
-- **翻译器** —— 4 个 LoRA adapter + projector,每个宿主模型一个目录:[`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) → 下载进 `outputs/runs/`(→ `<key>/best/`)
+- **翻译器** —— 4 个 LoRA adapter + projector,每个宿主模型一个目录:[`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) → 下载进 `outputs/runs/`(→ `<key>/`)
 
 ```bash
 # 下载、审计并把专业发布结构链接到本 checkout 的运行路径

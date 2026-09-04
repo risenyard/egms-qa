@@ -21,8 +21,15 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn.functional as F
+from safetensors.torch import load_file, save_file
 from torch import nn
 
+from egms_qa.translator.checkpoint import (
+    CONFIG_SCHEMA as TRANSLATOR_CONFIG_SCHEMA,
+    MODEL_TYPE as TRANSLATOR_MODEL_TYPE,
+    QUESTION_TEMPLATE,
+    RESPONSE_INSTRUCTION_TEMPLATE,
+)
 from egms_qa.translator.modeling import (
     EGMSProjector,
     build_batch,
@@ -64,6 +71,16 @@ def parse_args() -> argparse.Namespace:
         "--host-model",
         default=HOST_MODEL_DEFAULT,
         help="Hugging Face id or local path of the frozen host language model.",
+    )
+    p.add_argument(
+        "--host-model-revision",
+        default="",
+        help="Optional immutable Hugging Face revision for the host model.",
+    )
+    p.add_argument(
+        "--variant",
+        default="",
+        help="Stable name written to translator_config.json.",
     )
     p.add_argument("--token-cache", default=TOK_DEFAULT)
     p.add_argument("--labels", default=str(DEFAULT_LABELS))
@@ -672,13 +689,24 @@ def load_host_model(args: argparse.Namespace, device: torch.device):
     import transformers
     from transformers import AutoConfig, AutoTokenizer
 
-    config = AutoConfig.from_pretrained(args.host_model, trust_remote_code=True)
+    revision = args.host_model_revision or None
+    config = AutoConfig.from_pretrained(
+        args.host_model,
+        revision=revision,
+        trust_remote_code=True,
+    )
     model_type = str(getattr(config, "model_type", "")).lower()
-    tokenizer = AutoTokenizer.from_pretrained(args.host_model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.host_model,
+        revision=revision,
+        trust_remote_code=True,
+    )
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     kw = dict(trust_remote_code=True, torch_dtype=torch.bfloat16, device_map={"": 0})
+    if revision:
+        kw["revision"] = revision
     if not args.no_4bit:
         from transformers import BitsAndBytesConfig
 
@@ -958,7 +986,7 @@ def main() -> None:
     if auxiliary_enabled:
         auxiliary_heads = NumericAuxiliaryHeads(llm_hidden, auxiliary_stats).to(device, torch.bfloat16)
 
-    cache = torch.load(args.token_cache, map_location="cpu", weights_only=False)
+    cache = torch.load(args.token_cache, map_location="cpu", weights_only=True)
     spatial = cache["spatial_tokens"].to(torch.float32)
     tok_mask = cache["token_mask"]
     tid2idx = {str(t): i for i, t in enumerate(cache["tile_ids"])}
@@ -967,8 +995,13 @@ def main() -> None:
 
     projector = EGMSProjector(egms_dim, llm_hidden, args.projector_dropout).to(device, torch.bfloat16)
     if args.warm_start_projector and args.warm_start_projector.lower() != "none":
-        ck = torch.load(args.warm_start_projector, map_location="cpu", weights_only=False)
-        projector.load_state_dict(ck["projector_state"])
+        warm_start_path = Path(args.warm_start_projector)
+        if warm_start_path.suffix == ".safetensors":
+            projector_state = load_file(str(warm_start_path), device="cpu")
+        else:
+            ck = torch.load(warm_start_path, map_location="cpu", weights_only=True)
+            projector_state = ck["projector_state"]
+        projector.load_state_dict(projector_state)
         print(f"warm-started projector from {args.warm_start_projector}", flush=True)
     else:
         print("projector trained from scratch", flush=True)
@@ -997,20 +1030,70 @@ def main() -> None:
     def save_ckpt(tag: str, metrics: dict) -> None:
         d = out / tag
         d.mkdir(parents=True, exist_ok=True)
-        checkpoint = {
-                "projector_state": projector.state_dict(),
-                "qa_system_version": QA_SYSTEM_VERSION,
-                "answer_protocol": ANSWER_PROTOCOL,
-                "args": vars(args),
-                "metrics": metrics,
-                "egms_dim": egms_dim,
-                "llm_hidden": llm_hidden,
+        projector_state = {
+            key: value.detach().cpu().contiguous()
+            for key, value in projector.state_dict().items()
         }
+        save_file(
+            projector_state,
+            str(d / "projector.safetensors"),
+            metadata={"model_type": "egms_qa_translator_projector"},
+        )
+        variant = args.variant.strip() or Path(args.host_model).name.lower()
+        translator_config = {
+            "schema_version": TRANSLATOR_CONFIG_SCHEMA,
+            "model_type": TRANSLATOR_MODEL_TYPE,
+            "variant": variant,
+            "base_model": {
+                "name_or_path": args.host_model,
+                "revision": args.host_model_revision or None,
+            },
+            "input": {
+                "token_count": int(spatial.shape[1]),
+                "token_width": int(egms_dim),
+                "mask_length": int(tok_mask.shape[1]),
+                "layout": "one tile-summary token followed by row-major spatial-cell tokens",
+            },
+            "projector": {
+                "architecture": "EGMSProjector",
+                "input_dim": int(egms_dim),
+                "hidden_dim": int(max(egms_dim, llm_hidden)),
+                "output_dim": int(llm_hidden),
+                "activation": "gelu",
+                "dropout": float(args.projector_dropout),
+                "torch_dtype": "bfloat16",
+            },
+            "adapter": {"format": "peft", "path": "adapter"},
+            "prompt": {
+                "question_template": QUESTION_TEMPLATE,
+                "response_instruction_template": RESPONSE_INSTRUCTION_TEMPLATE,
+                "answer_protocol": "natural_language",
+            },
+            "generation": {"decoding": "greedy"},
+        }
+        (d / "translator_config.json").write_text(
+            json.dumps(translator_config, indent=2),
+            encoding="utf-8",
+        )
+        (d / "run_args.json").write_text(
+            json.dumps(vars(args), indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        (d / "checkpoint_metrics.json").write_text(
+            json.dumps(metrics, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
         if auxiliary_heads is not None:
-            checkpoint["numeric_auxiliary_state"] = auxiliary_heads.state_dict()
-            checkpoint["numeric_auxiliary_stats"] = auxiliary_stats
-        torch.save(checkpoint, d / "projector.pt")
-        model.save_pretrained(d / "lora_adapter")
+            auxiliary_state = {
+                key: value.detach().cpu().contiguous()
+                for key, value in auxiliary_heads.state_dict().items()
+            }
+            save_file(auxiliary_state, str(d / "training_auxiliary.safetensors"))
+            (d / "training_auxiliary_config.json").write_text(
+                json.dumps(auxiliary_stats, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+        model.save_pretrained(d / "adapter")
 
     def run_eval() -> None:
         nonlocal best_ppl, best_metrics
