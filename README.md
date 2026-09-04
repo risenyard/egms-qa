@@ -16,7 +16,7 @@
 [![Python](https://img.shields.io/badge/python-%E2%89%A5%203.10-blue.svg)](pyproject.toml)
 [![CI](https://github.com/risenyard/egms-qa/actions/workflows/ci.yml/badge.svg)](https://github.com/risenyard/egms-qa/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/release-v1.0.0-green.svg)](CHANGELOG.md)
-[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-EGMS--QA-yellow)](https://huggingface.co/risenyard)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-EGMS--QA-yellow)](https://huggingface.co/collections/risenyard/egms-qa)
 
 Natural-language question answering over persistent-scatterer displacement time
 series, for the [European Ground Motion Service](https://egms.land.copernicus.eu/)
