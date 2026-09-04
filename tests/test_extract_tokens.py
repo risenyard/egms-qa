@@ -27,7 +27,22 @@ def test_extract_defaults_target_hf_installed_inputs() -> None:
     assert args.manifest.endswith("data/encoder/manifest/split.parquet")
     assert args.data_config.endswith("data/encoder/manifest/data_config.json")
     assert args.output_name == ""
+    assert args.encoder_repository == ""
+    assert args.dataset_repository == ""
     assert TOKEN_SCHEMA == "egms-tokens-1.1"
+
+
+def test_extract_accepts_explicit_public_provenance() -> None:
+    args = parse_args(
+        [
+            "--encoder-repository",
+            "owner/encoder",
+            "--dataset-repository",
+            "owner/dataset",
+        ]
+    )
+    assert args.encoder_repository == "owner/encoder"
+    assert args.dataset_repository == "owner/dataset"
 
 
 def test_spatial_pooling_validates_shapes() -> None:

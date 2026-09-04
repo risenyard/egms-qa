@@ -81,7 +81,9 @@ Submit all tests to `itc-gpu` or `main-gpu` and retain logs:
 4. One-tile extraction with expected shape `[1,65,256]`.
 5. Complete 10k extraction with expected shape `[10000,65,256]` and numerical
    or bitwise regression against the intended cache.
-6. Encoder pretraining smoke: train, save, strict reload, resume.
+6. Encoder pretraining smoke: train, write `best.safetensors` plus matching
+   `config.json`, `training_args.json`, and `normalization.json`, consume that
+   bundle with the token-extraction CLI, and resume from `latest.pt`.
 7. Release installation into an empty runtime directory.
 8. At least one QA downstream consumer over all 10k tokens.
 9. Safe loading of all four translator projector/adapter families.

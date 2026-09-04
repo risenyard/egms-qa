@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from egms_encoder.pretrain import apply_release_config, parse_args, validate_training_args
+from egms_encoder.pretrain import (
+    apply_release_config,
+    parse_args,
+    resolved_model_config,
+    resolved_training_recipe,
+    validate_training_args,
+)
 
 
 EXPECTED_RELEASE_DEFAULTS = {
@@ -84,3 +90,15 @@ def test_pretrain_defaults_match_public_encoder_recipe() -> None:
     assert args.data_config == "data/encoder/manifest/data_config.json"
     assert args.normalization == "data/encoder/checkpoint/normalization.json"
     validate_training_args(args)
+
+    output_config = resolved_model_config(model_config, args)
+    assert output_config["input_length"] == args.input_length
+    assert output_config["d_model"] == args.d_model
+    assert output_config["spatial_layers"] == args.num_layers
+    assert output_config["coord_scale_m"] == args.coord_scale
+
+    output_recipe = resolved_training_recipe(training_args, args)
+    assert output_recipe["schema_version"] == "egms-qa-encoder-training-1.0"
+    assert output_recipe["optimization"]["maximum_steps"] == args.max_steps
+    assert output_recipe["data"]["maximum_points_per_tile"] == args.max_tile_points
+    assert output_recipe["masking"]["strategy"] == "synchronized_block"

@@ -32,6 +32,29 @@ def test_encoder_forward_shapes_and_padding_mask() -> None:
     assert torch.count_nonzero(output["reconstruction"][1, 3:]) == 0
 
 
+def test_encode_matches_forward_without_reconstruction_outputs() -> None:
+    model = TileEncoder(
+        input_length=16,
+        d_model=32,
+        patch_size=8,
+        temporal_layers=1,
+        temporal_heads=4,
+        spatial_layers=1,
+        spatial_heads=4,
+        dropout=0.0,
+        coord_scale=3500.0,
+    ).eval()
+    series = torch.randn(1, 4, 16)
+    coords = torch.randn(1, 4, 2)
+    mask = torch.ones(1, 4, dtype=torch.bool)
+    with torch.no_grad():
+        embedding = model.encode(series, coords=coords, point_mask=mask)
+        output = model(series, coords=coords, point_mask=mask)
+    assert isinstance(embedding, torch.Tensor)
+    assert embedding.shape == (1, 4, 32)
+    torch.testing.assert_close(embedding, output["embedding"], rtol=0, atol=0)
+
+
 def test_encoder_rejects_unscaled_absolute_coordinates() -> None:
     model = TileEncoder(
         input_length=8,

@@ -1,6 +1,7 @@
 # EGMS-QA Encoder
 
-> 🤗 Released weights & token cache: [`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder)
+> 🤗 [Encoder weights](https://huggingface.co/risenyard/egms-qa-encoder) ·
+> [tiles and token cache](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
 
 The EGMS-QA Encoder maps a variable-size tile of persistent-scatterer displacement
 histories to a fixed 65-token representation used by the rest of EGMS-QA. It is a
@@ -23,17 +24,15 @@ At inference the encoder is frozen and applied without masking. A deterministic
 pooling step assigns points to an 8×8 grid and mean-pools features per cell,
 yielding 65 tokens (1 tile summary + 64 cells) with a validity mask.
 
-This directory vendors the encoder model and data code (`models/`, `data/`,
+This directory contains the encoder model and data code (`models/`, `data/`,
 `pretrain.py`). Loading the checkpoint, extracting tokens, and
 **retraining the encoder from scratch** are all self-contained on the released
 data: the model-ready 294-step EGMS tiles ship as NPZ under
 `artifacts/source_tiles/` in `risenyard/egms-qa-dataset`; the release installer
 links them to `data/tiles/`. The split manifest and normalization ship with the
 HF repositories. The encoder was trained on this 10k tile set's train split.
-The code does not depend on a private repository or machine-specific path. One
-family-C4 threshold is corpus-relative and was derived from the larger European
-candidate pool; its frozen value is documented and built into the released C4
-algorithm, so the larger pool is not required to reproduce EGMS-QA artifacts.
+The code does not depend on a private repository, another source checkout, or
+a machine-specific path.
 
 ## Data support boundary
 
@@ -56,6 +55,7 @@ python -m egms_encoder.extract_tokens \
     --model-config data/encoder/checkpoint/config.json \
     --normalization data/encoder/checkpoint/normalization.json \
     --manifest   data/encoder/manifest/split.parquet \
+    --data-config data/encoder/manifest/data_config.json \
     --output-dir outputs/tokens
 # -> outputs/tokens/egms_tokens_10k.pt   (spatial_tokens [10000, 65, 256], mask, ids, splits)
 ```
@@ -71,25 +71,65 @@ Install the structured dataset before pretraining or token extraction:
 ```bash
 hf download risenyard/egms-qa-dataset \
     --repo-type dataset --local-dir release/egms-qa-dataset
-python -m egms_qa.release install \
+python -m egms_encoder.install_data \
     --release-dir release/egms-qa-dataset --target-root .
 hf download risenyard/egms-qa-encoder \
     --local-dir data/encoder/checkpoint
-python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
 ```
 
-## Release tests
+## Training
 
-The network-free test suite uses synthetic fixtures. Maintainers must also run
-the HF artifact integration suite on an allowed GPU node against the exact
-encoder and dataset staging directories:
+Reproduce pretraining with the released recipe:
 
 ```bash
-sbatch --export=ALL,CHECKOUT="$PWD",ENCODER_RELEASE=/path/to/encoder,DATASET_RELEASE=/path/to/dataset,PYTHON_BIN=python \
-    scripts/release/test_encoder_release.sbatch
+python -m egms_encoder.pretrain \
+    --output-dir outputs/my_encoder \
+    --device cuda:0
 ```
 
-This verifies the full release SHA256 inventory, the standalone Safetensors
-file set, configuration and normalization consistency, all 10,000 NPZ headers
-for direct 294-step storage, the token metadata contract, a real-tile encoder
-forward pass, and the public one-tile extraction CLI.
+The output contains a reusable inference bundle and resumable training state:
+
+```text
+outputs/my_encoder/
+├── best.safetensors
+├── best.pt
+├── latest.pt
+├── config.json
+├── training_args.json
+├── normalization.json
+├── run_args.json
+└── metrics.csv
+```
+
+Resume an interrupted run without writing conversion code:
+
+```bash
+python -m egms_encoder.pretrain \
+    --model-config outputs/my_encoder/config.json \
+    --training-args outputs/my_encoder/training_args.json \
+    --normalization outputs/my_encoder/normalization.json \
+    --resume-from outputs/my_encoder/latest.pt \
+    --output-dir outputs/my_encoder \
+    --device cuda:0
+```
+
+Use the trained encoder directly for token extraction:
+
+```bash
+python -m egms_encoder.extract_tokens \
+    --checkpoint outputs/my_encoder/best.safetensors \
+    --model-config outputs/my_encoder/config.json \
+    --normalization outputs/my_encoder/normalization.json \
+    --manifest data/encoder/manifest/split.parquet \
+    --data-config data/encoder/manifest/data_config.json \
+    --output-dir outputs/my_tokens \
+    --device cuda:0
+```
+
+`latest.pt` is for `--resume-from`; `best.safetensors` is for inference. Users
+do not need to write conversion code between training and token extraction.
+
+Token metadata records input hashes automatically. Add
+`--encoder-repository` and `--dataset-repository` only when those repository
+identifiers are true provenance for the supplied files; custom inputs are not
+labelled as official EGMS-QA artifacts by default.

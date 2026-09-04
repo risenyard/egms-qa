@@ -243,13 +243,13 @@ class TileEncoder(nn.Module):
             nn.init.zeros_(last.weight)
             nn.init.zeros_(last.bias)
 
-    def _encode(
+    def encode(
         self,
         series: torch.Tensor,
-        coords: torch.Tensor | None,
-        point_mask: torch.Tensor | None,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Temporal + spatial backbone -> (embedding, base reconstruction)."""
+        coords: torch.Tensor | None = None,
+        point_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Return point embeddings without running the reconstruction heads."""
         batch_size, num_points, _ = validate_series(series, self.input_length, self.max_points)
         if point_mask is not None and point_mask.shape != (batch_size, num_points):
             raise ValueError(f"Expected point_mask shape [B, N], got {tuple(point_mask.shape)}")
@@ -273,9 +273,7 @@ class TileEncoder(nn.Module):
             embedding = block(embedding, key_padding_mask=key_padding_mask)
             embedding = mask_points(embedding, point_mask)
 
-        base_reconstruction = self.reconstruction_head(embedding)
-        base_reconstruction = mask_points(base_reconstruction, point_mask)
-        return embedding, base_reconstruction
+        return embedding
 
     def forward(
         self,
@@ -284,7 +282,9 @@ class TileEncoder(nn.Module):
         point_mask: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         """series: [B, N, T], coords: [B, N, 2], point_mask: [B, N] bool."""
-        embedding, base_reconstruction = self._encode(series, coords, point_mask)
+        embedding = self.encode(series, coords, point_mask)
+        base_reconstruction = self.reconstruction_head(embedding)
+        base_reconstruction = mask_points(base_reconstruction, point_mask)
 
         residual_raw = self.residual_head(embedding)
         residual_prediction = linear_detrend_tensor(residual_raw)

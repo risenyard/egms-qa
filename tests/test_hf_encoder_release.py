@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -11,10 +13,12 @@ import pandas as pd
 import pytest
 import torch
 from numpy.lib import format as npy_format
+from safetensors.torch import load_file
 
 from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
 from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT, TileStore
 from egms_encoder.extract_tokens import pool_to_spatial_tokens
+from egms_encoder.install_data import install_encoder_data
 from egms_encoder.pretrain import apply_release_config, parse_args
 
 
@@ -263,3 +267,226 @@ def _single_row_manifest(row: pd.DataFrame, directory: Path) -> Path:
     output = directory / "single-row.parquet"
     row.to_parquet(output, index=False)
     return output
+
+
+def _run_cli(command: list[str], cwd: Path) -> None:
+    result = subprocess.run(
+        command,
+        cwd=cwd,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=180,
+    )
+    if result.returncode:
+        pytest.fail(
+            f"command failed ({result.returncode}): {' '.join(command)}\n"
+            f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+        )
+
+
+def test_train_exports_inference_bundle_consumed_by_token_cli(
+    release_dirs: tuple[Path, Path],
+    tmp_path: Path,
+) -> None:
+    if not torch.cuda.is_available():
+        pytest.fail("training-to-inference integration test requires CUDA")
+    encoder, dataset = release_dirs
+    manifest = pd.read_parquet(dataset / "metadata/split_manifest.parquet")
+    selected = []
+    for split in ("train", "val", "test"):
+        row = manifest.loc[manifest["split"] == split].iloc[[0]].copy()
+        row.loc[:, "path"] = str(_tile_path(dataset, row.iloc[0]["path"]))
+        selected.append(row)
+    small_manifest = tmp_path / "split.parquet"
+    pd.concat(selected, ignore_index=True).to_parquet(small_manifest, index=False)
+    output_dir = tmp_path / "trained"
+    data_config = dataset / "metadata/data_config.json"
+
+    _run_cli(
+        [
+            sys.executable,
+            "-m",
+            "egms_encoder.pretrain",
+            "--model-config",
+            str(encoder / "config.json"),
+            "--training-args",
+            str(encoder / "training_args.json"),
+            "--normalization",
+            str(encoder / "normalization.json"),
+            "--manifest",
+            str(small_manifest),
+            "--data-config",
+            str(data_config),
+            "--init-from-checkpoint",
+            str(encoder / "encoder.safetensors"),
+            "--output-dir",
+            str(output_dir),
+            "--device",
+            "cuda:0",
+            "--precision",
+            "bf16",
+            "--max-tile-points",
+            "32",
+            "--tiles-per-batch",
+            "1",
+            "--max-steps",
+            "1",
+            "--val-batches",
+            "1",
+            "--val-every-steps",
+            "1",
+            "--checkpoint-every-steps",
+            "1",
+            "--log-every-steps",
+            "1",
+        ],
+        tmp_path,
+    )
+
+    expected_files = {
+        "best.pt",
+        "best.safetensors",
+        "latest.pt",
+        "config.json",
+        "training_args.json",
+        "normalization.json",
+        "run_args.json",
+        "metrics.csv",
+    }
+    assert expected_files <= {path.name for path in output_dir.iterdir()}
+    training_checkpoint = torch.load(
+        output_dir / "best.pt", map_location="cpu", weights_only=True
+    )
+    inference_state = load_file(str(output_dir / "best.safetensors"))
+    assert set(inference_state) == set(training_checkpoint["model"])
+    for key, value in training_checkpoint["model"].items():
+        torch.testing.assert_close(inference_state[key], value, rtol=0, atol=0)
+
+    exported_config = json.loads(
+        (output_dir / "config.json").read_text(encoding="utf-8")
+    )
+    exported_recipe = json.loads(
+        (output_dir / "training_args.json").read_text(encoding="utf-8")
+    )
+    run_args = json.loads((output_dir / "run_args.json").read_text(encoding="utf-8"))
+    assert exported_config["input_length"] == 294
+    assert exported_recipe["schema_version"] == "egms-qa-encoder-training-1.0"
+    assert exported_recipe["optimization"]["maximum_steps"] == 1
+    assert run_args["max_steps"] == 1
+
+    _run_cli(
+        [
+            sys.executable,
+            "-m",
+            "egms_encoder.pretrain",
+            "--model-config",
+            str(encoder / "config.json"),
+            "--training-args",
+            str(encoder / "training_args.json"),
+            "--normalization",
+            str(encoder / "normalization.json"),
+            "--manifest",
+            str(small_manifest),
+            "--data-config",
+            str(data_config),
+            "--resume-from",
+            str(output_dir / "latest.pt"),
+            "--output-dir",
+            str(output_dir),
+            "--device",
+            "cuda:0",
+            "--precision",
+            "bf16",
+            "--max-tile-points",
+            "32",
+            "--tiles-per-batch",
+            "1",
+            "--max-steps",
+            "2",
+            "--val-batches",
+            "1",
+            "--val-every-steps",
+            "1",
+            "--checkpoint-every-steps",
+            "1",
+            "--log-every-steps",
+            "1",
+        ],
+        tmp_path,
+    )
+    resumed = torch.load(
+        output_dir / "latest.pt", map_location="cpu", weights_only=True
+    )
+    assert resumed["step"] == 2
+    resumed_recipe = json.loads(
+        (output_dir / "training_args.json").read_text(encoding="utf-8")
+    )
+    assert resumed_recipe["optimization"]["maximum_steps"] == 2
+
+    token_dir = tmp_path / "tokens"
+    _run_cli(
+        [
+            sys.executable,
+            "-m",
+            "egms_encoder.extract_tokens",
+            "--checkpoint",
+            str(output_dir / "best.safetensors"),
+            "--model-config",
+            str(output_dir / "config.json"),
+            "--normalization",
+            str(output_dir / "normalization.json"),
+            "--manifest",
+            str(small_manifest),
+            "--data-config",
+            str(data_config),
+            "--device",
+            "cuda:0",
+            "--max-tiles",
+            "1",
+            "--output-dir",
+            str(token_dir),
+        ],
+        tmp_path,
+    )
+    tokens = torch.load(
+        token_dir / "egms_tokens_1.pt", map_location="cpu", weights_only=True
+    )
+    assert tokens["spatial_tokens"].shape == (1, 65, 256)
+    assert tokens["token_mask"].shape == (1, 65)
+    assert "source_repositories" not in tokens["metadata"]
+
+
+def test_standalone_encoder_install_and_default_cli(
+    release_dirs: tuple[Path, Path],
+    tmp_path: Path,
+) -> None:
+    if not torch.cuda.is_available():
+        pytest.fail("standalone encoder integration test requires CUDA")
+    encoder, dataset = release_dirs
+    runtime = tmp_path / "runtime"
+    install_encoder_data(dataset, runtime)
+    checkpoint_dir = runtime / "data/encoder/checkpoint"
+    checkpoint_dir.mkdir(parents=True)
+    for filename in ("encoder.safetensors", "config.json", "normalization.json"):
+        (checkpoint_dir / filename).symlink_to((encoder / filename).resolve())
+
+    _run_cli(
+        [
+            sys.executable,
+            "-m",
+            "egms_encoder.extract_tokens",
+            "--device",
+            "cuda:0",
+            "--max-tiles",
+            "1",
+        ],
+        runtime,
+    )
+    output = torch.load(
+        runtime / "outputs/tokens/egms_tokens_1.pt",
+        map_location="cpu",
+        weights_only=True,
+    )
+    assert output["spatial_tokens"].shape == (1, 65, 256)
+    assert output["metadata"]["input_contract"]["stored_window"] == "[0,294)"

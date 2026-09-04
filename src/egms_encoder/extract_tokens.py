@@ -58,6 +58,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--max-tiles", type=int, default=None)
     p.add_argument("--log-every", type=int, default=500)
+    p.add_argument(
+        "--encoder-repository",
+        default="",
+        help="Optional public repository recorded as encoder provenance.",
+    )
+    p.add_argument(
+        "--dataset-repository",
+        default="",
+        help="Optional public repository recorded as dataset provenance.",
+    )
     return p.parse_args(argv)
 
 
@@ -204,8 +214,13 @@ def main() -> None:
             coords_t = torch.from_numpy(centered_coords).unsqueeze(0).to(device)
             pmask_t = torch.ones(1, n_pts, dtype=torch.bool, device=device)
 
-            out = model(series_t, coords=coords_t, point_mask=pmask_t)
-            emb = out["embedding"].squeeze(0).float().cpu().numpy()
+            emb = (
+                model.encode(series_t, coords=coords_t, point_mask=pmask_t)
+                .squeeze(0)
+                .float()
+                .cpu()
+                .numpy()
+            )
 
             tokens, mask, counts = pool_to_spatial_tokens(
                 emb, centered_coords, args.grid_size, tile_size
@@ -235,11 +250,6 @@ def main() -> None:
         "schema_version": TOKEN_SCHEMA,
         "release_name": "EGMS-QA token cache",
         "code_version": __version__,
-        "source_repositories": {
-            "encoder": "risenyard/egms-qa-encoder",
-            "dataset": "risenyard/egms-qa-dataset",
-            "tiles": "artifacts/source_tiles",
-        },
         "input_contract": {
             "stored_steps": int(source_window.get("stored_steps", input_length)),
             "stored_window": f"[{time_window.t_start},{time_window.t_end})",
@@ -286,6 +296,18 @@ def main() -> None:
         },
         "output_file": output_name,
     }
+    source_repositories = {}
+    if args.encoder_repository:
+        source_repositories["encoder"] = args.encoder_repository
+    if args.dataset_repository:
+        source_repositories.update(
+            {
+                "dataset": args.dataset_repository,
+                "tiles": "artifacts/source_tiles",
+            }
+        )
+    if source_repositories:
+        metadata["source_repositories"] = source_repositories
     torch.save({
         "spatial_tokens": torch.from_numpy(spatial_tokens),
         "token_mask": torch.from_numpy(token_mask),

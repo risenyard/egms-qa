@@ -9,6 +9,7 @@ to the configured time window (default 294). See `TileEncoder` for the model.
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import json
 import math
@@ -20,17 +21,13 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from safetensors.torch import save_file
 
 from egms_encoder.checkpoint import load_encoder_config, load_normalization
 from egms_encoder.data.tile_batching import iter_tile_batches
-from egms_encoder.data.tile_store import TileStore
+from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT, TileStore
 from egms_encoder.models.tile_encoder import TileEncoder
 
-STATIC_COLUMNS = [
-    "height", "rmse", "mean_velocity", "mean_velocity_std",
-    "acceleration", "acceleration_std", "seasonality", "seasonality_std",
-]
-FEATURE_COLUMNS = ["easting", "northing", *STATIC_COLUMNS]
 DEFAULT_MODEL_CONFIG = "data/encoder/checkpoint/config.json"
 DEFAULT_TRAINING_ARGS = "data/encoder/checkpoint/training_args.json"
 
@@ -220,6 +217,127 @@ def validate_training_args(args: argparse.Namespace) -> None:
         raise ValueError("learning rates must be non-negative and --lr must be positive")
 
 
+def resolved_model_config(model_config: dict, args: argparse.Namespace) -> dict:
+    """Return the inference config that exactly matches the effective model."""
+    resolved = copy.deepcopy(model_config)
+    resolved.update(
+        {
+            "input_length": int(args.input_length),
+            "patch_size": int(args.patch_size),
+            "d_model": int(args.d_model),
+            "temporal_layers": int(args.temporal_layers),
+            "temporal_heads": int(args.temporal_heads),
+            "spatial_layers": int(args.num_layers),
+            "spatial_heads": int(args.num_heads),
+            "dropout": float(args.dropout),
+            "coord_scale_m": float(args.coord_scale),
+            "residual_head_mode": str(args.residual_head_mode),
+        }
+    )
+    return resolved
+
+
+def resolved_training_recipe(training_args: dict, args: argparse.Namespace) -> dict:
+    """Return the public training schema with all CLI overrides applied."""
+    resolved = copy.deepcopy(training_args)
+    resolved.pop("checkpoint_selection", None)
+    resolved["data"].update(
+        {
+            "model_input_steps": int(args.input_length),
+            "maximum_points_per_tile": int(args.max_tile_points),
+        }
+    )
+    strategy = (
+        "synchronized_block"
+        if args.mask_strategy == "block" and args.sync_mask
+        else str(args.mask_strategy)
+    )
+    resolved["masking"].update(
+        {
+            "strategy": strategy,
+            "train_ratio": float(args.mask_ratio),
+            "evaluation_ratio": float(args.eval_mask_ratio),
+            "schedule": str(args.mask_schedule),
+        }
+    )
+    resolved["point_sampling"].update(
+        {
+            "method": str(args.point_sampling),
+            "residual_sampling_alpha": float(args.residual_sampling_alpha),
+        }
+    )
+    resolved["loss"].update(
+        {
+            "residual_loss_weight": float(args.residual_loss_weight),
+            "residual_consistency_weight": float(args.residual_consistency_weight),
+        }
+    )
+    resolved["optimization"].update(
+        {
+            "maximum_steps": int(args.max_steps),
+            "tiles_per_batch": int(args.tiles_per_batch),
+            "learning_rate": float(args.lr),
+            "minimum_learning_rate": float(args.min_lr),
+            "residual_head_learning_rate": float(args.residual_head_lr),
+            "scheduler": str(args.lr_scheduler),
+            "scheduler_total_steps": int(args.scheduler_total_steps),
+            "warmup_steps": int(args.warmup_steps),
+            "weight_decay": float(args.weight_decay),
+            "precision": str(args.precision),
+            "seed": int(args.seed),
+        }
+    )
+    resolved["validation"].update(
+        {
+            "batches": int(args.val_batches),
+            "interval_steps": int(args.val_every_steps),
+            "seed": int(args.val_seed),
+        }
+    )
+    resolved.setdefault("checkpointing", {}).update(
+        {
+            "interval_steps": int(args.checkpoint_every_steps),
+            "log_interval_steps": int(args.log_every_steps),
+            "rolling_window_steps": int(args.train_window_steps),
+        }
+    )
+    return resolved
+
+
+def write_inference_bundle_metadata(
+    output_dir: Path,
+    model_config: dict,
+    training_args: dict,
+    normalizer: dict,
+    args: argparse.Namespace,
+) -> None:
+    """Write configs that can be reused directly by token extraction."""
+    payloads = {
+        "config.json": resolved_model_config(model_config, args),
+        "training_args.json": resolved_training_recipe(training_args, args),
+        "normalization.json": normalizer,
+        "run_args.json": vars(args),
+    }
+    for filename, payload in payloads.items():
+        with (output_dir / filename).open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+
+
+def save_inference_state(path: Path, state: dict[str, torch.Tensor]) -> None:
+    """Save a pure model state in the public Safetensors format."""
+    tensors = {
+        key: value.detach().cpu().contiguous()
+        for key, value in state.items()
+    }
+    save_file(tensors, str(path), metadata={"model_type": "egms_encoder"})
+
+
+def save_inference_weights(path: Path, model: TileEncoder) -> None:
+    """Save the current model for strict inference loading."""
+    save_inference_state(path, model.state_dict())
+
+
 def collect_validation_batches(args, tile_store, rng, *, resampled: bool) -> list[dict]:
     batches = iter_tile_batches(
         tile_store, args.tiles_per_batch,
@@ -227,7 +345,7 @@ def collect_validation_batches(args, tile_store, rng, *, resampled: bool) -> lis
         rng=rng,
         max_batches=None if resampled else args.val_batches,
         max_points=args.max_tile_points,
-        feature_columns_count=len(FEATURE_COLUMNS), input_length=args.input_length,
+        feature_columns_count=FEATURE_COLUMNS_COUNT, input_length=args.input_length,
         point_sampling="uniform", residual_sampling_alpha=args.residual_sampling_alpha,
     )
     if resampled:
@@ -268,9 +386,6 @@ def main() -> None:
             f"Model input_length={args.input_length} does not match the data contract "
             f"({configured_input_length})"
         )
-    with (output_dir / "training_args.json").open("w", encoding="utf-8") as f:
-        json.dump(vars(args), f, indent=2, sort_keys=True)
-
     train_indices = tile_store.split_tile_indices("train")
     val_indices = tile_store.split_tile_indices("val")
     test_indices = tile_store.split_tile_indices("test")
@@ -283,8 +398,9 @@ def main() -> None:
     # Load precomputed normalization (skip the fit step)
     normalizer = load_normalization(args.normalization)
     normalizer.pop("_meta", None)  # strip annotation block before passing into trainer
-    with (output_dir / "normalization.json").open("w", encoding="utf-8") as f:
-        json.dump(normalizer, f, indent=2)
+    write_inference_bundle_metadata(
+        output_dir, model_config, training_args, normalizer, args
+    )
     print(
         f"normalizer: mean={normalizer['mean']:.6f} std={normalizer['std']:.6f} "
         f"residual_std={normalizer.get('residual_std',1.0):.6f}",
@@ -305,6 +421,8 @@ def main() -> None:
     step = 0
     epoch = 0
     best_val_loss = float("inf")
+    best_weights_path = output_dir / "best.safetensors"
+    best_weights_ready = bool(args.resume_from and best_weights_path.is_file())
     resume_elapsed_hours = 0.0
     resume_train_losses: list[float] = []
     if args.resume_from:
@@ -383,7 +501,7 @@ def main() -> None:
                 split="train",
                 rng=data_rng,
                 max_points=args.max_tile_points,
-                feature_columns_count=len(FEATURE_COLUMNS), input_length=args.input_length,
+                feature_columns_count=FEATURE_COLUMNS_COUNT, input_length=args.input_length,
                 point_sampling=args.point_sampling, residual_sampling_alpha=args.residual_sampling_alpha,
             )
 
@@ -428,6 +546,8 @@ def main() -> None:
                     if val_metrics["loss"] < best_val_loss:
                         best_val_loss = val_metrics["loss"]
                         save_checkpoint(output_dir / "best.pt", model, optimizer, scaler, args, step, epoch, best_val_loss)
+                        save_inference_weights(best_weights_path, model)
+                        best_weights_ready = True
 
                 writer.writerow(row)
                 if step % args.log_every_steps == 0:
@@ -463,9 +583,27 @@ def main() -> None:
                     break
 
     save_checkpoint(output_dir / "latest.pt", model, optimizer, scaler, args, step, epoch, best_val_loss)
+    best_checkpoint_path = output_dir / "best.pt"
+    if not best_checkpoint_path.is_file():
+        save_checkpoint(
+            best_checkpoint_path,
+            model,
+            optimizer,
+            scaler,
+            args,
+            step,
+            epoch,
+            best_val_loss,
+        )
+    if not best_weights_ready:
+        best_checkpoint = torch.load(
+            best_checkpoint_path, map_location="cpu", weights_only=True
+        )
+        save_inference_state(best_weights_path, best_checkpoint["model"])
     print(f"Training complete: {step} steps, best_val_loss={best_val_loss:.6f}")
     print(f"wrote {metrics_path}")
     print(f"wrote {output_dir / 'latest.pt'}")
+    print(f"wrote {best_weights_path}")
 
 
 def build_model(args, normalizer):

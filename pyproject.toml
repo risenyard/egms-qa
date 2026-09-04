@@ -37,8 +37,9 @@ test = [
 
 [project.scripts]
 egms-qa-release = "egms_qa.release:main"
-egms-qa-pretrain = "egms_encoder.pretrain:main"
-egms-qa-extract-tokens = "egms_encoder.extract_tokens:main"
+egms-encoder-install-data = "egms_encoder.install_data:main"
+egms-encoder-pretrain = "egms_encoder.pretrain:main"
+egms-encoder-extract-tokens = "egms_encoder.extract_tokens:main"
 egms-qa-build-labels = "egms_qa.qa_construction.build_labels:main"
 egms-qa-generate = "egms_qa.qa_construction.generate_qa:main"
 egms-qa-train = "egms_qa.translator.train:main"
