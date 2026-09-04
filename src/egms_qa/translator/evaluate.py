@@ -48,12 +48,17 @@ from egms_qa.qa_construction.qa_lib import (
 from egms_qa.paths import ENCODER_TOKENS, DEFAULT_HOST_MODEL
 
 TOK_DEFAULT = str(ENCODER_TOKENS)
-QWEN_DEFAULT = DEFAULT_HOST_MODEL
+HOST_MODEL_DEFAULT = DEFAULT_HOST_MODEL
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--adapter-dir", required=True, help="Checkpoint dir containing projector.pt and lora_adapter/.")
+    p.add_argument(
+        "--host-model",
+        default="",
+        help="Optional Hugging Face id or local base-model path; defaults to lora_adapter/adapter_config.json.",
+    )
     p.add_argument("--token-cache", default=TOK_DEFAULT)
     p.add_argument("--labels", default=str(DEFAULT_LABELS))
     p.add_argument("--meta", default=str(DEFAULT_META))
@@ -204,14 +209,33 @@ def build_eval_rows(args: argparse.Namespace, tasks: list[TaskRecord]):
     return all_rows, labels
 
 
-def load_model(adapter_dir: str, token_mode: str, seed: int, token_cache: str):
+def resolve_host_model(adapter_dir: str | Path, checkpoint: dict[str, Any], override: str = "") -> str:
+    if override:
+        return override
+    adapter_config = Path(adapter_dir) / "lora_adapter" / "adapter_config.json"
+    if adapter_config.is_file():
+        config = json.loads(adapter_config.read_text(encoding="utf-8"))
+        candidate = str(config.get("base_model_name_or_path", "")).strip()
+        if candidate:
+            return candidate
+    candidate = str(checkpoint.get("args", {}).get("host_model", "")).strip()
+    return candidate or HOST_MODEL_DEFAULT
+
+
+def load_model(
+    adapter_dir: str,
+    token_mode: str,
+    seed: int,
+    token_cache: str,
+    host_model_override: str = "",
+):
     import transformers
     from peft import PeftModel
     from transformers import AutoTokenizer
 
     device = torch.device("cuda:0")
     ck = torch.load(Path(adapter_dir) / "projector.pt", map_location="cpu", weights_only=False)
-    base = ck.get("args", {}).get("qwen_path", QWEN_DEFAULT)
+    base = resolve_host_model(adapter_dir, ck, host_model_override)
     tokenizer = AutoTokenizer.from_pretrained(base, trust_remote_code=True)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -519,7 +543,13 @@ def main() -> None:
     if resume_records:
         print(f"[eval] resuming {len(resume_records)}/{len(rows)} compatible records from {args.resume_dump}", flush=True)
 
-    tok, model, proj, spatial, tmask, tid2idx, device = load_model(args.adapter_dir, args.token_mode, args.seed, args.token_cache)
+    tok, model, proj, spatial, tmask, tid2idx, device = load_model(
+        args.adapter_dir,
+        args.token_mode,
+        args.seed,
+        args.token_cache,
+        args.host_model,
+    )
     for path_string in (args.dump, args.xverify_export):
         if path_string:
             Path(path_string).parent.mkdir(parents=True, exist_ok=True)

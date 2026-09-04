@@ -35,7 +35,7 @@ def match_region(text):
     return None
 
 
-def greedy_decode_one(row, spatial, tok_mask, tid2idx, tokenizer, projector, qwen, device, max_new):
+def greedy_decode_one(row, spatial, tok_mask, tid2idx, tokenizer, projector, host_model, device, max_new):
     """Single-example greedy decode (no padding → no position_id ambiguity). Proven path."""
     idx = tid2idx[str(row["tile_id"])]
     prefix = spatial[idx:idx + 1].to(device)
@@ -43,22 +43,22 @@ def greedy_decode_one(row, spatial, tok_mask, tid2idx, tokenizer, projector, qwe
     prompt_ids = tokenizer(build_prompt_q(row), add_special_tokens=False,
                            return_tensors="pt")["input_ids"].to(device)
     prefix_proj = projector(prefix.to(torch.bfloat16))
-    prompt_emb = qwen.get_input_embeddings()(prompt_ids).to(torch.bfloat16)
+    prompt_emb = host_model.get_input_embeddings()(prompt_ids).to(torch.bfloat16)
     inputs_embeds = torch.cat([prefix_proj, prompt_emb], dim=1)
     attn = torch.cat([prefix_mask, torch.ones_like(prompt_ids)], dim=1)
 
     eos = tokenizer.eos_token_id
     gen = []
-    out = qwen(inputs_embeds=inputs_embeds, attention_mask=attn, use_cache=True)
+    out = host_model(inputs_embeds=inputs_embeds, attention_mask=attn, use_cache=True)
     past = out.past_key_values
     nxt = out.logits[:, -1, :].argmax(dim=-1)
     gen.append(nxt.item())
     for _ in range(max_new - 1):
         if gen[-1] == eos:
             gen.pop(); break
-        emb = qwen.get_input_embeddings()(nxt.unsqueeze(0)).to(torch.bfloat16)
+        emb = host_model.get_input_embeddings()(nxt.unsqueeze(0)).to(torch.bfloat16)
         attn = torch.cat([attn, torch.ones(1, 1, dtype=torch.long, device=device)], dim=1)
-        out = qwen(inputs_embeds=emb, attention_mask=attn, past_key_values=past, use_cache=True)
+        out = host_model(inputs_embeds=emb, attention_mask=attn, past_key_values=past, use_cache=True)
         past = out.past_key_values
         nxt = out.logits[:, -1, :].argmax(dim=-1)
         gen.append(nxt.item())

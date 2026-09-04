@@ -110,7 +110,7 @@ python -m egms_qa.qa_construction.build_labels
 python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 
 # 3. train and evaluate a host model
-python -m egms_qa.translator.train --qwen-path Qwen/Qwen3.5-9B \
+python -m egms_qa.translator.train --host-model Qwen/Qwen3.5-9B \
     --token-cache data/encoder/tokens/encoder_tokens_10k.pt --output-dir outputs/runs/qwen
 python -m egms_qa.translator.evaluate --adapter-dir outputs/runs/qwen/best --split test
 

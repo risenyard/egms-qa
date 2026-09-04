@@ -38,9 +38,9 @@ EGMS-QA trains four host models with the identical projector + LoRA recipe
 ## Train / evaluate
 
 ```bash
-# train (GPU); --qwen-path switches host model, --token-cache the encoder tokens
+# train (GPU); --host-model selects the frozen language model
 python -m egms_qa.translator.train \
-    --qwen-path Qwen/Qwen3.5-9B \
+    --host-model Qwen/Qwen3.5-9B \
     --token-cache data/encoder/tokens/encoder_tokens_10k.pt \
     --output-dir outputs/runs/qwen
 

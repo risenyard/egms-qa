@@ -169,15 +169,15 @@ def build_batch(rows, spatial, tok_mask, tid2idx, tokenizer, device, max_prompt,
     return batch
 
 
-def forward_loss(batch, projector, qwen, return_prompt_hidden=False, return_focus_hidden=False):
+def forward_loss(batch, projector, host_model, return_prompt_hidden=False, return_focus_hidden=False):
     prefix_proj = projector(batch["prefix"].to(torch.bfloat16))                 # (B,65,H)
-    prompt_emb = qwen.get_input_embeddings()(batch["prompt_ids"]).to(torch.bfloat16)
+    prompt_emb = host_model.get_input_embeddings()(batch["prompt_ids"]).to(torch.bfloat16)
     inputs_embeds = torch.cat([prefix_proj, prompt_emb], dim=1)
     attn = torch.cat([batch["prefix_mask"], batch["prompt_mask"]], dim=1)
     fkw = {}
-    if getattr(qwen, "_needs_tti", False):   # Gemma3 multimodal: text token_type_ids (all 0)
+    if getattr(host_model, "_needs_tti", False):   # Gemma3 multimodal: text token_type_ids (all 0)
         fkw["token_type_ids"] = torch.zeros(inputs_embeds.shape[:2], dtype=torch.long, device=inputs_embeds.device)
-    out = qwen(
+    out = host_model(
         inputs_embeds=inputs_embeds,
         attention_mask=attn,
         use_cache=False,
@@ -229,33 +229,33 @@ def forward_loss(batch, projector, qwen, return_prompt_hidden=False, return_focu
     return loss, info
 
 
-def evaluate(rows, spatial, tok_mask, tid2idx, tokenizer, projector, qwen, device, args):
-    projector.eval(); qwen.eval(); tot_l = 0.0; tot_t = 0
+def evaluate(rows, spatial, tok_mask, tid2idx, tokenizer, projector, host_model, device, args):
+    projector.eval(); host_model.eval(); tot_l = 0.0; tot_t = 0
     with torch.no_grad():
         for s in range(0, len(rows), args.batch_size):
             b = build_batch(rows[s:s + args.batch_size], spatial, tok_mask, tid2idx,
                             tokenizer, device, args.max_prompt_tokens)
-            _, info = forward_loss(b, projector, qwen)
+            _, info = forward_loss(b, projector, host_model)
             tot_l += info["loss"] * info["valid_tokens"]; tot_t += info["valid_tokens"]
-    projector.train(); qwen.train()
+    projector.train(); host_model.train()
     avg = tot_l / max(tot_t, 1)
     return {"loss": avg, "ppl": float(math.exp(min(avg, 20.0))), "n_examples": len(rows), "n_tokens": tot_t}
 
 
-def per_task_eval_loss(rows, spatial, tok_mask, tid2idx, tokenizer, projector, qwen, device, args, cap=400):
+def per_task_eval_loss(rows, spatial, tok_mask, tid2idx, tokenizer, projector, host_model, device, args, cap=400):
     """Answer-token loss broken out per task (cheap signal of which groups are learning)."""
     by = {}
     for r in rows:
         by.setdefault(r["task"], []).append(r)
-    projector.eval(); qwen.eval(); out = {}
+    projector.eval(); host_model.eval(); out = {}
     with torch.no_grad():
         for task, trows in sorted(by.items()):
             trows = trows[:cap]; tl = 0.0; tt = 0
             for s in range(0, len(trows), args.batch_size):
                 b = build_batch(trows[s:s + args.batch_size], spatial, tok_mask, tid2idx,
                                 tokenizer, device, args.max_prompt_tokens)
-                _, info = forward_loss(b, projector, qwen)
+                _, info = forward_loss(b, projector, host_model)
                 tl += info["loss"] * info["valid_tokens"]; tt += info["valid_tokens"]
             out[task] = round(tl / max(tt, 1), 4)
-    projector.train(); qwen.train()
+    projector.train(); host_model.train()
     return out

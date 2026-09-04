@@ -54,13 +54,17 @@ from egms_qa.qa_construction.qa_lib import (
 
 from egms_qa.paths import ENCODER_TOKENS, DEFAULT_HOST_MODEL
 
-QWEN_DEFAULT = DEFAULT_HOST_MODEL
+HOST_MODEL_DEFAULT = DEFAULT_HOST_MODEL
 TOK_DEFAULT = str(ENCODER_TOKENS)
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--qwen-path", default=QWEN_DEFAULT)
+    p.add_argument(
+        "--host-model",
+        default=HOST_MODEL_DEFAULT,
+        help="Hugging Face id or local path of the frozen host language model.",
+    )
     p.add_argument("--token-cache", default=TOK_DEFAULT)
     p.add_argument("--labels", default=str(DEFAULT_LABELS))
     p.add_argument("--meta", default=str(DEFAULT_META))
@@ -664,13 +668,13 @@ def numeric_auxiliary_losses(
     }
 
 
-def load_base_model(args: argparse.Namespace, device: torch.device):
+def load_host_model(args: argparse.Namespace, device: torch.device):
     import transformers
     from transformers import AutoConfig, AutoTokenizer
 
-    config = AutoConfig.from_pretrained(args.qwen_path, trust_remote_code=True)
+    config = AutoConfig.from_pretrained(args.host_model, trust_remote_code=True)
     model_type = str(getattr(config, "model_type", "")).lower()
-    tokenizer = AutoTokenizer.from_pretrained(args.qwen_path, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(args.host_model, trust_remote_code=True)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -685,7 +689,11 @@ def load_base_model(args: argparse.Namespace, device: torch.device):
             bnb_4bit_use_double_quant=True,
         )
 
-    print(f"loading base 4bit={not args.no_4bit} model_type={model_type} from {args.qwen_path}", flush=True)
+    print(
+        f"loading host model 4bit={not args.no_4bit} "
+        f"model_type={model_type} from {args.host_model}",
+        flush=True,
+    )
     model = None
     used = None
     if model_type == "gemma3":
@@ -698,7 +706,7 @@ def load_base_model(args: argparse.Namespace, device: torch.device):
         if not hasattr(transformers, cls_name):
             continue
         try:
-            model = getattr(transformers, cls_name).from_pretrained(args.qwen_path, **kw)
+            model = getattr(transformers, cls_name).from_pretrained(args.host_model, **kw)
             used = cls_name
             break
         except Exception as exc:
@@ -944,7 +952,7 @@ def main() -> None:
     if auxiliary_enabled:
         print(f"numeric auxiliary stats={json.dumps(auxiliary_stats, sort_keys=True)}", flush=True)
 
-    tokenizer, model, llm_hidden = load_base_model(args, device)
+    tokenizer, model, llm_hidden = load_host_model(args, device)
     lora_params = [p for p in model.parameters() if p.requires_grad]
     auxiliary_heads = None
     if auxiliary_enabled:
