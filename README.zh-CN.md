@@ -94,6 +94,22 @@ Ortho Vertical 产品的修改与重打包衍生物(© European Union, Copernicu
 `data/` 与 `outputs/` 是 release installer 和模型下载在本地创建的运行路径。GitHub
 不再跟踪发布数据或 checkpoint 元数据;Hugging Face 是唯一发布源。
 
+## 数据支持范围
+
+当前 release 支持:
+
+- 在发布的 10,000-tile 数据集上复现 encoder 预训练、token 提取、translator 训练与评测;
+- 编码已经符合 EGMS-QA NPZ 契约,且与发布版 304 步源时间轴和 `[8,302)` 模型窗口兼容的新 tile;
+- 在用户自行准备的 NPZ tile 集合上训练,前提是用户同时提供匹配的 split manifest、data config 和仅由 train split 拟合的 normalization 文件。
+
+当前 release 不包含:
+
+- 官方 EGMS 服务的认证和下载;
+- 任意官方 EGMS ZIP/CSV 到 EGMS-QA NPZ tile 的转换;
+- 针对新 EGMS 产品版本的时间轴对齐、缺失率筛选、窗口选择、空间划分和 normalization 自动计算。
+
+不同 EGMS 参考期不能直接照搬发布版 `[8,302)` 窗口或 normalization;训练前必须根据新语料重新确定这些数据决策。
+
 ## 复现
 
 ```bash

@@ -35,6 +35,16 @@ corpus-relative, derived from the full European candidate pool, but its value
 ships in the C4 reference JSON, so re-deriving it is optional and never required
 to reproduce the release.)
 
+## Data support boundary
+
+The public encoder code consumes the EGMS-QA NPZ tile contract together with a
+split manifest, data config, and normalization file. It supports reproducing
+the released encoder and training or inference on already prepared compatible
+tiles. It does not download official EGMS products, convert arbitrary EGMS
+ZIP/CSV releases, or infer a valid time window and normalization for another
+reference period. New product versions require a separate, empirically audited
+preparation step before this encoder entrypoint can be used.
+
 ## Token extraction
 
 ```bash
