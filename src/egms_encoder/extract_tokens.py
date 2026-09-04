@@ -1,7 +1,7 @@
 """EGMS-QA token extraction with the EGMS encoder on Europe-wide 10k tiles.
 
 Applies the frozen encoder and ViT-style 65-token pooling (CLS + 8x8 spatial
-bins) over the per-tile point histories in the LazyTileStore.
+bins) over the per-tile point histories in the TileStore.
 
 Output
 ------
@@ -20,8 +20,6 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
-import os
-import sys
 import time
 from pathlib import Path
 
@@ -31,7 +29,7 @@ import torch
 
 
 # The encoder package (egms_encoder) is installed. The checkpoint, split manifest,
-# data config and the raw tiles all ship with the release (see the data repo);
+# data config and processed source tiles all ship with the release (see the data repo);
 # the split manifest's tile paths are relative, so run from the checkout root.
 from egms_qa.paths import ENCODER_CKPT, SPLIT_MANIFEST
 
@@ -87,8 +85,8 @@ def load_encoder(checkpoint_path: Path, device: torch.device):
     return model, train_args
 
 
-def load_lazy_store(manifest_path: Path, data_config_path: Path):
-    from egms_encoder.data.lazy_tile_store import LazyTileStore, TimeWindow
+def load_tile_store(manifest_path: Path, data_config_path: Path):
+    from egms_encoder.data.tile_store import TileStore, TimeWindow
 
     with open(data_config_path) as f:
         cfg = json.load(f)
@@ -98,7 +96,7 @@ def load_lazy_store(manifest_path: Path, data_config_path: Path):
     manifest = pd.read_parquet(manifest_path)
     split_assignments = dict(zip(manifest["tile_id"].astype(str),
                                  manifest["split"].astype(str)))
-    store = LazyTileStore(
+    store = TileStore(
         manifest=manifest,
         time_window=tw,
         split_assignments=split_assignments,
@@ -145,9 +143,9 @@ def main():
     print(f"[encoder] d_model={train_args['d_model']}, "
           f"layers={train_args['num_layers']}, heads={train_args['num_heads']}", flush=True)
     input_length = train_args["input_length"]
-    fc = 10  # FEATURE_COLUMNS_COUNT in LazyTileStore
+    fc = 10  # FEATURE_COLUMNS_COUNT in TileStore
 
-    store, tw, manifest = load_lazy_store(Path(args.manifest), Path(args.data_config))
+    store, tw, manifest = load_tile_store(Path(args.manifest), Path(args.data_config))
     if tw.input_length != input_length:
         raise ValueError(f"time_window len {tw.input_length} != checkpoint input_length {input_length}")
 

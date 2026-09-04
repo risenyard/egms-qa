@@ -15,7 +15,6 @@ import argparse
 import json
 import math
 import random
-import sys
 import time
 from pathlib import Path
 
@@ -24,7 +23,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from egms_qa.translator.train_core import (
+from egms_qa.translator.modeling import (
     EGMSProjector,
     build_batch,
     evaluate,

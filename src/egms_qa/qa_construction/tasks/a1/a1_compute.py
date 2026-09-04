@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import sys
 import time
 from pathlib import Path
 
@@ -84,12 +83,12 @@ def load_encoder(checkpoint_path: Path, device: torch.device):
 
 
 def load_store(manifest_path: Path, data_config_path: Path):
-    from egms_encoder.data.lazy_tile_store import LazyTileStore, TimeWindow
+    from egms_encoder.data.tile_store import TileStore, TimeWindow
 
     cfg = json.load(open(data_config_path))
     tw = TimeWindow(t_start=cfg["time_window"]["t_start"], t_end=cfg["time_window"]["t_end"])
     manifest = pd.read_parquet(manifest_path)
-    store = LazyTileStore(
+    store = TileStore(
         manifest=manifest,
         time_window=tw,
         split_assignments=dict(zip(manifest["tile_id"].astype(str), manifest["split"].astype(str))),

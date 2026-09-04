@@ -12,8 +12,8 @@ only.
 Files:
 
 - `train.py` — sampling and the training loop (entry point).
-- `train_core.py` — projector, batch construction, loss, evaluation building blocks.
-- `generation.py` — decoding utilities (projector, prompt builder, greedy decode).
+- `modeling.py` — projector, batch construction, loss, evaluation building blocks.
+- `generation.py` — decoding utilities (prompt builder, greedy decode).
 - `evaluate.py` — free-generation evaluation on the test split, scoring generated
   answers against the canonical task labels; supports a shuffled-token control.
 - `answer_extractor.py` — deterministic extraction of the canonical value from a

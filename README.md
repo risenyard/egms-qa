@@ -37,7 +37,7 @@ Each block pairs a code module here with its released artifacts on 🤗 Hugging 
 | block | code (this repo) | what it is | artifacts (🤗) |
 |---|---|---|---|
 | **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | the frozen tile representation and token extraction | [`egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) — checkpoint |
-| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | the 78-task definitions and the question–answer records | [`egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) — raw tiles, tokens, QA + tables |
+| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | the 78-task definitions and the question–answer records | [`egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) — QA, NPZ source tiles, tokens + tables |
 | **translator** | [`src/egms_qa/translator/`](src/egms_qa/translator/) | projector + LoRA training and evaluation on host LLMs | [`egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) — 4 adapters |
 
 Each block has its own README. The task system (78 tasks, families A/B/C/D/S/X)
@@ -67,37 +67,46 @@ translator training/evaluation.
 
 ## Data
 
-Code lives here; the heavy artifacts are released on Hugging Face. The encoder
-and dataset repos mirror this checkout's layout, so downloading them into a
-checkout drops every file into place:
+Code lives here; the heavy artifacts are released on Hugging Face. The dataset
+uses a publication-oriented layout and is linked into the runtime paths by
+`egms_qa.release`; model repos download directly into their target directories:
 
-- **Encoder** — frozen checkpoint: [`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) → `data/encoder/checkpoint/encoder.pt`
-- **Dataset** — raw EGMS tiles, encoder token cache, QA records + reference tables: [`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) → `data/tiles/`, `data/encoder/tokens/`, `outputs/qa/`, `outputs/tasks/`
-- **Translators** — 4 LoRA adapters + projectors: [`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) → `outputs/runs/<key>/best/`
+- **Encoder** — frozen checkpoint + normalization: [`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) → into `data/encoder/checkpoint/`
+- **Dataset** — QA, processed NPZ source tiles, encoder-token cache, labels, reference tables, and integrity metadata: [`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
+- **Translators** — 4 LoRA adapters + projectors, one dir per host model: [`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) → into `outputs/runs/` (→ `<key>/best/`)
 
 ```bash
-# fetch the dataset (raw tiles + tokens + QA) into a checkout
-hf download risenyard/egms-qa-dataset --repo-type dataset --local-dir .
+# download, audit, and link the structured dataset release into this checkout
+hf download risenyard/egms-qa-dataset \
+    --repo-type dataset --local-dir release/egms-qa-dataset
+python -m egms_qa.release audit --release-dir release/egms-qa-dataset
+python -m egms_qa.release install \
+    --release-dir release/egms-qa-dataset --target-root .
+# encoder checkpoint (flat repo) — fetch into the path the code expects
+hf download risenyard/egms-qa-encoder --local-dir data/encoder/checkpoint
+# translators (flat repo, one dir per host model) — fetch into outputs/runs
+hf download risenyard/egms-qa-translator --local-dir outputs/runs
 ```
 
 Run reproduction commands from the checkout root so the relative tile paths in the
 split manifest resolve. Paths are overridable via `EGMS_QA_ROOT`, `EGMS_QA_DATA`,
 `EGMS_QA_OUTPUTS` (see [`src/egms_qa/paths.py`](src/egms_qa/paths.py)).
-The raw tiles derive from the EGMS Level-3 product (© European Union, Copernicus
-Land Monitoring Service / EEA), redistributed under its free-and-open terms with
-attribution; see [`data/METADATA.md`](data/METADATA.md).
+The NPZ source tiles are a modified/repacked derivative of the EGMS Level-3
+Ortho Vertical product (© European Union, Copernicus Land Monitoring Service /
+EEA), distributed with source and modification notices; see
+[`data/METADATA.md`](data/METADATA.md). They are not an official EGMS product.
 
 ## Reproduce
 
 ```bash
-# 0. (optional) retrain the frozen encoder from scratch on the released tiles
-python -m egms_encoder.train_tile_aware --output-dir outputs/encoder_pretrain
+# 0. (optional) retrain the frozen encoder from the installed NPZ tile store
+python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
 
-# 1. tokens: either download the cache, or extract from the raw tile store
+# 1. tokens: either use the downloaded cache, or extract from the tile store
 python -m egms_encoder.extract_tokens --output-dir outputs/tokens
 
 # 2. task labels + QA records (or download them)
-python -m egms_qa.qa_construction.build_probe_labels
+python -m egms_qa.qa_construction.build_labels
 python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 
 # 3. train and evaluate a host model
@@ -113,5 +122,6 @@ python -m egms_qa.translator.summarize_results
 
 ## Licence
 
-Code is released under the MIT Licence ([`LICENSE`](LICENSE)); the dataset and
-model weights under CC-BY-4.0 ([`DATA_LICENSE`](DATA_LICENSE)).
+Code is released under the MIT Licence ([`LICENSE`](LICENSE)). EGMS-QA-created
+data and model artifacts are CC-BY-4.0; Copernicus-derived source measurements
+retain the CLMS terms documented in [`DATA_LICENSE`](DATA_LICENSE).

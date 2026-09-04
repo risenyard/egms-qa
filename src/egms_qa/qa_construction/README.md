@@ -9,7 +9,7 @@ the EGMS-QA question–answer dataset. It has three stages:
    deterministic reference value for each task family over the 10,000 tiles and
    writes a per-family table under `outputs/tasks/`. Each family carries its
    exact algorithm in `tasks/<family>/<task>_algorithm.md`.
-2. **Label aggregation** — `build_probe_labels.py` reads the per-family tables
+2. **Label aggregation** — `build_labels.py` reads the per-family tables
    and materializes one canonical target per leaf task into
    `outputs/qa/labels.parquet` (+ `labels_meta.json`).
 3. **QA rendering** — `generate_qa.py` (with `qa_lib.py`, `verifier` logic in
@@ -18,7 +18,7 @@ the EGMS-QA question–answer dataset. It has three stages:
    static X refusal tasks are sampled so they do not dominate the loss.
 
 ```bash
-python -m egms_qa.qa_construction.build_probe_labels          # -> outputs/qa/labels.parquet
+python -m egms_qa.qa_construction.build_labels          # -> outputs/qa/labels.parquet
 python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 ```
 
@@ -109,13 +109,16 @@ For the exact reference-value algorithm of any task, see the matching
 
 - **Unit**: a 7 km tile; 10,000 tiles across Europe, split 8,000 / 1,000 / 1,000
   (train / validation / test) by spatial unit.
-- **Source**: EGMS Level-3 vertical displacement (2019–2023), 294 time steps per
-  point after preparation; see `../../../data/METADATA.md` for provenance. The
-  raw EGMS product is Copernicus data and is not redistributed here.
+- **Source**: EGMS Level-3 Ortho Vertical displacement (2019–2023). The 10,000
+  processed source tiles are released as NPZ under
+  `artifacts/source_tiles/` in `risenyard/egms-qa-dataset`. They contain 304
+  prepared steps; the encoder uses `[8,302)` (294 steps). See
+  `../../../data/METADATA.md`.
 - **Representation**: each tile is encoded to 65 tokens (1 summary + 8×8 spatial
   cells) of dimension 256 by the frozen EGMS encoder (see `egms_encoder`).
 - **Records**: one question–answer pair per rendered tile–task–phrasing; answers
   are natural language only. The generated JSONL and the reference tables are
   part of the data release (see the top-level README for the download link).
-- **Licence**: question–answer records and derived tables are released under
-  CC-BY-4.0 (`../../../DATA_LICENSE`).
+- **Licence**: question–answer records and derived tables are CC-BY-4.0. The
+  Copernicus-derived measurements retain the CLMS source and modification
+  notices in `../../../DATA_LICENSE`.

@@ -11,14 +11,14 @@ import collections
 import json
 import math
 import random
-import sys
 import time
 from pathlib import Path
 from typing import Any
 
 import torch
 
-from egms_qa.translator.generation import EGMSProjector, build_prompt_q
+from egms_qa.translator.modeling import EGMSProjector
+from egms_qa.translator.generation import build_prompt_q
 from egms_qa.translator.answer_extractor import (
     AMBIGUOUS,
     PARSED,

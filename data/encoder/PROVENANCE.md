@@ -23,8 +23,9 @@ From the data release (git-ignored, place here):
 
 - The encoder is trained with `coord_scale = 3500`; the token cache records the
   paired checkpoint and normalization in its metadata.
-- The raw per-tile point store ships in the dataset repo under `data/tiles/`, so
-  recomputing tokens or task reference values from raw tiles is self-contained.
+- The processed per-tile point store ships in the dataset repo under
+  `artifacts/source_tiles/`; `python -m egms_qa.release install` links it to
+  `data/tiles/` so recomputing tokens or task reference values is self-contained.
   (Only re-deriving the family-C4 corpus threshold needs the full European pool,
   which is not shipped; its value ships in the C4 reference JSON.)
-- The raw EGMS Level-3 product is Copernicus data; see `../METADATA.md`.
+- The underlying EGMS Level-3 product is Copernicus data; see `../METADATA.md`.

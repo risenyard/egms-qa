@@ -36,7 +36,7 @@ token,再由一个宿主语言模型用自然语言回答监测类问题,并对�
 | 模块 | 代码(本仓库) | 内容 | 产物(🤗) |
 |---|---|---|---|
 | **encoder** | [`src/egms_encoder/`](src/egms_encoder/) | 冻结的瓦片表示与 token 提取 | [`egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) — checkpoint |
-| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | 78 个任务的定义与问答对记录 | [`egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) — 原始瓦片、tokens、QA + 参考值表 |
+| **qa_construction** | [`src/egms_qa/qa_construction/`](src/egms_qa/qa_construction/) | 78 个任务的定义与问答对记录 | [`egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) — QA、NPZ 源瓦片、tokens + 参考值表 |
 | **translator** | [`src/egms_qa/translator/`](src/egms_qa/translator/) | 投影器 + LoRA 在宿主 LLM 上的训练与评测 | [`egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) — 4 个 adapter |
 
 每个模块都有各自的 README。任务体系(78 个任务,A/B/C/D/S/X 六族)与数据集
@@ -62,35 +62,43 @@ pip install -e ".[tasks]"        # + 任务参考值计算
 
 ## 数据
 
-代码在本仓库;重数据发布在 Hugging Face。encoder 与 dataset 库**镜像本 checkout 的目录**,
-下载进 checkout 即可各就各位:
+代码在本仓库;重数据发布在 Hugging Face。dataset 采用面向发布的分层结构,由
+`egms_qa.release` 映射到运行路径;encoder 与 translator 模型库下载到目标目录即可:
 
-- **编码器** —— 冻结 checkpoint:[`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) → `data/encoder/checkpoint/encoder.pt`
-- **数据集** —— 原始 EGMS 瓦片、token 缓存、QA 记录 + 参考值表:[`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset) → `data/tiles/`、`data/encoder/tokens/`、`outputs/qa/`、`outputs/tasks/`
-- **翻译器** —— 4 个 LoRA adapter + projector:[`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) → `outputs/runs/<key>/best/`
+- **编码器** —— 冻结 checkpoint + 归一化参数:[`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder) → 下载进 `data/encoder/checkpoint/`
+- **数据集** —— QA、处理后的 NPZ 源瓦片、encoder token、标签、参考值表与完整性元数据:[`risenyard/egms-qa-dataset`](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
+- **翻译器** —— 4 个 LoRA adapter + projector,每个宿主模型一个目录:[`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator) → 下载进 `outputs/runs/`(→ `<key>/best/`)
 
 ```bash
-# 把数据集(原始瓦片 + tokens + QA)拉进 checkout
-hf download risenyard/egms-qa-dataset --repo-type dataset --local-dir .
+# 下载、审计并把专业发布结构链接到本 checkout 的运行路径
+hf download risenyard/egms-qa-dataset \
+    --repo-type dataset --local-dir release/egms-qa-dataset
+python -m egms_qa.release audit --release-dir release/egms-qa-dataset
+python -m egms_qa.release install \
+    --release-dir release/egms-qa-dataset --target-root .
+# 编码器 checkpoint(扁平库)—— 拉进代码期望的路径
+hf download risenyard/egms-qa-encoder --local-dir data/encoder/checkpoint
+# 翻译器(扁平库,每个宿主模型一个目录)—— 拉进 outputs/runs
+hf download risenyard/egms-qa-translator --local-dir outputs/runs
 ```
 
 复现命令请**从 checkout 根目录运行**,这样 split manifest 里的相对瓦片路径才能解析。
 路径均可通过 `EGMS_QA_ROOT`、`EGMS_QA_DATA`、`EGMS_QA_OUTPUTS`
-覆盖(见 [`src/egms_qa/paths.py`](src/egms_qa/paths.py))。原始瓦片源自 EGMS Level-3
-产品(© European Union, Copernicus / EEA),按其免费开放条款并署名后在此转发;见
-[`data/METADATA.md`](data/METADATA.md)。
+覆盖(见 [`src/egms_qa/paths.py`](src/egms_qa/paths.py))。NPZ 源瓦片是 EGMS Level-3
+Ortho Vertical 产品的修改与重打包衍生物(© European Union, Copernicus / EEA),附带
+来源和修改说明;它们不是 EGMS 官方产品。见 [`data/METADATA.md`](data/METADATA.md)。
 
 ## 复现
 
 ```bash
-# 0.(可选)在发布的瓦片上从零重训冻结编码器
-python -m egms_encoder.train_tile_aware --output-dir outputs/encoder_pretrain
+# 0.(可选)从安装好的 NPZ tile store 重训冻结编码器
+python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
 
-# 1. token:下载缓存,或从原始瓦片存储提取
+# 1. token:使用下载缓存,或从 NPZ tile store 提取
 python -m egms_encoder.extract_tokens --output-dir outputs/tokens
 
 # 2. 任务标签 + QA 记录(或直接下载)
-python -m egms_qa.qa_construction.build_probe_labels
+python -m egms_qa.qa_construction.build_labels
 python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 
 # 3. 训练并评测一个宿主模型
@@ -106,5 +114,6 @@ python -m egms_qa.translator.summarize_results
 
 ## 许可
 
-代码以 MIT 许可发布([`LICENSE`](LICENSE));数据集与模型权重以 CC-BY-4.0 发布
-([`DATA_LICENSE`](DATA_LICENSE))。
+代码以 MIT 许可发布([`LICENSE`](LICENSE));EGMS-QA 创建的数据和模型产物以
+CC-BY-4.0 发布。Copernicus 衍生源测量遵循 [`DATA_LICENSE`](DATA_LICENSE) 中列出的
+CLMS 条款。

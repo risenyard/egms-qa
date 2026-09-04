@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import csv
 import json
-from pathlib import Path
 from statistics import mean
 
 from egms_qa.paths import OUTPUTS_DIR, HOST_MODELS

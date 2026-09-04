@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import sys
 import time
 from collections import Counter
 from pathlib import Path
@@ -45,7 +44,7 @@ def main() -> None:
     ap.add_argument("--log-every", type=int, default=1000)
     args = ap.parse_args()
 
-    from egms_encoder.data.lazy_tile_store import LazyTileStore, TimeWindow
+    from egms_encoder.data.tile_store import TileStore, TimeWindow
 
     cfg = json.load(open(args.data_config))
     tw = TimeWindow(
@@ -54,7 +53,7 @@ def main() -> None:
     )
     manifest = pd.read_parquet(args.manifest)
     split_assignments = dict(zip(manifest["tile_id"].astype(str), manifest["split"].astype(str)))
-    store = LazyTileStore(manifest=manifest, time_window=tw, split_assignments=split_assignments)
+    store = TileStore(manifest=manifest, time_window=tw, split_assignments=split_assignments)
 
     out_path = Path(args.out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,12 +1,11 @@
-"""LazyTileStore — per-tile npz reader with precomputed split.
+"""TileStore — per-tile NPZ reader with precomputed split.
 
+Constructed from a released split manifest parquet (one row per tile, with
+``path``, ``tile_id``, ``centroid_x``, ``centroid_y``, ``n_points``, ``split``).
+Each tile's full feature row is materialised on demand by reading the NPZ;
+nothing is loaded eagerly.
 
-Constructed from a manifest parquet (one row per tile, with ``path``,
-``tile_id``, ``centroid_x``, ``centroid_y``, ``n_points`` …) and an optional
-spatial blocked split JSON. Each tile's full feature row is materialised
-on demand by reading the npz; nothing is loaded eagerly.
-
-Tile row layout matches ``TileStore.get_tile``:
+Tile row layout:
     [easting, northing,
      height, rmse,
      mean_velocity, mean_velocity_std,
@@ -14,9 +13,8 @@ Tile row layout matches ``TileStore.get_tile``:
      seasonality, seasonality_std,
      time_series(T) ...]
 
-The time series is sliced to ``[t_start, t_end)``; the resulting
-window is guaranteed NaN-free by the pool filter (verified by
-``scripts/v4_verify_trim_zero_nan.py``).
+The time series is sliced to ``[t_start, t_end)``; the window is guaranteed
+NaN-free by the pool filter used to build the released tile set.
 """
 
 from __future__ import annotations
@@ -47,7 +45,7 @@ class TimeWindow:
         return self.t_end - self.t_start
 
 
-class LazyTileStore:
+class TileStore:
     """Per-tile npz reader with precomputed metadata + split.
 
     Parameters
@@ -112,50 +110,14 @@ class LazyTileStore:
 
         counts = [m["num_points"] for m in self.tile_metadata]
         print(
-            f"LazyTileStore: {self.num_tiles} tiles  "
+            f"TileStore: {self.num_tiles} tiles  "
             f"(input_length={time_window.input_length}, t=[{time_window.t_start},{time_window.t_end}))  "
             f"points/tile: min={min(counts)}, median={int(np.median(counts))}, max={max(counts)}",
             flush=True,
         )
 
     @classmethod
-    def from_config(cls, config_path: str | Path) -> "LazyTileStore":
-        """Build directly from ``data/processed/v4/v4_data_config.json``.
-
-        The config is the single source of truth for paths, time window,
-        and split file.
-        """
-        config_path = Path(config_path)
-        with open(config_path) as f:
-            cfg = json.load(f)
-        repo_root = _infer_repo_root(config_path)
-
-        sample_path = repo_root / cfg["files"]["sample_10k"]
-        manifest = pd.read_parquet(sample_path)
-        window = TimeWindow(
-            t_start=int(cfg["time_window"]["t_start"]),
-            t_end=int(cfg["time_window"]["t_end"]),
-        )
-
-        split_path = repo_root / "data/processed/v4/v4_split.json"
-        split_assignments: dict[str, str] | None = None
-        if split_path.exists():
-            with open(split_path) as f:
-                split_doc = json.load(f)
-            split_assignments = {}
-            for name in ("train", "val", "test"):
-                for tid in split_doc.get(name, []):
-                    split_assignments[str(tid)] = name
-
-        return cls(
-            manifest=manifest,
-            time_window=window,
-            split_assignments=split_assignments,
-            feature_columns_count=int(cfg["tile_field_layout"]["feature_columns_count"]),
-        )
-
-    @classmethod
-    def from_manifest(cls, manifest_path: str | Path, data_config_path: str | Path | None = None) -> "LazyTileStore":
+    def from_manifest(cls, manifest_path: str | Path, data_config_path: str | Path | None = None) -> "TileStore":
         """Build from a released split manifest parquet.
 
         The manifest has one row per tile with ``tile_id``, ``path`` (relative to
@@ -205,23 +167,11 @@ class LazyTileStore:
         out[:, self.feature_columns_count:] = ts.astype(np.float32, copy=False)
         return out
 
-    def split_tile_indices(self, split: str, *args, **kwargs) -> np.ndarray:
-        """Ignores legacy split-config args (val_fraction, split_seed,
-        test_fraction, split_strategy, stratify_bins) because the split is
-        precomputed and loaded from disk. Extra args are accepted only for
-        signature compatibility with iter_tile_batches.
-        """
+    def split_tile_indices(self, split: str) -> np.ndarray:
+        """Return the tile indices for a split. The train/val/test assignment is
+        precomputed and loaded from the manifest, so no split config is needed."""
         if split not in self._split_idx:
             raise ValueError(
                 f"split={split!r} not available; have {list(self._split_idx)}"
             )
         return self._split_idx[split]
-
-
-def _infer_repo_root(config_path: Path) -> Path:
-    """Walk up from config until we find a directory containing 'src/'."""
-    p = config_path.resolve().parent
-    for parent in [p, *p.parents]:
-        if (parent / "src").is_dir() and (parent / "data").is_dir():
-            return parent
-    return p

@@ -1,26 +1,14 @@
 """EGMS-QA decode utilities (task-agnostic, A-X task families).
 
-Shared by the evaluator: EGMSProjector, build_prompt_q, parse_number,
-match_region, greedy_decode_one.
+Shared by the evaluator: build_prompt_q, parse_number, match_region,
+greedy_decode_one. The projector itself lives in ``modeling.py``.
 """
 from __future__ import annotations
 import re
 import torch
-from torch import nn
 
 REGIONS = ["northwest", "northeast", "southwest", "southeast",
            "north", "south", "east", "west", "center", "centre"]
-
-
-class EGMSProjector(nn.Module):
-    def __init__(self, egms_dim, llm_hidden, dropout=0.05):
-        super().__init__()
-        hidden = max(egms_dim, llm_hidden)
-        self.net = nn.Sequential(nn.Linear(egms_dim, hidden), nn.GELU(),
-                                 nn.Dropout(dropout), nn.Linear(hidden, llm_hidden))
-
-    def forward(self, x):
-        return self.net(x)
 
 
 def build_prompt_q(r):

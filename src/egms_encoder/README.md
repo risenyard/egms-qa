@@ -22,10 +22,12 @@ pooling step assigns points to an 8×8 grid and mean-pools features per cell,
 yielding 65 tokens (1 tile summary + 64 cells) with a validity mask.
 
 This directory vendors the encoder model and data code (`models/`, `data/`,
-`train_tile_aware.py`). Loading the checkpoint, extracting tokens, and
+`pretrain.py`). Loading the checkpoint, extracting tokens, and
 **retraining the encoder from scratch** are all self-contained on the released
-data: the raw tiles (`data/tiles/`), split manifest and normalization ship with
-the dataset repo, and the encoder was trained on this 10k tile set's train split.
+data: the processed source tiles ship as NPZ under
+`artifacts/source_tiles/` in `risenyard/egms-qa-dataset`; the release installer
+links them to `data/tiles/`. The split manifest and normalization ship with the
+code/model release. The encoder was trained on this 10k tile set's train split.
 The release has no external dependency. (One family-C4 threshold is
 corpus-relative, derived from the full European candidate pool, but its value
 ships in the C4 reference JSON, so re-deriving it is optional and never required
@@ -45,3 +47,13 @@ python -m egms_encoder.extract_tokens \
 The released token cache (`data/encoder/tokens/encoder_tokens_10k.pt`) lets you
 skip this step and train/evaluate the translator directly. Encoder provenance is
 in `../../data/encoder/PROVENANCE.md`.
+
+Install the structured dataset before pretraining or token extraction:
+
+```bash
+hf download risenyard/egms-qa-dataset \
+    --repo-type dataset --local-dir release/egms-qa-dataset
+python -m egms_qa.release install \
+    --release-dir release/egms-qa-dataset --target-root .
+python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
+```

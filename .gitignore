@@ -33,3 +33,4 @@ env/
 /data/encoder/checkpoint/*.pt
 /data/adapters/
 /data/tiles/
+/release/

@@ -1,7 +1,7 @@
 """Encoder pretraining entrypoint: self-supervised masked reconstruction of the released
 10k tile set (train split).
 
-Data loading uses LazyTileStore.from_manifest over per-tile npz files, with a
+Data loading uses TileStore.from_manifest over per-tile npz files, with a
 precomputed train/val/test split and normalization. The input length is locked
 to the configured time window (default 294). See `TileEncoder` for the model.
 """
@@ -20,10 +20,9 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch import nn
 
-from egms_encoder.data.lazy_tile_store import LazyTileStore
-from egms_encoder.data.tile_store import iter_tile_batches
+from egms_encoder.data.tile_batching import iter_tile_batches
+from egms_encoder.data.tile_store import TileStore
 from egms_encoder.models.tile_encoder import TileEncoder
 
 STATIC_COLUMNS = [
@@ -99,14 +98,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--precision", default="bf16", choices=["fp32", "bf16", "fp16"])
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--seed", type=int, default=42)
-    # Validation
-    p.add_argument("--split-strategy", default="random", choices=["random", "stratified"],
-                   help="Tile split strategy for train/val/test assignment")
-    p.add_argument("--val-fraction", type=float, default=0.05)
-    p.add_argument("--test-fraction", type=float, default=0.0,
-                   help="Held-out test tile fraction reserved from training and validation")
-    p.add_argument("--stratify-bins", type=int, default=3,
-                   help="Number of quantile bins per descriptor for stratified tile splitting")
+    # Validation (train/val/test split is precomputed in the manifest)
     p.add_argument("--val-batches", type=int, default=16)
     p.add_argument(
         "--resample-val-batches",
@@ -120,21 +112,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--log-every-steps", type=int, default=20)
     p.add_argument("--train-window-steps", type=int, default=1000)
     p.add_argument("--resume-from", default=None)
-    args = p.parse_args()
-    # Single released encoder configuration (patch temporal Transformer + spatial
-    # attention + additive residual head).
-    args.model_version = "v3_3"
-    return args
+    return p.parse_args()
 
 
 def collect_validation_batches(args, tile_store, rng, *, resampled: bool) -> list[dict]:
     batches = iter_tile_batches(
         tile_store, args.tiles_per_batch,
-        split="val", val_fraction=args.val_fraction, split_seed=args.val_seed,
+        split="val",
         rng=rng,
-        test_fraction=args.test_fraction,
-        split_strategy=args.split_strategy,
-        stratify_bins=args.stratify_bins,
         max_batches=None if resampled else args.val_batches,
         max_points=args.max_tile_points,
         feature_columns_count=len(FEATURE_COLUMNS), input_length=args.input_length,
@@ -157,8 +142,8 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load data via LazyTileStore
-    tile_store = LazyTileStore.from_manifest(args.manifest, args.data_config)
+    # Load data via TileStore
+    tile_store = TileStore.from_manifest(args.manifest, args.data_config)
     v4_input_length = tile_store.time_window.input_length
     if args.input_length is None:
         args.input_length = v4_input_length
@@ -202,7 +187,7 @@ def main() -> None:
     print(f"Model: {param_count:,} parameters ({param_count/1e6:.1f}M)", flush=True)
 
     if args.init_from_checkpoint:
-        load_init_checkpoint(model, Path(args.init_from_checkpoint), device, args.model_version)
+        load_init_checkpoint(model, Path(args.init_from_checkpoint), device)
 
     optimizer = build_optimizer(args, model)
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda" and args.precision == "fp16")
@@ -237,12 +222,7 @@ def main() -> None:
     seen_val_tile_ids: set[int] = set()
     if args.resample_val_batches:
         val_batches = []
-        val_tile_count = len(tile_store.split_tile_indices(
-            "val", args.val_fraction, args.val_seed,
-            test_fraction=args.test_fraction,
-            split_strategy=args.split_strategy,
-            stratify_bins=args.stratify_bins,
-        ))
+        val_tile_count = len(tile_store.split_tile_indices("val"))
         print(
             f"validation batches will be resampled: {args.val_batches} batches x "
             f"{args.tiles_per_batch} tiles from {val_tile_count} validation tiles",
@@ -290,11 +270,8 @@ def main() -> None:
             epoch += 1
             batches = iter_tile_batches(
                 tile_store, args.tiles_per_batch,
-                split="train", val_fraction=args.val_fraction, split_seed=args.val_seed,
+                split="train",
                 rng=data_rng,
-                test_fraction=args.test_fraction,
-                split_strategy=args.split_strategy,
-                stratify_bins=args.stratify_bins,
                 max_points=args.max_tile_points,
                 feature_columns_count=len(FEATURE_COLUMNS), input_length=args.input_length,
                 point_sampling=args.point_sampling, residual_sampling_alpha=args.residual_sampling_alpha,
@@ -401,7 +378,7 @@ def build_model(args, normalizer):
 
 def build_optimizer(args, model):
     """Use an optional dedicated LR for the residual head."""
-    if args.model_version not in ("v3_1", "v3_3") or args.residual_head_lr is None:
+    if args.residual_head_lr is None:
         return torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
     residual_ids = {id(p) for p in model.residual_head.parameters()}
@@ -418,7 +395,7 @@ def build_optimizer(args, model):
 
 def set_optimizer_lrs(args, optimizer, current_lr: float) -> None:
     """Update scheduler-controlled base LR while preserving residual head LR."""
-    if args.model_version in ("v3_1", "v3_3") and args.residual_head_lr is not None and len(optimizer.param_groups) > 1:
+    if args.residual_head_lr is not None and len(optimizer.param_groups) > 1:
         optimizer.param_groups[0]["lr"] = current_lr
         optimizer.param_groups[1]["lr"] = args.residual_head_lr
         return
@@ -426,31 +403,28 @@ def set_optimizer_lrs(args, optimizer, current_lr: float) -> None:
         group["lr"] = current_lr
 
 
-def load_init_checkpoint(model, checkpoint_path: Path, device, model_version: str) -> None:
+def load_init_checkpoint(model, checkpoint_path: Path, device) -> None:
     """Warm-start weights without loading optimizer/scaler state."""
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     state = checkpoint["model"]
-    if model_version in ("v3_1", "v3_3"):
-        incompatible = model.load_state_dict(state, strict=False)
-        allowed_missing = {
-            "residual_scale",
-            "residual_head.0.weight",
-            "residual_head.0.bias",
-            "residual_head.1.weight",
-            "residual_head.1.bias",
-            "residual_head.4.weight",
-            "residual_head.4.bias",
-        }
-        missing = set(incompatible.missing_keys)
-        unexpected = set(incompatible.unexpected_keys)
-        bad_missing = missing - allowed_missing
-        if bad_missing or unexpected:
-            raise RuntimeError(
-                "Unexpected init checkpoint mismatch: "
-                f"missing={sorted(bad_missing)} unexpected={sorted(unexpected)}"
-            )
-    else:
-        model.load_state_dict(state)
+    incompatible = model.load_state_dict(state, strict=False)
+    allowed_missing = {
+        "residual_scale",
+        "residual_head.0.weight",
+        "residual_head.0.bias",
+        "residual_head.1.weight",
+        "residual_head.1.bias",
+        "residual_head.4.weight",
+        "residual_head.4.bias",
+    }
+    missing = set(incompatible.missing_keys)
+    unexpected = set(incompatible.unexpected_keys)
+    bad_missing = missing - allowed_missing
+    if bad_missing or unexpected:
+        raise RuntimeError(
+            "Unexpected init checkpoint mismatch: "
+            f"missing={sorted(bad_missing)} unexpected={sorted(unexpected)}"
+        )
     print(f"initialized weights from {checkpoint_path}", flush=True)
 
 
@@ -609,14 +583,11 @@ def reconstruction_losses(out, target, loss_mask, args, normalizer):
     else:
         residual_head_loss = residual_loss
 
-    if args.model_version in ("v3_1", "v3_3"):
-        loss = (
-            global_loss
-            + float(args.residual_loss_weight) * residual_head_loss
-            + float(args.residual_consistency_weight) * residual_loss
-        )
-    else:
-        loss = global_loss + float(args.residual_loss_weight) * residual_loss
+    loss = (
+        global_loss
+        + float(args.residual_loss_weight) * residual_head_loss
+        + float(args.residual_consistency_weight) * residual_loss
+    )
     return {
         "loss": loss,
         "global_loss": global_loss,
@@ -686,12 +657,7 @@ def evaluate(args, model, val_batches, device, normalizer):
 
 def fit_tile_normalizer(tile_store, args):
     """Compute global mean/std from training tiles."""
-    train_indices = tile_store.split_tile_indices(
-        "train", args.val_fraction, args.val_seed,
-        test_fraction=args.test_fraction,
-        split_strategy=args.split_strategy,
-        stratify_bins=args.stratify_bins,
-    )
+    train_indices = tile_store.split_tile_indices("train")
     total, sq_total, residual_sq_total, count, residual_count = 0.0, 0.0, 0.0, 0, 0
     fc = len(FEATURE_COLUMNS)
     for idx in train_indices:
@@ -703,16 +669,15 @@ def fit_tile_normalizer(tile_store, args):
         total += float(vals.sum())
         sq_total += float((vals ** 2).sum())
         count += n
-        if args.model_version in ("v3_1", "v3_3"):
-            res_sq, res_count = residual_sum_squares_np(series)
-            residual_sq_total += res_sq
-            residual_count += res_count
+        res_sq, res_count = residual_sum_squares_np(series)
+        residual_sq_total += res_sq
+        residual_count += res_count
     if count == 0:
         return None
     mean = total / count
     std = max(math.sqrt(sq_total / count - mean * mean), 1e-6)
     normalizer = {"mean": float(mean), "std": float(std), "count": count}
-    if args.model_version in ("v3_1", "v3_3") and residual_count > 0:
+    if residual_count > 0:
         residual_raw_std = max(math.sqrt(residual_sq_total / residual_count), 1e-6)
         normalizer["residual_std"] = float(residual_raw_std / std)
         normalizer["residual_raw_std"] = float(residual_raw_std)

@@ -3,7 +3,7 @@
 The logical dataset is:
   10,000 tiles x 78 delivered tasks x 20 phrase variants.
 
-Probe-applicable tasks use the labels parquet produced by build_probe_labels.py.
+Probe-applicable tasks use the labels parquet produced by build_labels.py.
 X tasks are static refusal policies from the task reference tables and are
 sampled so refusal examples teach boundaries without dominating token-dependent
 monitoring questions.

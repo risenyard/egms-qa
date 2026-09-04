@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import sys
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -23,10 +22,11 @@ ROOT = Path(".")
 ENCODER_DATA = ROOT / "data/encoder"
 
 CKPT = ENCODER_DATA / "checkpoint/encoder.pt"
+MANIFEST = ENCODER_DATA / "manifest/split.parquet"
 DATA_CONFIG = ENCODER_DATA / "manifest/data_config.json"
 
-from egms_encoder.data.lazy_tile_store import LazyTileStore  # noqa: E402
-from egms_encoder.train_tile_aware import FEATURE_COLUMNS, build_model  # noqa: E402
+from egms_encoder.data.tile_store import TileStore  # noqa: E402
+from egms_encoder.pretrain import FEATURE_COLUMNS, build_model  # noqa: E402
 
 
 def stable_seed(text: str) -> int:
@@ -69,6 +69,7 @@ def summarize(values: np.ndarray) -> dict[str, float]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--checkpoint", default=str(CKPT))
+    ap.add_argument("--manifest", default=str(MANIFEST))
     ap.add_argument("--data-config", default=str(DATA_CONFIG))
     ap.add_argument("--out-dir", default="outputs/tasks/a2/work")
     ap.add_argument("--sample-tiles", type=int, default=10000)
@@ -98,7 +99,7 @@ def main() -> None:
     model.load_state_dict(ckpt["model"])
     model.to(device).eval()
 
-    store = LazyTileStore.from_config(args.data_config)
+    store = TileStore.from_manifest(args.manifest, args.data_config)
     input_length = int(store.time_window.input_length)
     max_points = int(getattr(train_args, "max_tile_points", 4096))
     mask_ratio = float(getattr(train_args, "eval_mask_ratio", getattr(train_args, "mask_ratio", 0.3)))
