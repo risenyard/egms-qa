@@ -48,7 +48,9 @@ python -m egms_encoder.extract_tokens \
 
 The released token cache (`data/encoder/tokens/encoder_tokens_10k.pt`) lets you
 skip this step and train/evaluate the translator directly. Encoder provenance is
-in `../../data/encoder/PROVENANCE.md`.
+documented in the
+[dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset) and
+[encoder card](https://huggingface.co/risenyard/egms-qa-encoder).
 
 Install the structured dataset before pretraining or token extraction:
 
