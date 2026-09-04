@@ -159,6 +159,7 @@ def _tile_store_pair_smoke(
     legacy_config: Path,
     target_config: Path,
     encoder_checkpoint: Path,
+    encoder_config: Path,
 ) -> dict:
     old_manifest = pd.read_parquet(source_manifest)
     new_manifest = pd.read_parquet(target_manifest)
@@ -194,7 +195,7 @@ def _tile_store_pair_smoke(
     coords -= coords.mean(axis=0, keepdims=True)
 
     device = torch.device("cpu")
-    model, train_args = load_encoder(encoder_checkpoint, device)
+    model, model_config = load_encoder(encoder_checkpoint, encoder_config, device)
     point_mask = torch.ones(1, len(tile), dtype=torch.bool)
     with torch.no_grad():
         output = model(
@@ -224,7 +225,7 @@ def _tile_store_pair_smoke(
     return {
         "sampled_manifest_indices": sampled_indices,
         "encoder_input_bitwise_equal": True,
-        "checkpoint_input_length": int(train_args["input_length"]),
+        "checkpoint_input_length": int(model_config["input_length"]),
         "encoder_embedding_shape": list(output["embedding"].shape),
         "pretraining_reconstruction_shape": list(pretrain_output["reconstruction"].shape),
         "token_shape": list(tokens.shape),
@@ -239,6 +240,7 @@ def main() -> None:
     parser.add_argument("--checkout", type=Path, required=True)
     parser.add_argument("--audit-root", type=Path, required=True)
     parser.add_argument("--encoder-checkpoint", type=Path, required=True)
+    parser.add_argument("--encoder-config", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=8)
     args = parser.parse_args()
 
@@ -301,6 +303,7 @@ def main() -> None:
         legacy_config,
         target_release / "metadata/data_config.json",
         args.encoder_checkpoint.resolve(),
+        args.encoder_config.resolve(),
     )
 
     environment = os.environ.copy()

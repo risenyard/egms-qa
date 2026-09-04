@@ -13,6 +13,7 @@ set -euo pipefail
 : "${TARGET_RELEASE:?TARGET_RELEASE is required}"
 : "${CHECKOUT:?CHECKOUT is required}"
 : "${ENCODER_CHECKPOINT:?ENCODER_CHECKPOINT is required}"
+: "${ENCODER_CONFIG:?ENCODER_CONFIG is required}"
 : "${AUDIT_BASE:?AUDIT_BASE is required}"
 
 export PYTHONPATH="${CHECKOUT}/src${PYTHONPATH:+:${PYTHONPATH}}"
@@ -23,4 +24,5 @@ export PYTHONPATH="${CHECKOUT}/src${PYTHONPATH:+:${PYTHONPATH}}"
   --checkout "${CHECKOUT}" \
   --audit-root "${AUDIT_BASE}/${SLURM_JOB_ID}" \
   --encoder-checkpoint "${ENCODER_CHECKPOINT}" \
+  --encoder-config "${ENCODER_CONFIG}" \
   --workers "${SLURM_CPUS_PER_TASK}"

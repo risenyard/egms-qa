@@ -5,7 +5,8 @@ CHECKOUT="/home/lis2/EGMS_VLM/egms-qa-migration294"
 SOURCE_RELEASE="/home/lis2/EGMS_VLM/egms-qa-hf/dataset"
 TARGET_RELEASE="/home/lis2/EGMS_VLM/egms-qa-hf/dataset-294-staging"
 ENCODER_RELEASE="/home/lis2/EGMS_VLM/egms-qa-hf/encoder"
-ENCODER_CHECKPOINT="${ENCODER_RELEASE}/encoder.pt"
+ENCODER_CHECKPOINT="${ENCODER_RELEASE}/encoder.safetensors"
+ENCODER_CONFIG="${ENCODER_RELEASE}/config.json"
 AUDIT_BASE="/home/lis2/EGMS_VLM/egms-qa-hf/migration294-audit"
 UPLOAD_RECORD="/home/lis2/EGMS_VLM/egms-qa-hf/logs/egms-upload294-final.txt"
 
@@ -16,7 +17,7 @@ crop_job_id="$(sbatch --parsable \
   "${CHECKOUT}/scripts/release/crop294.sbatch")"
 
 audit_job_id="$(sbatch --parsable --dependency="afterok:${crop_job_id}" \
-  --export=ALL,SOURCE_RELEASE="${SOURCE_RELEASE}",TARGET_RELEASE="${TARGET_RELEASE}",CHECKOUT="${CHECKOUT}",ENCODER_CHECKPOINT="${ENCODER_CHECKPOINT}",AUDIT_BASE="${AUDIT_BASE}" \
+  --export=ALL,SOURCE_RELEASE="${SOURCE_RELEASE}",TARGET_RELEASE="${TARGET_RELEASE}",CHECKOUT="${CHECKOUT}",ENCODER_CHECKPOINT="${ENCODER_CHECKPOINT}",ENCODER_CONFIG="${ENCODER_CONFIG}",AUDIT_BASE="${AUDIT_BASE}" \
   "${CHECKOUT}/scripts/release/audit_crop294.sbatch")"
 
 upload_job_id="$(sbatch --parsable --dependency="afterok:${audit_job_id}" \
