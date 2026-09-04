@@ -31,7 +31,13 @@ import torch
 # The encoder package (egms_encoder) is installed. The checkpoint, split manifest,
 # data config and processed source tiles all ship with the release (see the data repo);
 # the split manifest's tile paths are relative, so run from the checkout root.
-from egms_qa.paths import ENCODER_CKPT, SPLIT_MANIFEST
+from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
+from egms_qa.paths import (
+    ENCODER_CKPT,
+    ENCODER_CONFIG,
+    ENCODER_NORMALIZATION,
+    SPLIT_MANIFEST,
+)
 
 TILE_SIZE = 7000.0
 GRID = 8
@@ -40,6 +46,8 @@ GRID = 8
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--checkpoint", default=str(ENCODER_CKPT))
+    p.add_argument("--model-config", default=str(ENCODER_CONFIG))
+    p.add_argument("--normalization", default=str(ENCODER_NORMALIZATION))
     p.add_argument("--manifest", default=str(SPLIT_MANIFEST))
     p.add_argument("--data-config",
                    default=str(SPLIT_MANIFEST.parent / "data_config.json"))
@@ -52,37 +60,11 @@ def parse_args():
     return p.parse_args()
 
 
-def load_encoder(checkpoint_path: Path, device: torch.device):
+def load_encoder(checkpoint_path: Path, config_path: Path, device: torch.device):
     print(f"[load] {checkpoint_path}", flush=True)
-    ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    train_args = ckpt["args"]
-
-    from egms_encoder.models.tile_encoder import TileEncoder
-
-    # coord_scale is applied INSIDE the model's forward (coords / coord_scale
-    # before the coord embedding), so it must match the value the checkpoint was
-    # trained with (recorded in its args); otherwise the coordinate branch sees
-    # raw-scale coords and produces garbage tokens.
-    coord_scale = train_args.get("coord_scale")
-    print(f"[coord_scale] {coord_scale}", flush=True)
-    model = TileEncoder(
-        input_length=train_args["input_length"],
-        d_model=train_args["d_model"],
-        patch_size=train_args.get("patch_size", 8),
-        temporal_layers=train_args.get("temporal_layers", 2),
-        temporal_heads=train_args.get("temporal_heads", 4),
-        spatial_layers=train_args["num_layers"],
-        spatial_heads=train_args["num_heads"],
-        residual_head_mode=train_args.get("residual_head_mode", "additive"),
-        coord_scale=coord_scale,
-    )
-    missing, unexpected = model.load_state_dict(ckpt["model"], strict=False)
-    if unexpected:
-        print(f"  unexpected: {unexpected[:5]}", flush=True)
-    if missing:
-        print(f"  missing: {missing[:5]}", flush=True)
-    model.eval().to(device)
-    return model, train_args
+    model, config = load_encoder_checkpoint(checkpoint_path, config_path, device)
+    print(f"[coord_scale] {config['coord_scale_m']}", flush=True)
+    return model, config
 
 
 def load_tile_store(manifest_path: Path, data_config_path: Path):
@@ -133,16 +115,15 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     ckpt_path = Path(args.checkpoint)
-    norm_path = ckpt_path.parent / "normalization.json"
-    with open(norm_path) as f:
-        norm = json.load(f)
+    norm = load_normalization(args.normalization)
     norm_mean = float(norm["mean"]); norm_std = float(norm["std"])
     print(f"[norm] mean={norm_mean:.4f} std={norm_std:.4f}", flush=True)
 
-    model, train_args = load_encoder(ckpt_path, device)
-    print(f"[encoder] d_model={train_args['d_model']}, "
-          f"layers={train_args['num_layers']}, heads={train_args['num_heads']}", flush=True)
-    input_length = train_args["input_length"]
+    model, model_config = load_encoder(ckpt_path, Path(args.model_config), device)
+    print(f"[encoder] d_model={model_config['d_model']}, "
+          f"layers={model_config['spatial_layers']}, "
+          f"heads={model_config['spatial_heads']}", flush=True)
+    input_length = int(model_config["input_length"])
     fc = 10  # FEATURE_COLUMNS_COUNT in TileStore
 
     store, tw, manifest = load_tile_store(Path(args.manifest), Path(args.data_config))
@@ -153,7 +134,7 @@ def main():
     n_tiles = n_total if args.max_tiles is None else min(n_total, args.max_tiles)
     n_patch = args.grid * args.grid
     n_tok = n_patch + 1
-    d_model = int(train_args["d_model"])
+    d_model = int(model_config["d_model"])
 
     spatial_tokens = np.zeros((n_tiles, n_tok, d_model), dtype=np.float32)
     token_mask = np.zeros((n_tiles, n_tok), dtype=bool)
@@ -212,8 +193,9 @@ def main():
     out_pt = out_dir / "encoder_tokens.pt"
     metadata = {
         "encoder_checkpoint": str(ckpt_path.resolve()),
-        "coord_scale": train_args.get("coord_scale"),
-        "encoder_args": dict(train_args),
+        "encoder_config_path": str(Path(args.model_config).resolve()),
+        "coord_scale": float(model_config["coord_scale_m"]),
+        "encoder_config": dict(model_config),
         "manifest_path": str(Path(args.manifest).resolve()),
         "data_config_path": str(Path(args.data_config).resolve()),
         "normalizer_mean": norm_mean,

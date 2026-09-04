@@ -50,7 +50,8 @@ preparation step before this encoder entrypoint can be used.
 ```bash
 # encoder checkpoint + split manifest come from the data release (data/encoder/)
 python -m egms_encoder.extract_tokens \
-    --checkpoint data/encoder/checkpoint/encoder.pt \
+    --checkpoint data/encoder/checkpoint/encoder.safetensors \
+    --model-config data/encoder/checkpoint/config.json \
     --manifest   data/encoder/manifest/split.parquet \
     --output-dir outputs/tokens
 # -> outputs/tokens/encoder_tokens_10k.pt   (spatial_tokens [10000, 65, 256], mask, ids, splits)

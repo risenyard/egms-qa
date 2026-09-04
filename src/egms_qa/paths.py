@@ -28,7 +28,10 @@ DATA_DIR = _env_path("EGMS_QA_DATA", ROOT / "data")
 OUTPUTS_DIR = _env_path("EGMS_QA_OUTPUTS", ROOT / "outputs")
 
 # --- Encoder representation (heavy; from data release) ---
-ENCODER_CKPT = DATA_DIR / "encoder" / "checkpoint" / "encoder.pt"
+ENCODER_CKPT = DATA_DIR / "encoder" / "checkpoint" / "encoder.safetensors"
+ENCODER_CONFIG = DATA_DIR / "encoder" / "checkpoint" / "config.json"
+ENCODER_NORMALIZATION = DATA_DIR / "encoder" / "checkpoint" / "normalization.json"
+ENCODER_TRAINING_ARGS = DATA_DIR / "encoder" / "checkpoint" / "training_args.json"
 ENCODER_TOKENS = DATA_DIR / "encoder" / "tokens" / "encoder_tokens_10k.pt"
 SPLIT_MANIFEST = DATA_DIR / "encoder" / "manifest" / "split.parquet"
 

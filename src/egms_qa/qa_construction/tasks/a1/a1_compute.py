@@ -26,11 +26,16 @@ import numpy as np
 import pandas as pd
 import torch
 
+from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
+from egms_qa.paths import ENCODER_CKPT, ENCODER_CONFIG, ENCODER_NORMALIZATION
+
 
 ROOT = Path(".")
 ENCODER_DATA = ROOT / "data/encoder"
 
-CKPT = ENCODER_DATA / "checkpoint/encoder.pt"
+CKPT = ENCODER_CKPT
+MODEL_CONFIG = ENCODER_CONFIG
+NORMALIZATION = ENCODER_NORMALIZATION
 MANIFEST = ENCODER_DATA / "manifest/split.parquet"
 DATA_CONFIG = ENCODER_DATA / "manifest/data_config.json"
 TOKEN_CACHE = ROOT / "data/encoder/tokens/encoder_tokens_10k.pt"
@@ -60,26 +65,15 @@ def angular_drift(cosine_value: float) -> float:
     return float(np.arccos(np.clip(cosine_value, -1.0, 1.0)) / np.pi)
 
 
-def load_encoder(checkpoint_path: Path, device: torch.device):
-    ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-    train_args = ckpt["args"]
-    from egms_encoder.models.tile_encoder import TileEncoder
-
-    model = TileEncoder(
-        input_length=train_args["input_length"],
-        d_model=train_args["d_model"],
-        patch_size=train_args.get("patch_size", 8),
-        temporal_layers=train_args.get("temporal_layers", 2),
-        temporal_heads=train_args.get("temporal_heads", 4),
-        spatial_layers=train_args["num_layers"],
-        spatial_heads=train_args["num_heads"],
-        residual_head_mode=train_args.get("residual_head_mode", "additive"),
-        coord_scale=train_args.get("coord_scale"),
-    )
-    model.load_state_dict(ckpt["model"], strict=False)
-    model.eval().to(device)
-    norm = json.load(open(checkpoint_path.parent / "normalization.json"))
-    return model, train_args, float(norm["mean"]), float(norm["std"])
+def load_encoder(
+    checkpoint_path: Path,
+    config_path: Path,
+    normalization_path: Path,
+    device: torch.device,
+):
+    model, config = load_encoder_checkpoint(checkpoint_path, config_path, device)
+    norm = load_normalization(normalization_path)
+    return model, config, float(norm["mean"]), float(norm["std"])
 
 
 def load_store(manifest_path: Path, data_config_path: Path):
@@ -135,6 +129,8 @@ def metric_summary(values: np.ndarray) -> dict[str, float]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--checkpoint", default=str(CKPT))
+    ap.add_argument("--model-config", default=str(MODEL_CONFIG))
+    ap.add_argument("--normalization", default=str(NORMALIZATION))
     ap.add_argument("--manifest", default=str(MANIFEST))
     ap.add_argument("--data-config", default=str(DATA_CONFIG))
     ap.add_argument("--token-cache", default=str(TOKEN_CACHE))
@@ -170,8 +166,10 @@ def main() -> None:
     chosen = shard_items(all_chosen, args.shard_index, args.num_shards)
     manifest_idx = {str(t): i for i, t in enumerate(manifest["tile_id"].astype(str))}
 
-    model, train_args, norm_mean, norm_std = load_encoder(Path(args.checkpoint), device)
-    input_length = int(train_args["input_length"])
+    model, model_config, norm_mean, norm_std = load_encoder(
+        Path(args.checkpoint), Path(args.model_config), Path(args.normalization), device
+    )
+    input_length = int(model_config["input_length"])
     if tw.input_length != input_length:
         raise ValueError(f"time window length {tw.input_length} != checkpoint input_length {input_length}")
 

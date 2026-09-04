@@ -159,7 +159,7 @@ def main() -> None:
             f"(trailing steps will be unused)",
             flush=True,
         )
-    with (output_dir / "args.json").open("w", encoding="utf-8") as f:
+    with (output_dir / "training_args.json").open("w", encoding="utf-8") as f:
         json.dump(vars(args), f, indent=2, sort_keys=True)
 
     train_indices = tile_store.split_tile_indices("train")
@@ -407,8 +407,13 @@ def set_optimizer_lrs(args, optimizer, current_lr: float) -> None:
 
 def load_init_checkpoint(model, checkpoint_path: Path, device) -> None:
     """Warm-start weights without loading optimizer/scaler state."""
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    state = checkpoint["model"]
+    if checkpoint_path.suffix == ".safetensors":
+        from safetensors.torch import load_file
+
+        state = load_file(str(checkpoint_path), device=str(device))
+    else:
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
+        state = checkpoint["model"]
     incompatible = model.load_state_dict(state, strict=False)
     allowed_missing = {
         "residual_scale",
