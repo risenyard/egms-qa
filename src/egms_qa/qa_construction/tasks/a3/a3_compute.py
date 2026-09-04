@@ -16,7 +16,7 @@ import torch
 
 
 ROOT = Path(".")
-TOKEN_CACHE = ROOT / "data/encoder/tokens/encoder_tokens_10k.pt"
+TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
 OUT_PATH = ROOT / "outputs/tasks/a3/a3_final_table.csv"
 GRID_BINS = 64
 

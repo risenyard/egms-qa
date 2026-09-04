@@ -38,7 +38,7 @@ MODEL_CONFIG = ENCODER_CONFIG
 NORMALIZATION = ENCODER_NORMALIZATION
 MANIFEST = ENCODER_DATA / "manifest/split.parquet"
 DATA_CONFIG = ENCODER_DATA / "manifest/data_config.json"
-TOKEN_CACHE = ROOT / "data/encoder/tokens/encoder_tokens_10k.pt"
+TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
 
 FC = 10
 

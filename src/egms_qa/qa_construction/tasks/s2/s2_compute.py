@@ -32,7 +32,7 @@ from sklearn.preprocessing import StandardScaler, normalize
 
 
 ROOT = Path(".")
-DEFAULT_TOKEN_CACHE = ROOT / "data/encoder/tokens/encoder_tokens_10k.pt"
+DEFAULT_TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
 DEFAULT_OUT_DIR = ROOT / "outputs/tasks/s2"
 S22_LABELS = ("common", "unusual", "rare", "extreme")
 

@@ -3,13 +3,12 @@ from __future__ import annotations
 import json
 
 import torch
-from safetensors.torch import load_file, save_file
+from safetensors.torch import save_file
 
 from egms_encoder.checkpoint import (
     CONFIG_SCHEMA,
     MODEL_TYPE,
     build_encoder,
-    export_legacy_checkpoint,
     load_encoder_checkpoint,
     load_encoder_config,
     load_normalization,
@@ -57,16 +56,6 @@ def test_safetensors_checkpoint_round_trip(tmp_path) -> None:
         expected = original(series, coords=coords, point_mask=mask)["embedding"]
         actual = loaded(series, coords=coords, point_mask=mask)["embedding"]
     torch.testing.assert_close(actual, expected, rtol=0, atol=0)
-
-
-def test_export_legacy_checkpoint_keeps_only_model_tensors(tmp_path) -> None:
-    model = build_encoder(model_config())
-    legacy_path = tmp_path / "training.pt"
-    torch.save({"model": model.state_dict(), "optimizer": {"state": {}}, "step": 10}, legacy_path)
-    output_path = tmp_path / "encoder.safetensors"
-    export_legacy_checkpoint(legacy_path, output_path)
-    exported = load_file(str(output_path))
-    assert set(exported) == set(model.state_dict())
 
 
 def test_config_and_normalization_validation(tmp_path) -> None:

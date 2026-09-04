@@ -56,10 +56,10 @@ python -m egms_encoder.extract_tokens \
     --model-config data/encoder/checkpoint/config.json \
     --manifest   data/encoder/manifest/split.parquet \
     --output-dir outputs/tokens
-# -> outputs/tokens/encoder_tokens_10k.pt   (spatial_tokens [10000, 65, 256], mask, ids, splits)
+# -> outputs/tokens/egms_tokens_10k.pt   (spatial_tokens [10000, 65, 256], mask, ids, splits)
 ```
 
-The released token cache (`data/encoder/tokens/encoder_tokens_10k.pt`) lets you
+The released token cache (`data/encoder/tokens/egms_tokens_10k.pt`) lets you
 skip this step and train/evaluate the translator directly. Encoder provenance is
 documented in the
 [dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset) and

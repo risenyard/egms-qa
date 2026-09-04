@@ -1,14 +1,13 @@
-"""Load and export the standalone EGMS-QA Encoder artifact."""
+"""Load the standalone EGMS-QA Encoder artifact."""
 
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import torch
-from safetensors.torch import load_file, save_file
+from safetensors.torch import load_file
 
 from egms_encoder.models.tile_encoder import TileEncoder
 
@@ -78,35 +77,3 @@ def load_normalization(path: str | Path) -> dict[str, float | int]:
     if float(values["std"]) <= 0 or float(values["residual_std"]) <= 0:
         raise ValueError(f"normalization scales must be positive: {normalization_path}")
     return values
-
-
-def export_legacy_checkpoint(checkpoint_path: str | Path, output_path: str | Path) -> None:
-    """Export only model tensors from a trusted legacy training checkpoint."""
-    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
-    state = checkpoint.get("model") if isinstance(checkpoint, dict) else None
-    if not isinstance(state, dict) or not state:
-        raise ValueError(f"training checkpoint has no model state: {checkpoint_path}")
-    if not all(isinstance(value, torch.Tensor) for value in state.values()):
-        raise ValueError("model state contains non-tensor values")
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    contiguous = {key: value.detach().cpu().contiguous() for key, value in state.items()}
-    save_file(contiguous, str(output_path), metadata={"model_type": MODEL_TYPE})
-
-
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    export = subparsers.add_parser("export", help="Export weights from a legacy training checkpoint")
-    export.add_argument("--checkpoint", type=Path, required=True)
-    export.add_argument("--output", type=Path, required=True)
-    return parser
-
-
-def main(argv: Iterable[str] | None = None) -> None:
-    args = _parser().parse_args(argv)
-    export_legacy_checkpoint(args.checkpoint, args.output)
-
-
-if __name__ == "__main__":
-    main()

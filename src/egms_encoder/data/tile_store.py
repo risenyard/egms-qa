@@ -60,16 +60,14 @@ class TimeWindow:
     def from_config(cls, config: dict) -> "TimeWindow":
         """Read and validate the stored-axis contract from ``data_config``.
 
-        ``stored_steps`` is the current field name. ``source_steps`` remains a
-        read-only compatibility alias for the original 304-step release.
+        ``stored_steps`` is required; the public release has no implicit or
+        compatibility time-axis fallback.
         """
         try:
             raw = config["time_window"]
             t_start = int(raw["t_start"])
             t_end = int(raw["t_end"])
-            stored_steps = int(
-                raw["stored_steps"] if "stored_steps" in raw else raw["source_steps"]
-            )
+            stored_steps = int(raw["stored_steps"])
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError(
                 "data_config.json must define time_window.t_start, t_end, "
@@ -164,8 +162,7 @@ class TileStore:
         the checkout root), ``n_points``, centroids, and a ``split`` column. The
         time window and tile-row layout are read from ``data_config.json``.
         There is intentionally no implicit time-axis default: the same code can
-        read legacy 304-step stores and the model-ready 294-step release only
-        when their respective contracts are supplied.
+        read the model-ready release only when its current contract is supplied.
         """
         manifest = pd.read_parquet(manifest_path)
         config_path = Path(data_config_path)

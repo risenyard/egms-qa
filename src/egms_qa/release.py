@@ -127,7 +127,7 @@ def build_manifest(release_dir: Path, workers: int = 8) -> dict:
             "artifacts/representations": "frozen encoder token cache",
             "artifacts/labels": "canonical task labels",
             "artifacts/reference_tables": "deterministic per-family task tables",
-            "metadata": "provenance, split, audit, and integrity records",
+            "metadata": "current data contract, split, audit, and integrity records",
         },
         "components": component_stats,
         "file_extensions": dict(sorted(extension_counts.items())),
@@ -209,22 +209,18 @@ def install_release(release_dir: Path, target_root: Path) -> None:
     }
     token_file = release_dir / "artifacts/representations/egms_tokens_10k.pt"
     token_metadata = release_dir / "artifacts/representations/egms_tokens_10k_metadata.json"
-    if not token_file.exists():
-        token_file = release_dir / "artifacts/representations/encoder_tokens_10k.pt"
-    if not token_metadata.exists():
-        token_metadata = release_dir / "artifacts/representations/encoder_tokens_10k_metadata.json"
     file_links = {
         release_dir / "metadata/data_config.json":
             target_root / "data/encoder/manifest/data_config.json",
         release_dir / "metadata/split_manifest.parquet":
             target_root / "data/encoder/manifest/split.parquet",
         token_file:
-            target_root / "data/encoder/tokens/encoder_tokens_10k.pt",
+            target_root / "data/encoder/tokens/egms_tokens_10k.pt",
         token_metadata:
-            target_root / "data/encoder/tokens/encoder_tokens_10k_metadata.json",
+            target_root / "data/encoder/tokens/egms_tokens_10k_metadata.json",
         release_dir / "artifacts/labels/labels.parquet":
             target_root / "outputs/qa/labels.parquet",
-        release_dir / "metadata/labels_meta.json":
+        release_dir / "artifacts/labels/metadata.json":
             target_root / "outputs/qa/labels_meta.json",
         release_dir / "metadata/qa_audit.json":
             target_root / "outputs/qa/qa_audit.json",

@@ -58,4 +58,4 @@ Class counts in the final table:
 - `a1_combine_shards.py`: shard combiner; writes only `a1_final_table.csv` and removes temporary `work/` by default.
 
 Current EGMS encoder package: `data/encoder/`.
-Current EGMS encoder token cache: `data/encoder/tokens/encoder_tokens_10k.pt`.
+Current EGMS token cache: `data/encoder/tokens/egms_tokens_10k.pt`.

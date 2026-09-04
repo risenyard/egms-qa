@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import argparse
 import json
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import torch
-from safetensors.torch import load_file, save_file
+from safetensors.torch import load_file
 
 from egms_qa.translator.modeling import EGMSProjector
 
@@ -94,35 +93,3 @@ def load_projector(
     projector.load_state_dict(state, strict=True)
     projector.eval()
     return projector, config
-
-
-def export_legacy_projector(checkpoint_path: str | Path, output_path: str | Path) -> None:
-    """Export projector tensors from a trusted legacy training checkpoint."""
-    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
-    state = checkpoint.get("projector_state") if isinstance(checkpoint, dict) else None
-    if not isinstance(state, dict) or not state:
-        raise ValueError(f"checkpoint has no projector state: {checkpoint_path}")
-    if not all(isinstance(value, torch.Tensor) for value in state.values()):
-        raise ValueError("projector state contains non-tensor values")
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    tensors = {key: value.detach().cpu().contiguous() for key, value in state.items()}
-    save_file(tensors, str(output_path), metadata={"model_type": "egms_qa_translator_projector"})
-
-
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    export = subparsers.add_parser("export", help="Export a legacy projector checkpoint")
-    export.add_argument("--checkpoint", type=Path, required=True)
-    export.add_argument("--output", type=Path, required=True)
-    return parser
-
-
-def main(argv: Iterable[str] | None = None) -> None:
-    args = _parser().parse_args(argv)
-    export_legacy_projector(args.checkpoint, args.output)
-
-
-if __name__ == "__main__":
-    main()

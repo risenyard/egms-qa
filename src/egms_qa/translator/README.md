@@ -41,13 +41,13 @@ and model-specific training configurations (ids in `../paths.py`):
 # train (GPU); --host-model selects the frozen language model
 python -m egms_qa.translator.train \
     --host-model Qwen/Qwen3.5-9B \
-    --token-cache data/encoder/tokens/encoder_tokens_10k.pt \
+    --token-cache data/encoder/tokens/egms_tokens_10k.pt \
     --output-dir outputs/runs/qwen
 
 # evaluate a trained checkpoint on the test split
 python -m egms_qa.translator.evaluate \
     --adapter-dir outputs/runs/qwen/best \
-    --token-cache data/encoder/tokens/encoder_tokens_10k.pt \
+    --token-cache data/encoder/tokens/egms_tokens_10k.pt \
     --split test
 
 # combine the four host-model summaries into the results report

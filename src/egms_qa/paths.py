@@ -32,7 +32,7 @@ ENCODER_CKPT = DATA_DIR / "encoder" / "checkpoint" / "encoder.safetensors"
 ENCODER_CONFIG = DATA_DIR / "encoder" / "checkpoint" / "config.json"
 ENCODER_NORMALIZATION = DATA_DIR / "encoder" / "checkpoint" / "normalization.json"
 ENCODER_TRAINING_ARGS = DATA_DIR / "encoder" / "checkpoint" / "training_args.json"
-ENCODER_TOKENS = DATA_DIR / "encoder" / "tokens" / "encoder_tokens_10k.pt"
+ENCODER_TOKENS = DATA_DIR / "encoder" / "tokens" / "egms_tokens_10k.pt"
 SPLIT_MANIFEST = DATA_DIR / "encoder" / "manifest" / "split.parquet"
 
 # --- Task reference values and QA records (generated / from data release) ---

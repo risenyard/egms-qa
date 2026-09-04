@@ -17,11 +17,11 @@ def test_release_manifest_audit_and_install(tmp_path: Path) -> None:
     release = tmp_path / "release"
     tile_path = release / "artifacts/source_tiles/E00N00/tile_0.npz"
     _write(tile_path, b"tile")
-    _write(release / "artifacts/representations/encoder_tokens_10k.pt", b"tokens")
-    _write(release / "artifacts/representations/encoder_tokens_10k_metadata.json", b"{}")
+    _write(release / "artifacts/representations/egms_tokens_10k.pt", b"tokens")
+    _write(release / "artifacts/representations/egms_tokens_10k_metadata.json", b"{}")
     _write(release / "artifacts/labels/labels.parquet", b"labels")
     _write(release / "artifacts/reference_tables/a1/a1_final_table.csv", b"tile_id\n")
-    _write(release / "metadata/labels_meta.json", b"{}")
+    _write(release / "artifacts/labels/metadata.json", b"{}")
     _write(release / "metadata/qa_audit.json", b"{}")
     _write(release / "metadata/data_config.json", b"{}")
     for split in ("train", "validation", "test"):

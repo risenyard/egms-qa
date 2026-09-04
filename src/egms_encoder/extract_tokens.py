@@ -5,7 +5,7 @@ bins) over the per-tile point histories in the TileStore.
 
 Output
 ------
-outputs/tokens/encoder_tokens_10k.pt
+outputs/tokens/egms_tokens_10k.pt
   - spatial_tokens [T, 65, 256] float32
   - token_mask [T, 65] bool
   - tile_indices [T] int32 (index into manifest)
@@ -180,7 +180,7 @@ def main():
     print(f"n_points mean={n_points_per_tile.mean():.1f}  "
           f"min={n_points_per_tile.min()}  max={n_points_per_tile.max()}", flush=True)
 
-    out_pt = out_dir / "encoder_tokens.pt"
+    out_pt = out_dir / "egms_tokens_10k.pt"
     with Path(args.data_config).open(encoding="utf-8") as handle:
         data_config = json.load(handle)
     configured_axis = data_config["time_window"]

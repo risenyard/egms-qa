@@ -89,7 +89,7 @@ hf download risenyard/egms-qa-translator --local-dir outputs/runs
 覆盖(见 [`src/egms_qa/paths.py`](src/egms_qa/paths.py))。NPZ 源瓦片是 EGMS Level-3
 Ortho Vertical 产品的修改与重打包衍生物(© European Union, Copernicus / EEA),附带
 来源和修改说明;它们不是 EGMS 官方产品。详见
-[HF 数据来源说明](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/SOURCE_PROVENANCE.md)。
+[HF 数据来源说明](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/SOURCE_PROVENANCE.md)。
 
 `data/` 与 `outputs/` 是 release installer 和模型下载在本地创建的运行路径。GitHub
 不再跟踪发布数据或 checkpoint 元数据;Hugging Face 是唯一发布源。
@@ -125,7 +125,7 @@ python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 
 # 3. 训练并评测一个宿主模型
 python -m egms_qa.translator.train --host-model Qwen/Qwen3.5-9B \
-    --token-cache data/encoder/tokens/encoder_tokens_10k.pt --output-dir outputs/runs/qwen
+    --token-cache data/encoder/tokens/egms_tokens_10k.pt --output-dir outputs/runs/qwen
 python -m egms_qa.translator.evaluate --adapter-dir outputs/runs/qwen/best --split test
 
 # 4. 四模型汇总报告

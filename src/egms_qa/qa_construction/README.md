@@ -114,7 +114,7 @@ For the exact reference-value algorithm of any task, see the matching
   `artifacts/source_tiles/` in `risenyard/egms-qa-dataset`. They store 294
   model steps and the encoder reads `[0,294)` directly. This corresponds to
   `[8,302)` on the original 304-step prepared axis. See the
-  [HF provenance record](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/SOURCE_PROVENANCE.md).
+  [HF provenance record](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/SOURCE_PROVENANCE.md).
 - **Representation**: each tile is encoded to 65 tokens (1 summary + 8×8 spatial
   cells) of dimension 256 by the frozen EGMS encoder (see `egms_encoder`).
 - **Records**: one question–answer pair per rendered tile–task–phrasing; answers

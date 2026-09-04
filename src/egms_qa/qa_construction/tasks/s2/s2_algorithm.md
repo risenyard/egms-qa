@@ -16,7 +16,7 @@ Official leaf tasks:
 Input token cache:
 
 ```text
-data/encoder/tokens/encoder_tokens_10k.pt
+data/encoder/tokens/egms_tokens_10k.pt
 ```
 
 Steps:

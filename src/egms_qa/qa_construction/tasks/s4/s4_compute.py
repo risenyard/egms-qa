@@ -27,7 +27,7 @@ import torch
 
 
 ROOT = Path(".")
-DEFAULT_TOKEN_CACHE = ROOT / "data/encoder/tokens/encoder_tokens_10k.pt"
+DEFAULT_TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
 DEFAULT_OUT_DIR = ROOT / "outputs/tasks/s4"
 S41_COL = "S41_encoder_perceived_local_structure_strength"
 S42_COL = "S42_encoder_perceived_local_structure_class"
