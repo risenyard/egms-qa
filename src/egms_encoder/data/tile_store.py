@@ -18,6 +18,8 @@ import pandas as pd
 LOGGER = logging.getLogger(__name__)
 
 FEATURE_COLUMNS_COUNT = 10
+DATA_CONFIG_SCHEMA = "egms-qa-data-config-1.1"
+RELEASE_STORED_STEPS = 294
 STATIC_KEYS = (
     "height",
     "rmse",
@@ -86,6 +88,7 @@ class TileStore:
         split_assignments: dict[str, str] | None = None,
         feature_columns_count: int = FEATURE_COLUMNS_COUNT,
         data_root: str | Path | None = None,
+        data_config: dict | None = None,
     ) -> None:
         required = {"tile_id", "path", "n_points", "centroid_x", "centroid_y"}
         missing = required - set(manifest.columns)
@@ -108,6 +111,7 @@ class TileStore:
 
         self.manifest = manifest.reset_index(drop=True).copy()
         self.time_window = time_window
+        self.data_config = dict(data_config or {})
         self.feature_columns_count = int(feature_columns_count)
         self.num_tiles = len(self.manifest)
         self.data_root = Path(data_root) if data_root is not None else Path.cwd()
@@ -186,7 +190,23 @@ class TileStore:
 
         manifest = pd.read_parquet(manifest_path)
         config = json.loads(config_path.read_text(encoding="utf-8"))
+        if config.get("schema_version") != DATA_CONFIG_SCHEMA:
+            raise ValueError(
+                f"unsupported data config schema {config.get('schema_version')!r}; "
+                f"expected {DATA_CONFIG_SCHEMA!r}"
+            )
         time_window = TimeWindow.from_config(config)
+        if (
+            time_window.stored_steps,
+            time_window.t_start,
+            time_window.t_end,
+            time_window.input_length,
+        ) != (RELEASE_STORED_STEPS, 0, RELEASE_STORED_STEPS, RELEASE_STORED_STEPS):
+            raise ValueError(
+                "released tiles must store the model-ready [0,294) window directly; "
+                f"found stored_steps={time_window.stored_steps}, "
+                f"window=[{time_window.t_start},{time_window.t_end})"
+            )
         try:
             feature_columns_count = int(
                 config["tile_field_layout"]["feature_columns_count"]
@@ -200,13 +220,15 @@ class TileStore:
         split_assignments = dict(
             zip(manifest["tile_id"].astype(str), manifest["split"].astype(str))
         )
-        return cls(
+        store = cls(
             manifest=manifest,
             time_window=time_window,
             split_assignments=split_assignments,
             feature_columns_count=feature_columns_count,
             data_root=data_root,
+            data_config=config,
         )
+        return store
 
     def get_tile(self, tile_index: int) -> np.ndarray:
         """Return one ``[N, feature_columns_count + input_length]`` tile."""

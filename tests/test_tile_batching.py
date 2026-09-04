@@ -9,7 +9,8 @@ from egms_encoder.data.tile_store import TimeWindow
 
 class SyntheticStore:
     def __init__(self) -> None:
-        self.time_window = TimeWindow(8, 302)
+        self.time_window = TimeWindow(0, 294, stored_steps=294)
+        # Materialized TileStore rows contain 10 feature columns + 294 steps.
         self.tiles = [
             np.arange(3 * 304, dtype=np.float32).reshape(3, 304),
             np.arange(5 * 304, dtype=np.float32).reshape(5, 304),
@@ -33,6 +34,7 @@ def test_batching_uses_store_time_window_by_default() -> None:
 
 
 def test_residual_sampling_rejects_invalid_weight() -> None:
+    # 10 feature columns + a direct 294-step model window.
     tile = np.zeros((10, 304), dtype=np.float32)
     with pytest.raises(ValueError, match="must be in"):
         sample_tile_points(

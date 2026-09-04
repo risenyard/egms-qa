@@ -96,6 +96,7 @@ def test_tile_store_rejects_shape_that_disagrees_with_config(
     config_path.write_text(
         json.dumps(
             {
+                "schema_version": "egms-qa-data-config-1.1",
                 "time_window": {
                     "stored_steps": 294,
                     "t_start": 0,
@@ -117,7 +118,7 @@ def test_tile_store_rejects_missing_contract_field(tmp_path: Path) -> None:
     tile_path = tmp_path / "tile.npz"
     arrays = {
         "coords": np.zeros((2, 2), dtype=np.float32),
-        "time_series": np.zeros((2, 304), dtype=np.float32),
+        "time_series": np.zeros((2, 294), dtype=np.float32),
         **{key: np.zeros(2, dtype=np.float32) for key in STATIC_KEYS if key != "rmse"},
     }
     np.savez_compressed(tile_path, **arrays)
@@ -128,7 +129,11 @@ def test_tile_store_rejects_missing_contract_field(tmp_path: Path) -> None:
         "centroid_x": 0.0,
         "centroid_y": 0.0,
     }])
-    store = TileStore(manifest, TimeWindow(8, 302), data_root=tmp_path)
+    store = TileStore(
+        manifest,
+        TimeWindow(0, 294, stored_steps=294),
+        data_root=tmp_path,
+    )
     with pytest.raises(ValueError, match="missing fields.*rmse"):
         store.get_tile(0)
 
@@ -141,7 +146,7 @@ def test_tile_store_rejects_incomplete_split_assignment(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="missing tile_id: b"):
         TileStore(
             manifest,
-            TimeWindow(8, 302),
+            TimeWindow(0, 294, stored_steps=294),
             split_assignments={"a": "train"},
             data_root=tmp_path,
         )
@@ -160,3 +165,58 @@ def test_tile_store_requires_data_config(tmp_path: Path) -> None:
     ).to_parquet(manifest_path, index=False)
     with pytest.raises(FileNotFoundError, match="data config is required"):
         TileStore.from_manifest(manifest_path, tmp_path / "missing.json")
+
+
+@pytest.mark.parametrize(
+    ("schema", "stored_steps", "start", "end", "message"),
+    [
+        ("egms-qa-data-config-1.0", 304, 8, 302, "unsupported data config schema"),
+        (
+            "egms-qa-data-config-1.1",
+            304,
+            8,
+            302,
+            "must store the model-ready.*directly",
+        ),
+    ],
+)
+def test_release_loader_rejects_legacy_304_step_contract(
+    tmp_path: Path,
+    schema: str,
+    stored_steps: int,
+    start: int,
+    end: int,
+    message: str,
+) -> None:
+    manifest_path = tmp_path / "split.parquet"
+    pd.DataFrame(
+        [
+            {
+                "tile_id": "tile",
+                "path": "tile.npz",
+                "split": "train",
+                "n_points": 2,
+                "centroid_x": 0.0,
+                "centroid_y": 0.0,
+            }
+        ]
+    ).to_parquet(manifest_path, index=False)
+    config_path = tmp_path / "data_config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "schema_version": schema,
+                "time_window": {
+                    "stored_steps": stored_steps,
+                    "t_start": start,
+                    "t_end": end,
+                    "input_length": end - start,
+                    "end_is_exclusive": True,
+                },
+                "tile_field_layout": {"feature_columns_count": 10},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match=message):
+        TileStore.from_manifest(manifest_path, config_path)

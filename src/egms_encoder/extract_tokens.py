@@ -31,15 +31,14 @@ import torch
 from egms_encoder import __version__
 from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
 from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT, TileStore
-from egms_qa.paths import (
-    ENCODER_CKPT,
-    ENCODER_CONFIG,
-    ENCODER_NORMALIZATION,
-    SPLIT_MANIFEST,
-)
 
+ENCODER_CKPT = Path("data/encoder/checkpoint/encoder.safetensors")
+ENCODER_CONFIG = Path("data/encoder/checkpoint/config.json")
+ENCODER_NORMALIZATION = Path("data/encoder/checkpoint/normalization.json")
+SPLIT_MANIFEST = Path("data/encoder/manifest/split.parquet")
 DEFAULT_TILE_SIZE = 7000.0
 DEFAULT_GRID_SIZE = 8
+TOKEN_SCHEMA = "egms-tokens-1.1"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -231,44 +230,60 @@ def main() -> None:
         "egms_tokens_10k.pt" if n_tiles == 10_000 else f"egms_tokens_{n_tiles}.pt"
     )
     out_pt = out_dir / output_name
+    source_window = store.data_config.get("time_window", {})
     metadata = {
-        "schema_version": "egms-qa-tokens-1.0",
-        "encoder_model_type": model_config["model_type"],
+        "schema_version": TOKEN_SCHEMA,
+        "release_name": "EGMS-QA token cache",
         "code_version": __version__,
         "source_repositories": {
             "encoder": "risenyard/egms-qa-encoder",
-            "tiles": "risenyard/egms-qa-dataset/artifacts/source_tiles",
+            "dataset": "risenyard/egms-qa-dataset",
+            "tiles": "artifacts/source_tiles",
         },
-        "input_sha256": {
-            "checkpoint": _sha256(ckpt_path),
-            "model_config": _sha256(model_config_path),
+        "input_contract": {
+            "stored_steps": int(source_window.get("stored_steps", input_length)),
+            "stored_window": f"[{time_window.t_start},{time_window.t_end})",
+            "source_axis_steps": int(
+                source_window.get("original_source_steps", input_length)
+            ),
+            "source_window": (
+                f"[{source_window['original_t_start']},"
+                f"{source_window['original_t_end']})"
+                if "original_t_start" in source_window
+                and "original_t_end" in source_window
+                else f"[{time_window.t_start},{time_window.t_end})"
+            ),
+            "source_index_offset": int(
+                source_window.get("original_index_offset", time_window.t_start)
+            ),
+            "cadence_days": float(source_window.get("cadence_days", 0.0)),
+            "tile_size_m": tile_size,
+            "token_count": int(n_tok),
+            "token_width": int(d_model),
+            "token_layout": (
+                f"index 0 = tile summary; 1..{n_patch} = "
+                f"{args.grid_size}x{args.grid_size} spatial cells in row-major order"
+            ),
+        },
+        "reproduction_input_sha256": {
+            "encoder_weights": _sha256(ckpt_path),
+            "encoder_config": _sha256(model_config_path),
             "normalization": _sha256(norm_path),
-            "manifest": _sha256(manifest_path),
+            "split_manifest": _sha256(manifest_path),
             "data_config": _sha256(data_config_path),
         },
-        "encoder_config": model_config,
-        "coord_scale_m": float(model_config["coord_scale_m"]),
-        "normalizer_mean": norm_mean,
-        "normalizer_std": norm_std,
-        "tile_size_m": tile_size,
-        "grid_size": int(args.grid_size),
-        "n_tokens": int(n_tok),
-        "n_tiles": int(n_tiles),
-        "d_model": int(d_model),
-        "input_length": int(input_length),
-        "time_window_start": int(time_window.t_start),
-        "time_window_end": int(time_window.t_end),
-        "token_layout": (
-            f"index 0 = tile summary; 1..{n_patch} = "
-            f"{args.grid_size}x{args.grid_size} spatial cells in row-major order"
-        ),
-        "extraction_module": "egms_encoder.extract_tokens",
-        "extraction_date_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-        "bin_occupancy_mean": float(occ.mean()),
-        "bin_occupancy_median": float(np.median(occ)),
-        "n_points_per_tile_mean": float(n_points_per_tile.mean()),
-        "n_points_per_tile_min": int(n_points_per_tile.min()),
-        "n_points_per_tile_max": int(n_points_per_tile.max()),
+        "extraction": {
+            "module": "egms_encoder.extract_tokens",
+            "date_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        },
+        "statistics": {
+            "tiles": int(n_tiles),
+            "bin_occupancy_mean": float(occ.mean()),
+            "bin_occupancy_median": float(np.median(occ)),
+            "points_per_tile_mean": float(n_points_per_tile.mean()),
+            "points_per_tile_min": int(n_points_per_tile.min()),
+            "points_per_tile_max": int(n_points_per_tile.max()),
+        },
         "output_file": output_name,
     }
     torch.save({

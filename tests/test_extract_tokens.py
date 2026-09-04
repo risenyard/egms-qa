@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from egms_encoder.extract_tokens import parse_args, pool_to_spatial_tokens
+from egms_encoder.extract_tokens import TOKEN_SCHEMA, parse_args, pool_to_spatial_tokens
 
 
 def test_spatial_pooling_uses_summary_token_and_row_major_cells() -> None:
@@ -27,6 +27,7 @@ def test_extract_defaults_target_hf_installed_inputs() -> None:
     assert args.manifest.endswith("data/encoder/manifest/split.parquet")
     assert args.data_config.endswith("data/encoder/manifest/data_config.json")
     assert args.output_name == ""
+    assert TOKEN_SCHEMA == "egms-tokens-1.1"
 
 
 def test_spatial_pooling_validates_shapes() -> None:

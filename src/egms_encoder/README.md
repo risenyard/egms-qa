@@ -77,3 +77,19 @@ hf download risenyard/egms-qa-encoder \
     --local-dir data/encoder/checkpoint
 python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
 ```
+
+## Release tests
+
+The network-free test suite uses synthetic fixtures. Maintainers must also run
+the HF artifact integration suite on an allowed GPU node against the exact
+encoder and dataset staging directories:
+
+```bash
+sbatch --export=ALL,CHECKOUT="$PWD",ENCODER_RELEASE=/path/to/encoder,DATASET_RELEASE=/path/to/dataset,PYTHON_BIN=python \
+    scripts/release/test_encoder_release.sbatch
+```
+
+This verifies the full release SHA256 inventory, the standalone Safetensors
+file set, configuration and normalization consistency, all 10,000 NPZ headers
+for direct 294-step storage, the token metadata contract, a real-tile encoder
+forward pass, and the public one-tile extraction CLI.

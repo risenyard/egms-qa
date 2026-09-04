@@ -280,6 +280,7 @@ def check_dataset(dataset: Path, report: Report) -> tuple[dict[str, Any] | None,
     required = [
         "README.md",
         "DATA_TERMS.md",
+        "SOURCE_PROVENANCE.md",
         "metadata/release_manifest.json",
         "metadata/files.sha256",
         "metadata/data_config.json",
@@ -289,6 +290,7 @@ def check_dataset(dataset: Path, report: Report) -> tuple[dict[str, Any] | None,
         "artifacts/representations/egms_tokens_10k.pt",
         "artifacts/representations/egms_tokens_10k_metadata.json",
         "artifacts/labels/labels.parquet",
+        "artifacts/labels/metadata.json",
         "artifacts/reference_tables",
         "data/qa/train.jsonl",
         "data/qa/validation.jsonl",
@@ -352,19 +354,45 @@ def check_dataset(dataset: Path, report: Report) -> tuple[dict[str, Any] | None,
         "token metadata",
     )
     if token_meta:
+        if token_meta.get("schema_version") != "egms-tokens-1.1":
+            report.fail("token metadata schema", str(token_meta.get("schema_version")))
+        else:
+            report.passed("token metadata schema", "egms-tokens-1.1")
+        input_contract = token_meta.get("input_contract") or {}
+        statistics = token_meta.get("statistics") or {}
         shape = (
-            token_meta.get("n_tiles"),
-            token_meta.get("n_tokens"),
-            token_meta.get("d_model"),
+            statistics.get("tiles"),
+            input_contract.get("token_count"),
+            input_contract.get("token_width"),
         )
         if shape == (10_000, 65, 256):
             report.passed("token metadata shape", "[10000, 65, 256]")
         else:
             report.fail("token metadata shape", str(shape))
-        if token_meta.get("encoder_release") == "EGMS Encoder 4.3":
-            report.passed("token encoder release", "EGMS Encoder 4.3")
+        if token_meta.get("release_name") == "EGMS-QA token cache":
+            report.passed("token release name", "EGMS-QA token cache")
         else:
-            report.fail("token encoder release", str(token_meta.get("encoder_release")))
+            report.fail("token release name", str(token_meta.get("release_name")))
+        window = (
+            input_contract.get("stored_steps"),
+            input_contract.get("stored_window"),
+            input_contract.get("source_axis_steps"),
+            input_contract.get("source_window"),
+            input_contract.get("source_index_offset"),
+        )
+        if window == (294, "[0,294)", 304, "[8,302)", 8):
+            report.passed("token time contract", "stored [0,294), original [8,302)")
+        else:
+            report.fail("token time contract", str(window))
+    legacy_tokens = [
+        dataset / "artifacts/representations/encoder_tokens_10k.pt",
+        dataset / "artifacts/representations/encoder_tokens_10k_metadata.json",
+    ]
+    present_legacy = [path.name for path in legacy_tokens if path.exists()]
+    if present_legacy:
+        report.fail("legacy token artifacts", "present: " + ", ".join(present_legacy))
+    else:
+        report.passed("legacy token artifacts", "none present")
     return manifest, token_meta
 
 
@@ -375,23 +403,60 @@ def check_encoder(encoder: Path, report: Report) -> dict[str, Any] | None:
     report.passed("HF encoder staging", str(encoder))
     require_paths(
         encoder,
-        ["README.md", "encoder.pt", "args.json", "normalization.json"],
+        [
+            "README.md",
+            "encoder.safetensors",
+            "config.json",
+            "normalization.json",
+            "training_args.json",
+            "eval_results.json",
+        ],
         report,
         "HF encoder contract",
     )
     check_broken_links(encoder, report, "HF encoder symlinks")
-    args = load_json(encoder / "args.json", report, "encoder args")
-    if args:
-        architecture = args.get("architecture") or {}
+    legacy = [name for name in ("encoder.pt", "args.json") if (encoder / name).exists()]
+    if legacy:
+        report.fail("legacy encoder artifacts", "present: " + ", ".join(legacy))
+    else:
+        report.passed("legacy encoder artifacts", "none present")
+    config = load_json(encoder / "config.json", report, "encoder config")
+    if config:
         actual = (
-            args.get("encoder_version"),
-            architecture.get("input_length"),
-            architecture.get("d_model"),
+            config.get("schema_version"),
+            config.get("model_type"),
+            config.get("input_length"),
+            config.get("d_model"),
         )
-        if actual == ("4.3", 294, 256):
-            report.passed("Encoder 4.3 contract", "version=4.3, input=294, width=256")
+        if actual == (
+            "egms-qa-encoder-config-1.0",
+            "egms_encoder",
+            294,
+            256,
+        ):
+            report.passed("Encoder 4.3 architecture", "input=294, width=256")
         else:
-            report.fail("Encoder 4.3 contract", str(actual))
+            report.fail("Encoder 4.3 architecture", str(actual))
+    training = load_json(encoder / "training_args.json", report, "encoder training args")
+    if training:
+        actual = (
+            training.get("schema_version"),
+            (training.get("data") or {}).get("model_input_steps"),
+        )
+        if actual == ("egms-qa-encoder-training-1.0", 294):
+            report.passed("encoder training contract", "input=294")
+        else:
+            report.fail("encoder training contract", str(actual))
+    evaluation = load_json(encoder / "eval_results.json", report, "encoder evaluation")
+    if evaluation:
+        actual = (
+            evaluation.get("schema_version"),
+            (evaluation.get("sample") or {}).get("input_steps"),
+        )
+        if actual == ("egms-qa-encoder-evaluation-1.0", 294):
+            report.passed("encoder evaluation contract", "input=294")
+        else:
+            report.fail("encoder evaluation contract", str(actual))
     normalization = load_json(encoder / "normalization.json", report, "normalization")
     if normalization:
         mean, std = normalization.get("mean"), normalization.get("std")
@@ -399,7 +464,7 @@ def check_encoder(encoder: Path, report: Report) -> dict[str, Any] | None:
             report.passed("normalization values", f"mean={mean}, std={std}")
         else:
             report.fail("normalization values", f"mean={mean}, std={std}")
-    return args
+    return config
 
 
 def check_translator(translator: Path, report: Report) -> None:
@@ -407,17 +472,33 @@ def check_translator(translator: Path, report: Report) -> None:
         report.fail("HF translator staging", f"directory not found: {translator}")
         return
     report.passed("HF translator staging", str(translator))
-    required = ["README.md"]
+    required = ["README.md", "manifest.json"]
     for family in TRANSLATORS:
         required.extend(
             [
-                f"{family}/best/projector.pt",
-                f"{family}/best/lora_adapter/adapter_config.json",
-                f"{family}/best/lora_adapter/adapter_model.safetensors",
+                f"{family}/projector.safetensors",
+                f"{family}/translator_config.json",
+                f"{family}/training_args.json",
+                f"{family}/eval_results.json",
+                f"{family}/adapter/adapter_config.json",
+                f"{family}/adapter/adapter_model.safetensors",
             ]
         )
     require_paths(translator, required, report, "HF translator contract")
     check_broken_links(translator, report, "HF translator symlinks")
+    manifest = load_json(translator / "manifest.json", report, "translator manifest")
+    if manifest:
+        variants = set((manifest.get("variants") or {}).keys())
+        if (
+            manifest.get("schema_version") == "egms-qa-translator-manifest-1.0"
+            and variants == set(TRANSLATORS)
+        ):
+            report.passed("translator manifest contract", ", ".join(TRANSLATORS))
+        else:
+            report.fail(
+                "translator manifest contract",
+                f"schema={manifest.get('schema_version')}, variants={sorted(variants)}",
+            )
 
 
 def check_cross_hashes(
@@ -428,12 +509,12 @@ def check_cross_hashes(
 ) -> None:
     if not token_meta:
         return
-    expected = token_meta.get("input_sha256") or {}
+    expected = token_meta.get("reproduction_input_sha256") or {}
     paths = {
-        "checkpoint": encoder / "encoder.pt",
-        "encoder_config": encoder / "args.json",
+        "encoder_weights": encoder / "encoder.safetensors",
+        "encoder_config": encoder / "config.json",
         "normalization": encoder / "normalization.json",
-        "manifest": dataset / "metadata/split_manifest.parquet",
+        "split_manifest": dataset / "metadata/split_manifest.parquet",
         "data_config": dataset / "metadata/data_config.json",
     }
     for key, path in paths.items():

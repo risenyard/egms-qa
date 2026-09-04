@@ -209,10 +209,6 @@ def install_release(release_dir: Path, target_root: Path) -> None:
     }
     token_file = release_dir / "artifacts/representations/egms_tokens_10k.pt"
     token_metadata = release_dir / "artifacts/representations/egms_tokens_10k_metadata.json"
-    if not token_file.exists():
-        token_file = release_dir / "artifacts/representations/encoder_tokens_10k.pt"
-    if not token_metadata.exists():
-        token_metadata = release_dir / "artifacts/representations/encoder_tokens_10k_metadata.json"
     file_links = {
         release_dir / "metadata/data_config.json":
             target_root / "data/encoder/manifest/data_config.json",
@@ -224,7 +220,7 @@ def install_release(release_dir: Path, target_root: Path) -> None:
             target_root / "data/encoder/tokens/egms_tokens_10k_metadata.json",
         release_dir / "artifacts/labels/labels.parquet":
             target_root / "outputs/qa/labels.parquet",
-        release_dir / "metadata/labels_meta.json":
+        release_dir / "artifacts/labels/metadata.json":
             target_root / "outputs/qa/labels_meta.json",
         release_dir / "metadata/qa_audit.json":
             target_root / "outputs/qa/qa_audit.json",

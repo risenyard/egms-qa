@@ -28,10 +28,12 @@ public contract and the user approves that change:
 - Dataset contains `metadata/release_manifest.json`, `metadata/files.sha256`,
   `metadata/data_config.json`, `metadata/split_manifest.parquet`, and
   `metadata/tile_manifest.parquet`.
-- Encoder contains `README.md`, `encoder.pt`, `args.json`, and
-  `normalization.json`. Additional `safetensors` files are allowed.
-- Translator contains `README.md` and complete `qwen`, `gemma`, `llama`, and
-  `mistral` `best/` directories with projector and LoRA adapter files.
+- Encoder contains `README.md`, `encoder.safetensors`, `config.json`,
+  `normalization.json`, `training_args.json`, and `eval_results.json`.
+  Legacy `encoder.pt` and `args.json` files are not part of the release.
+- Translator contains `README.md`, `manifest.json`, and complete `qwen`,
+  `gemma`, `llama`, and `mistral` directories with `projector.safetensors`,
+  `translator_config.json`, training/evaluation metadata, and `adapter/`.
 - Cards, package metadata, token metadata, manifests, and release notes use the
   same public names and version. No old private repository names or local
   absolute paths may appear in published material.

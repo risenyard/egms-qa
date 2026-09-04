@@ -98,7 +98,7 @@ split manifest resolve. Paths are overridable via `EGMS_QA_ROOT`, `EGMS_QA_DATA`
 The NPZ source tiles are a modified/repacked derivative of the EGMS Level-3
 Ortho Vertical product (© European Union, Copernicus Land Monitoring Service /
 EEA), distributed with source and modification notices; see
-the [dataset provenance](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/SOURCE_PROVENANCE.md).
+the [dataset provenance](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/SOURCE_PROVENANCE.md).
 They are not an official EGMS product.
 
 The `data/` and `outputs/` runtime paths are created locally by the release

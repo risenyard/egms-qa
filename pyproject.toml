@@ -57,3 +57,6 @@ include = ["egms_qa*", "egms_encoder*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "hf_integration: checks the staged or downloaded Hugging Face release artifacts",
+]
