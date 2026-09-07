@@ -20,83 +20,10 @@ from egms_qa.paths import (
     QA_DIR as DEFAULT_OUT,
     TASKS_DIR as DEFAULT_TASKS_DIR,
     ENCODER_TOKENS as DEFAULT_ENCODER_CACHE,
-    OUTPUTS_DIR,
 )
 
-DEFAULT_PERBIN_CACHE = OUTPUTS_DIR / "perbin_scalar_tokens/perbin_scalar_tokens.pt"
-
-
-TASK_SPECS: list[dict[str, Any]] = [
-    # A. Observation gate
-    dict(id="A11", source_family="a1", target_column="A11_global_angular_drift", label_type="numeric", name="global representation drift"),
-    dict(id="A12", source_family="a1", target_column="A12_representation_stability_class", label_type="categorical", name="representation stability class"),
-    dict(id="A21", source_family="a2", target_column="A21_masked_global_mse_z", label_type="numeric", name="masked reconstruction loss"),
-    dict(id="A22", source_family="a2", target_column="A22_reconstruction_reliability_class", label_type="categorical", name="reconstruction reliability class"),
-    dict(id="A31", source_family="a3", target_column="A31_valid_bin_fraction_8x8", label_type="numeric", name="spatial observation coverage"),
-    dict(id="A32", source_family="a3", target_column="A32_spatial_coverage_class", label_type="categorical", name="spatial coverage class"),
-    dict(id="A41", source_family="a4", target_column="A41_median_rmse_mm", label_type="numeric", name="median measurement noise"),
-    dict(id="A42", source_family="a4", target_column="A42_noise_level_class", label_type="categorical", name="measurement noise class"),
-    dict(id="A51", source_family="a5", target_column="A51_monitoring_usability_class", label_type="categorical", name="monitoring usability gate"),
-    dict(id="A52", source_family="a5", target_column="A52_monitoring_usability_reason", label_type="categorical", name="monitoring usability reason"),
-    # B. Motion vital signs
-    dict(id="B11", source_family="b1", target_column="B11_subsidence_snr", label_type="numeric", name="average subsidence SNR"),
-    dict(id="B12", source_family="b1", target_column="B12_clear_subsidence_class", label_type="categorical", name="clear average subsidence signal"),
-    dict(id="B21", source_family="b2", target_column="B21_mean_velocity_mm_yr", label_type="numeric", name="mean velocity"),
-    dict(id="B22", source_family="b2", target_column="B22_mean_subsidence_intensity_band", label_type="categorical", name="mean subsidence intensity band"),
-    dict(id="B31", source_family="b3", target_column="B31_velocity_p10_mm_yr", label_type="numeric", name="sinking tail velocity"),
-    dict(id="B32", source_family="b3", target_column="B32_velocity_p90_mm_yr", label_type="numeric", name="upper-tail velocity"),
-    dict(id="B33", source_family="b3", target_column="B33_vel_abs_p90_mm_yr", label_type="numeric", name="absolute tail velocity"),
-    dict(id="B34", source_family="b3", target_column="B34_uplift_protected_direction", label_type="categorical", name="uplift-protected direction"),
-    dict(id="B35", source_family="b3", target_column="B35_worst_point_significance", label_type="categorical", name="worst-point significance"),
-    dict(id="B36", source_family="b3", target_column="B36_european_velocity_typicality", label_type="categorical", name="European velocity typicality"),
-    dict(id="B41", source_family="b4", target_column="B41_acc_abs_p90", label_type="numeric", name="acceleration strength"),
-    dict(id="B42", source_family="b4", target_column="B42_european_acceleration_typicality", label_type="categorical", name="European acceleration typicality"),
-    dict(id="B51", source_family="b5", target_column="B51_seasonality_p90", label_type="numeric", name="seasonality strength"),
-    dict(id="B61", source_family="b6", target_column="B61_monitoring_trigger", label_type="categorical", name="monitoring trigger"),
-    # C. Spatial organization
-    dict(id="C11", source_family="c1", target_column="C11_noise_aware_moving_fraction", label_type="numeric", name="noise-aware moving point fraction"),
-    dict(id="C12", source_family="c1", target_column="C12_motion_extent_class", label_type="categorical", name="motion extent class"),
-    dict(id="C13", source_family="c1", target_column="C13_moving_bin_location", label_type="categorical", name="strongest motion bin location"),
-    dict(id="C21", source_family="c2", target_column="C21_spatial_concentration_score", label_type="numeric", name="spatial concentration"),
-    dict(id="C22", source_family="c2", target_column="C22_spatial_concentration_class", label_type="categorical", name="spatial concentration class"),
-    dict(id="C31", source_family="c3", target_column="C31_deformation_front_strength_mm_yr", label_type="numeric", name="deformation front strength"),
-    dict(id="C32", source_family="c3", target_column="C32_front_location", label_type="categorical", name="deformation front location"),
-    dict(id="C33", source_family="c3", target_column="C33_deformation_front_strength_class", label_type="categorical", name="deformation front strength class"),
-    dict(id="C41", source_family="c4", target_column="C41_fast_tail_bin_fraction", label_type="numeric", name="fast-tail bin fraction"),
-    dict(id="C42", source_family="c4", target_column="C42_fast_tail_extent_class", label_type="categorical", name="fast-tail extent class"),
-    dict(id="C51", source_family="c5", target_column="C51_monitoring_priority", label_type="categorical", name="monitoring priority"),
-    dict(id="C52", source_family="c5", target_column="C52_hidden_local_risk", label_type="categorical", name="hidden local risk"),
-    # D. Temporal dynamics
-    dict(id="D11", source_family="d1", target_column="D11_long_term_trend_shape", label_type="categorical", name="D12/D13 p85 primitive trend shape"),
-    dict(id="D12", source_family="d1", target_column="D12_curvature_strength", label_type="numeric", name="geometry curvature strength"),
-    dict(id="D13", source_family="d1", target_column="D13_changepoint_strength", label_type="numeric", name="geometry changepoint strength"),
-    dict(id="D14", source_family="d1", target_column="D14_dominant_changepoint_time_year", label_type="numeric", name="D13 strong changepoint time"),
-    dict(id="D21", source_family="d2", target_column="D21_dominant_seasonal_peak", label_type="categorical", name="coherent dominant seasonal phase"),
-    dict(id="D22", source_family="d2", target_column="D22_phase_coherence", label_type="numeric", name="seasonal phase coherence"),
-    dict(id="D23", source_family="d2", target_column="D23_phase_dispersion_days", label_type="numeric", name="seasonal phase dispersion"),
-    dict(id="D24", source_family="d2", target_column="D24_seasonal_amplitude_change_mm", label_type="numeric", name="seasonal amplitude change"),
-    dict(id="D31", source_family="d3", target_column="D31_motion_intensification_mm_yr2", label_type="numeric", name="motion intensification"),
-    dict(id="D32", source_family="d3", target_column="D32_acceleration_support_fraction", label_type="numeric", name="acceleration spatial support"),
-    dict(id="D33", source_family="d3", target_column="D33_intensification_spread_mm_yr2", label_type="numeric", name="intensification spread"),
-    dict(id="D34", source_family="d3", target_column="D34_intensification_hotspot_strength_mm_yr2", label_type="numeric", name="intensification hotspot strength"),
-    dict(id="D35", source_family="d3", target_column="D35_intensification_hotspot_location", label_type="categorical", name="intensification hotspot location"),
-    dict(id="D41", source_family="d4", target_column="D41_temporal_dominant_process", label_type="categorical", name="temporal dominant process"),
-    dict(id="D42", source_family="d4", target_column="D42_temporal_evolution_archetype", label_type="categorical", name="temporal evolution archetype"),
-    # S. Encoder representation understanding
-    dict(id="S11", source_family="s1", target_column="S11_reference_anchor_profile", label_type="categorical", name="reference anchor profile", construct=True),
-    dict(id="S12", source_family="s1", target_column="S12_reference_anchor_distance", label_type="numeric", name="nearest reference anchor distance", construct=True),
-    dict(id="S13", source_family="s1", target_column="S13_reference_anchor_margin", label_type="numeric", name="reference anchor margin", construct=True),
-    dict(id="S14", source_family="s1", target_column="S14_reference_assignment_status", label_type="categorical", name="reference assignment status", construct=True),
-    dict(id="S15", source_family="s1", target_column="S15_reference_anchor_profile_description", label_type="categorical", name="reference anchor profile description", construct=True),
-    dict(id="S21", source_family="s2", target_column="S21_local_isolation_score", label_type="numeric", name="local isolation score", construct=True),
-    dict(id="S22", source_family="s2", target_column="S22_representation_rarity_class", label_type="categorical", name="representation rarity class", construct=True),
-    dict(id="S31", source_family="s3", target_column="S31_representation_monitoring_rarity_gap_p", label_type="numeric", name="representation-monitoring rarity gap", construct=True),
-    dict(id="S32", source_family="s3", target_column="S32_representation_monitoring_rarity_relation", label_type="categorical", name="representation-monitoring rarity relation", construct=True),
-    dict(id="S33", source_family="s3", target_column="S33_monitoring_distinctive_dimension", label_type="categorical", name="monitoring distinctive dimension", construct=True),
-    dict(id="S41", source_family="s4", target_column="S41_encoder_perceived_local_structure_strength", label_type="numeric", name="encoder-perceived local structure strength", construct=True),
-    dict(id="S42", source_family="s4", target_column="S42_encoder_perceived_local_structure_class", label_type="categorical", name="encoder-perceived local structure class", construct=True),
-    dict(id="S43", source_family="s4", target_column="S43_encoder_perceived_local_structure_concentration", label_type="numeric", name="encoder-perceived local structure concentration", construct=True),
-]
+from egms_qa.qa_construction.task_specs import TASK_SPECS
+from egms_qa.qa_construction.tables import align_family_to_base, read_family
 
 
 def parse_args() -> argparse.Namespace:
@@ -104,39 +31,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--tasks-root", default=str(DEFAULT_TASKS_DIR))
     p.add_argument("--out-dir", default=str(DEFAULT_OUT))
     p.add_argument("--encoder-cache", default=str(DEFAULT_ENCODER_CACHE))
-    p.add_argument("--perbin-cache", default=str(DEFAULT_PERBIN_CACHE))
     p.add_argument("--skip-cache-validation", action="store_true")
     return p.parse_args()
-
-
-def read_family(root: Path, family: str) -> pd.DataFrame:
-    path = root / family / f"{family}_final_table.csv"
-    if not path.exists():
-        raise FileNotFoundError(path)
-    df = pd.read_csv(path)
-    if "tile_id" not in df.columns or "split" not in df.columns:
-        raise ValueError(f"{path} must contain tile_id and split")
-    if df["tile_id"].duplicated().any():
-        dupes = df.loc[df["tile_id"].duplicated(), "tile_id"].head().tolist()
-        raise ValueError(f"{path} has duplicate tile_id values: {dupes}")
-    if len(df) != 10000:
-        raise ValueError(f"{path} expected 10000 rows, found {len(df)}")
-    return df
-
-
-def align_family_to_base(table: pd.DataFrame, base_index: pd.MultiIndex, family: str) -> pd.DataFrame:
-    keyed = table.copy()
-    keyed["tile_id"] = keyed["tile_id"].astype(str)
-    keyed["split"] = keyed["split"].astype(str)
-    keyed = keyed.set_index(["tile_id", "split"], verify_integrity=True)
-    missing = base_index.difference(keyed.index)
-    extra = keyed.index.difference(base_index)
-    if len(missing) or len(extra):
-        raise ValueError(
-            f"{family} tile_id/split index mismatch; "
-            f"missing={list(missing[:5])} extra={list(extra[:5])}"
-        )
-    return keyed.loc[base_index].reset_index()
 
 
 def normalize_series(s: pd.Series, label_type: str) -> pd.Series:
@@ -299,18 +195,6 @@ def main() -> None:
             "order": "labels reordered to encoder_cache tile_ids",
         }
 
-        perbin_path = Path(args.perbin_cache)
-        perbin_ids, perbin_splits = load_cache_ids(perbin_path)
-        if perbin_ids != labels["tile_id"].astype(str).tolist():
-            raise ValueError("perbin_cache tile_ids do not match encoder-ordered EGMS-QA labels")
-        if any(perbin_splits) and perbin_splits != labels["split"].astype(str).tolist():
-            raise ValueError("perbin_cache splits do not match encoder-ordered EGMS-QA labels")
-        cache_checks["perbin_cache"] = {
-            "path": str(perbin_path.resolve()),
-            "rows": len(perbin_ids),
-            "split_counts": dict(sorted(Counter(perbin_splits).items())),
-            "order": "matches encoder-ordered labels",
-        }
 
     if split_counts(labels) != {"test": 1000, "train": 8000, "val": 1000}:
         raise ValueError(f"unexpected split counts: {split_counts(labels)}")
@@ -332,7 +216,6 @@ def main() -> None:
         "sources": {
             "tasks_root": str(root.resolve()),
             "encoder_cache": str(Path(args.encoder_cache).resolve()),
-            "perbin_cache": str(Path(args.perbin_cache).resolve()),
         },
         "verification": {
             "rows": int(len(labels)),

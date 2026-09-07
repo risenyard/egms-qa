@@ -19,7 +19,9 @@ Translator 通过投影器与 LoRA 适配宿主语言模型，使其根据冻结
 
 ## 模块
 
-三个模块指南分别提供数据安装、训练与评测命令。对应的数据、权重与配方集中于
+三个模块指南分别提供数据安装、训练与评测命令。
+[任务实现索引](src/egms_qa/qa_construction/tasks/README.md)列出各任务组的依赖和重建范围。
+对应的数据、权重与配方集中于
 [EGMS-QA Collection](https://huggingface.co/collections/risenyard/egms-qa)。
 
 | 模块 | 代码与指南 | Hugging Face 发布内容 |
@@ -57,7 +59,6 @@ pip install -e '.[translator]'   # Translator 训练与评测
 
 QA construction 定义 78 个任务，覆盖观测质量、运动特征、空间组织、时间动态、
 表示属性和拒答边界。参考值表与标签提供生成问答记录所需的目标值。
-训练保留完整任务目录。
 
 发布数据集包含源瓦片、预计算 encoder tokens、参考值表、标签和 QA split，
 支持三个模块的直接使用与复现。

@@ -1,9 +1,9 @@
-# D Temporal Dynamics Delivery
+# Temporal task summary
 
 ## Scope
 
-This folder is the group-level delivery for EGMS-QA D Temporal Dynamics. It
-assembles the already delivered D1-D4 family targets into one canonical table:
+The optional summary assembles the released D1-D4 family targets into one
+local analysis table:
 
 ```text
 d_final_table.csv
@@ -34,13 +34,28 @@ is assembled.
 The group table includes only task target columns plus the D41 rank columns
 needed to interpret D41/D42.
 
+## Run
+
+After installing the Dataset as described in the [QA guide](README.md), run:
+
+```bash
+python -m egms_qa.qa_construction.summarize_temporal
+```
+
+Inputs default to `outputs/tasks/`; generated files go to
+`outputs/summaries/temporal/`. Both locations can be overridden with
+`--tasks-root` and `--out-dir`. Add `--plot` after installing `.[tasks]` to
+generate the distribution plot. The summary is optional and is not an input
+to label aggregation or QA generation. D12 and D13 use the target columns
+defined in [task_specs.py](task_specs.py).
+
 ## Output Files
 
 - `d_final_table.csv`: merged 10k D-group target table.
 - `d_final_summary.json`: row count, delivered task list, class counts, and
   scalar summaries.
-- `d_final_distribution.png`: distribution overview for D11, D21, D41, and D42.
-- `d_build.py`: reproducible group-level merge script.
+- `d_final_distribution.png`: optional distribution plot (`--plot`).
+
 
 ## Verification
 

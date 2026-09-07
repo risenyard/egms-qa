@@ -50,8 +50,10 @@ reduce the generated records and do not reproduce the full release counts.
 | Label aggregation | `build_labels.py` | `labels.parquet` and `labels_meta.json` |
 | Question and answer rendering | `generate_qa.py` and `qa_lib.py` | split JSONL files and rendering metadata |
 
-The task-family notes define the inputs, formulas, thresholds, and target
-columns used by the reference tables. Label aggregation joins the tables by
+The [task implementation index](tasks/README.md) links all 27 task groups,
+their algorithms, dependencies, and reconstruction scope. The task-family
+notes define the inputs, formulas, thresholds, and target columns used by the
+reference tables. Label aggregation joins the tables by
 tile ID and split. Rendering converts the resulting targets into visible
 natural-language answers using the approved question phrasings.
 
@@ -59,17 +61,18 @@ To rebuild labels from the released tables and render them into a new directory:
 
 ```bash
 python -m egms_qa.qa_construction.build_labels \
-    --out-dir outputs/labels-generated --skip-cache-validation
+    --out-dir outputs/labels-generated
 python -m egms_qa.qa_construction.generate_qa \
     --labels outputs/labels-generated/labels.parquet \
     --meta outputs/labels-generated/labels_meta.json \
     --out-dir outputs/qa-generated
 ```
 
-This aggregation command checks table identities, joins, and split counts.
-`--skip-cache-validation` omits the additional representation-cache order
-checks, so label row order follows the reference tables. The released label
-file remains the canonical input for reproducing model results.
+This command checks table identities and splits against the published encoder
+token cache, then aligns label rows to its tile order. No additional
+representation cache is required. The released label file remains the canonical
+input for reproducing model results. The optional
+[temporal summary](temporal_summary.md) combines the D1–D4 tables for analysis.
 
 ## Dataset contract
 

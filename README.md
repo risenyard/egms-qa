@@ -23,7 +23,9 @@ representations.
 ## Components
 
 The three module guides provide data setup, training, and evaluation commands.
-The associated data, weights, and recipes are available through the
+The [task implementation index](src/egms_qa/qa_construction/tasks/README.md)
+lists task dependencies and reconstruction scope. The associated data,
+weights, and recipes are available through the
 [EGMS-QA Collection](https://huggingface.co/collections/risenyard/egms-qa).
 
 | component | code and guide | Hugging Face release |
@@ -66,8 +68,7 @@ as `[N,294]` arrays. The fixed tile-level split contains 8,000 training,
 QA construction defines 78 tasks across observation quality, motion,
 spatial organization, temporal dynamics, representation properties, and
 refusal boundaries. Reference tables and labels provide the targets used to
-render the question–answer records. The full task catalog is retained for
-training.
+render the question–answer records.
 
 The published Dataset includes the source tiles, precomputed encoder tokens,
 reference tables, labels, and QA splits. These artifacts support direct use

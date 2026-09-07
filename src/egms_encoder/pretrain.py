@@ -78,10 +78,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--mask-ratio", type=float, default=None)
     p.add_argument("--mask-strategy", default=None, choices=["random", "block"])
     p.add_argument("--sync-mask", dest="sync_mask", action=argparse.BooleanOptionalAction, default=None,
-                   help="Synchronized masking: all points in a tile share the same time mask. "
-                        "Default: on. Disabling lets points 'borrow' masked-position values from "
-                        "neighbors, which drops reconstruction loss but corrupts embedding quality "
-                        "(experiments confirmed ACC probe R^2 collapsed from 0.84 to 0.45).")
+                   help="Use the same temporal mask for all points in a tile so that "
+                        "masked observations are also hidden from neighboring points. "
+                        "Defaults to the published training recipe.")
     p.add_argument("--mask-schedule", default=None, choices=["fixed", "short_mix"],
                    help="training mask schedule; validation uses eval_mask_ratio")
     p.add_argument("--eval-mask-ratio", type=float, default=None,

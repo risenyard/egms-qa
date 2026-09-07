@@ -49,7 +49,7 @@ class DatasetInputs:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run EGMS Encoder 4.3 on the published HF dataset or compatible "
+            "Run EGMS-QA Encoder on the published HF dataset or compatible "
             "local 294-step tiles."
         )
     )
