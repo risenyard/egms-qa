@@ -516,6 +516,9 @@ def summarize(results: list[dict[str, Any]], task_by_id: dict[str, TaskRecord]) 
 
     numeric_items = [v for v in per_task.values() if v["metric_type"] == "numeric"]
     class_items = [v for v in per_task.values() if v["metric_type"] == "classification"]
+    categorical_items = [v for key, v in per_task.items()
+                         if v['metric_type'] == 'classification' and not key.startswith('X')]
+    boundary_items = [v for key, v in per_task.items() if key.startswith('X')]
     family_numeric: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
     family_class: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
     for task, rec in per_task.items():
@@ -526,6 +529,14 @@ def summarize(results: list[dict[str, Any]], task_by_id: dict[str, TaskRecord]) 
 
     return {
         **extraction_summary(results),
+        "reporting_summary": {
+            "numeric_tasks": len(numeric_items),
+            "categorical_tasks": len(categorical_items),
+            "boundary_tasks": len(boundary_items),
+            "mean_numeric_r2": _mean_metric(numeric_items, 'r2'),
+            "mean_categorical_balanced_accuracy": _mean_metric(categorical_items, 'balanced_acc'),
+            "mean_boundary_balanced_accuracy": _mean_metric(boundary_items, 'balanced_acc'),
+        },
         "numeric_r2_summary": numeric_collection_summary(numeric_items),
         "classification_balanced_acc_mean": _mean_metric(class_items, "balanced_acc"),
         "classification_acc_micro": (

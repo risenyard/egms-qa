@@ -52,11 +52,12 @@ and the dataset datasheet are documented in
 
 The frozen encoder reconstructs masked intervals at 1.510 mm RMSE, near the
 source residual noise. Across four host models (Qwen, Gemma, Llama, Mistral)
-trained with the identical recipe, the adapted system reaches mean R² up to
+trained with model-specific schedules, the adapted system reaches mean R² up to
 0.778 on numeric tasks and balanced accuracy up to 0.777 on categorical tasks,
 refuses out-of-scope questions at near-ceiling rates, and collapses toward chance
 under a shuffled-token control — so the answers depend on the supplied tile.
-Regenerate the full table with `python -m egms_qa.translator.summarize_results`.
+After evaluating all four variants, regenerate the table with
+`python -m egms_qa.translator.summarize_results --evaluation-root outputs/evaluation`.
 
 ## Install
 
@@ -133,7 +134,8 @@ the new corpus before training.
 
 ```bash
 # 0. (optional) retrain the frozen encoder from the installed NPZ tile store
-python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
+python -m egms_qa.reproduce encoder \
+    --model-dir data/encoder/checkpoint --output-dir outputs/encoder_pretrain
 
 # 1. tokens: either use the downloaded cache, or resolve both HF repos directly
 python -m egms_encoder.extract_tokens \
@@ -145,16 +147,24 @@ python -m egms_encoder.extract_tokens \
 python -m egms_qa.qa_construction.build_labels
 python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 
-# 3. train and evaluate a host model
-python -m egms_qa.translator.train --host-model Qwen/Qwen3.5-9B \
-    --token-cache data/encoder/tokens/egms_tokens_10k.pt --output-dir outputs/runs/qwen
-python -m egms_qa.translator.evaluate --adapter-dir outputs/runs/qwen/best --split test
+# 3. complete training recipe from the pinned host model
+pip install -e '.[translator]'
+python -m egms_qa.reproduce translator \
+    --variant-dir outputs/runs/qwen --output-dir outputs/training/qwen
 
-# 4. combined four-model report
-python -m egms_qa.translator.summarize_results
+# 4. evaluate downloaded released weights on the reported 71-task subset
+python -m egms_qa.reproduce evaluate --variant-dir outputs/runs/qwen \
+    --evaluation-config outputs/runs/evaluation_config.json \
+    --output-dir outputs/evaluation/qwen
 ```
 
-`pytest` runs the data-contract, encoder, release, and answer-extractor tests.
+Add `--dry-run` to inspect a reproduction command's complete command list.
+Training recipes come from HF.
+To evaluate newly trained weights, point `--variant-dir` at the final stage's
+`best/` directory. Reporting uses 71 tasks (29 numeric, 28 categorical, 14
+boundary); training retains all 78 tasks.
+
+`pytest` runs the data-contract, encoder, release, interface, and answer-extractor tests.
 
 ## Licence
 

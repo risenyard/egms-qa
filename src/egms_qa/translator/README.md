@@ -35,7 +35,29 @@ and model-specific training configurations (ids in `../paths.py`):
 | llama | unsloth/Meta-Llama-3.1-8B-Instruct |
 | mistral | unsloth/Mistral-Nemo-Instruct-2407 |
 
-## Train / evaluate
+## Reproduce the published training and evaluation
+
+From the checkout root, install `pip install -e '.[translator]'` and follow the
+top-level README to install the Dataset and download the translator bundle.
+The complete recipes live in each HF variant's `training_args.json`;
+`evaluation_config.json` defines the reported 71-task protocol. CUDA is required.
+
+```bash
+python -m egms_qa.reproduce translator \
+    --variant-dir outputs/runs/qwen --output-dir outputs/training/qwen
+python -m egms_qa.reproduce evaluate --variant-dir outputs/runs/qwen \
+    --evaluation-config outputs/runs/evaluation_config.json \
+    --output-dir outputs/evaluation/qwen
+```
+
+Use `--dry-run` to inspect the resolved commands. The runner starts from the
+pinned host model, then connects all required training stages. Evaluation
+selects 71 reported tasks and samples one phrasing for each of 1,000 test tiles
+per task. Numeric, categorical, and boundary means are reported separately.
+
+## Custom training and sampled evaluation
+
+These lower-level examples use generic defaults, not the published recipe:
 
 ```bash
 # train (GPU); --host-model selects the frozen language model

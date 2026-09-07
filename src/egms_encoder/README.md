@@ -142,3 +142,8 @@ It does not authenticate to the official EGMS service, convert arbitrary
 ZIP/CSV products, choose a valid time window, or estimate normalization for a
 new reference period. A different product version must be prepared and audited
 before it is supplied to this Encoder.
+
+Compatibility also requires consistent displacement units (mm), vertical component,
+temporal sampling, preprocessing, and metric coordinates for the tile geometry.
+Keep the released normalization when using the released frozen checkpoint;
+fit new normalization only on the training split when training a new encoder.
