@@ -5,16 +5,6 @@ EGMS tile tokens using a token projector and a LoRA adapter.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    T["EGMS tile tokens"] --> P["Two-layer projector"]
-    Q["Question"] --> E["Host token embeddings"]
-    P --> I["Prefix followed by question embeddings"]
-    E --> I
-    I --> L["Host language model + LoRA"]
-    L --> A["Natural-language answer"]
-```
-
 The projector maps tile tokens to the host model's embedding width. The
 projected tokens form a prefix before the question. Training updates the
 projector and LoRA adapter. The encoder and host-model base weights remain
