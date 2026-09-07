@@ -9,21 +9,12 @@
 [![Version](https://img.shields.io/badge/release-v1.0.0-green.svg)](CHANGELOG.md)
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-EGMS--QA-yellow)](https://huggingface.co/collections/risenyard/egms-qa)
 
-EGMS-QA 基于欧洲地面运动服务（EGMS）的位移时间序列回答监测问题。冻结的编码器
-将每个 7 km 瓦片表示为 65 个 token，投影器与经 LoRA 适配的语言模型据此生成数值
-答案、类别答案，或对超出支持范围的问题给出拒答。
+EGMS-QA 支持基于欧洲地面运动服务（EGMS）位移时间序列的自然语言问答。
+Encoder 从每个 7 km 瓦片中提取点位表示，并池化为 65 个 token。
+QA construction 定义监测任务、计算参考值，并生成问题与参考答案记录。
+Translator 通过投影器与 LoRA 适配宿主语言模型，使其根据冻结的瓦片表示回答问题。
 
 ![EGMS-QA 总体框架](docs/assets/egms-framework.png)
-
-## 问答示例
-
-[发布测试集](https://huggingface.co/datasets/risenyard/egms-qa-dataset/viewer/default/test?row=157)
-包含以下 B21 参考记录，对应瓦片 `E52N20_x5270550_y2000050`。
-问题与参考答案保留英文原文：
-
-> **Question:** For a ground-motion screening report, what is the average vertical ground velocity?
->
-> **Reference answer:** The mean vertical ground velocity is -0.450 mm/yr.
 
 ## 代码与模型
 

@@ -17,6 +17,9 @@ env/
 .idea/
 .DS_Store
 
+# Local agent-maintenance instructions
+/.agents/
+
 # Heavy artifacts — download from the data release (see README), never committed
 *.pt
 *.pth

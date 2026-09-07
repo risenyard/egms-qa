@@ -9,23 +9,15 @@
 [![Version](https://img.shields.io/badge/release-v1.0.0-green.svg)](CHANGELOG.md)
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-EGMS--QA-yellow)](https://huggingface.co/collections/risenyard/egms-qa)
 
-EGMS-QA answers monitoring questions from European Ground Motion Service
-(EGMS) displacement time series. A frozen encoder represents each 7 km tile
-as 65 tokens. A projector and a LoRA-adapted language model use those tokens
-to produce numerical answers, categorical answers, or refusals for questions
-outside the supported scope.
+EGMS-QA supports natural-language question answering over European Ground
+Motion Service (EGMS) displacement time series. The encoder extracts point
+representations from each 7 km tile and pools them into 65 tokens. QA
+construction defines monitoring tasks, derives their reference values, and
+renders question–answer records. The translator adapts a host language model
+with a projector and LoRA to answer questions from the frozen tile
+representations.
 
 ![EGMS-QA framework](docs/assets/egms-framework.png)
-
-## Question–Answer Example
-
-The [released test split](https://huggingface.co/datasets/risenyard/egms-qa-dataset/viewer/default/test?row=157)
-contains this B21 reference record for tile
-`E52N20_x5270550_y2000050`:
-
-> **Question:** For a ground-motion screening report, what is the average vertical ground velocity?
->
-> **Reference answer:** The mean vertical ground velocity is -0.450 mm/yr.
 
 ## Code and Models
 
