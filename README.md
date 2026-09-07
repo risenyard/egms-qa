@@ -15,7 +15,9 @@ as 65 tokens. A projector and a LoRA-adapted language model use those tokens
 to produce numerical answers, categorical answers, or refusals for questions
 outside the supported scope.
 
-## Example question and reference answer
+![EGMS-QA framework](docs/assets/egms-framework.png)
+
+## Question–Answer Example
 
 The [released test split](https://huggingface.co/datasets/risenyard/egms-qa-dataset/viewer/default/test?row=157)
 contains this B21 reference record for tile
@@ -25,9 +27,7 @@ contains this B21 reference record for tile
 >
 > **Reference answer:** The mean vertical ground velocity is -0.450 mm/yr.
 
-![EGMS-QA framework](docs/assets/egms-framework.png)
-
-## Guides and artifacts
+## Code and Models
 
 | component | guide | released artifacts |
 |---|---|---|
@@ -40,7 +40,7 @@ recipes in the [EGMS-QA Collection](https://huggingface.co/collections/risenyard
 The module guides cover data installation, training, evaluation, and output
 files.
 
-## Install and check the encoder
+## Installation
 
 Encode one released tile to check the installation:
 
@@ -65,7 +65,7 @@ Translator training and evaluation require CUDA. The Dataset includes
 precomputed tokens, so those workflows can use the released representations
 directly.
 
-## Selected evaluation results
+## Evaluation
 
 Encoder evaluation measures reconstruction of masked observations.
 Translator evaluation measures numerical answers, categorical answers, and
@@ -84,13 +84,15 @@ means for the two answer types across the four variants. Full results and
 protocol settings are available in the
 [model card](https://huggingface.co/risenyard/egms-qa-translator).
 
-## Dataset and scope
+## Dataset
 
 The Dataset contains 10,000 model-ready tiles with `[N,294]` displacement
 arrays and a fixed 8,000/1,000/1,000 train/validation/test split. Training uses
 the full 78-task catalog. The
 [QA construction guide](src/egms_qa/qa_construction/README.md) describes the
 task definitions and records.
+
+## Scope
 
 New collections must satisfy the
 [encoder input requirements](src/egms_encoder/README.md#input-requirements).
@@ -102,11 +104,13 @@ workflow.
 EGMS-QA describes measured deformation histories. Its answers do not establish
 causes, predict future motion, or certify structural safety.
 
-## Citation and license
+## Citation
 
 The software citation is provided in [CITATION.cff](CITATION.cff). Research
 using the source measurements should also cite the EGMS product identified in
 the [source provenance](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/SOURCE_PROVENANCE.md).
+
+## License
 
 Code uses the [MIT License](LICENSE). EGMS-QA-created data and model artifacts
 use CC-BY-4.0. The repacked EGMS Level-3 Ortho Vertical measurements retain the
