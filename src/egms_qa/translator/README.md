@@ -1,94 +1,133 @@
 # EGMS-QA Translator
 
-The translator answers questions from frozen EGMS tile tokens. A two-layer
-projector maps the 256-dimensional tokens to the host model's embedding width.
-The projected tokens precede the question, and a LoRA adapter tunes the
-language model while its base weights remain frozen.
+The translator adapts a host language model to answer questions from frozen
+EGMS tile tokens using a token projector and a LoRA adapter.
 
-[Project guide](../../../README.md) ·
-[Models and recipes](https://huggingface.co/risenyard/egms-qa-translator) ·
-[Encoder](https://huggingface.co/risenyard/egms-qa-encoder) ·
-[Dataset](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
+## Architecture
 
-## Evaluate a released model
+```mermaid
+flowchart LR
+    T["EGMS tile tokens"] --> P["Two-layer projector"]
+    Q["Question"] --> E["Host token embeddings"]
+    P --> I["Prefix followed by question embeddings"]
+    E --> I
+    I --> L["Host language model + LoRA"]
+    L --> A["Natural-language answer"]
+```
 
-Run the following commands from the repository root. Evaluation requires CUDA
-and GPU memory for the host model in bfloat16 plus generation state.
+The projector maps tile tokens to the host model's embedding width. The
+projected tokens form a prefix before the question. Training updates the
+projector and LoRA adapter. The encoder and host-model base weights remain
+frozen.
+
+## Workflows
+
+This guide covers running and training the [EGMS-QA](../../../README.md)
+translator. The [Hugging Face model card](https://huggingface.co/risenyard/egms-qa-translator)
+documents the four variants, released files, input contract, and results.
+The [Dataset](https://huggingface.co/datasets/risenyard/egms-qa-dataset) provides
+the encoder tokens, labels, and task tables used by these workflows.
+
+| goal | where to start |
+|---|---|
+| Evaluate released weights | [Install the code](#installation), [prepare the data and model](#prepare-data-and-model), then [evaluate](#evaluate-a-released-model) |
+| Train a translator | Complete the same setup, then [reproduce training](#reproduce-training) |
+| Inspect model files or results | Hugging Face [files](https://huggingface.co/risenyard/egms-qa-translator#files) and [evaluation](https://huggingface.co/risenyard/egms-qa-translator#evaluation) |
+
+## Installation
+
+Python 3.10 or later is required. Training and answer generation require CUDA
+and enough GPU memory for the host model in bfloat16 plus its runtime state.
+Command previews with `--dry-run` can run on CPU.
 
 ```bash
+git clone https://github.com/risenyard/egms-qa
+cd egms-qa
 pip install -e '.[translator]'
-hf download risenyard/egms-qa-translator \
-    --include 'qwen/*' --include 'evaluation_config.json' \
-    --local-dir outputs/runs
+```
+
+Run all commands below from the `egms-qa` repository root.
+
+## Prepare data and model
+
+The example uses `qwen`. Replace it in the download and runtime paths with
+`gemma`, `llama`, or `mistral` to use another variant. The
+[model card](https://huggingface.co/risenyard/egms-qa-translator) lists the
+corresponding host models and recipes.
+
+```bash
 hf download risenyard/egms-qa-dataset --repo-type dataset \
     --local-dir release/egms-qa-dataset
 python -m egms_qa.release install \
     --release-dir release/egms-qa-dataset --target-root .
+hf download risenyard/egms-qa-translator \
+    --include 'qwen/*' --include 'evaluation_config.json' \
+    --local-dir outputs/runs
+```
+
+This installs the full Dataset, including its precomputed tokens, QA artifacts,
+and source tiles. The translator uses the precomputed tokens, so the setup
+above is sufficient for the workflows below. Each variant's configuration
+identifies the host model and revision to download when execution starts.
+
+## Evaluate a released model
+
+After completing [setup](#prepare-data-and-model), preview the evaluation plan:
+
+```bash
 python -m egms_qa.reproduce evaluate \
     --variant-dir outputs/runs/qwen \
     --evaluation-config outputs/runs/evaluation_config.json \
-    --output-dir outputs/evaluation/qwen
+    --output-dir outputs/evaluation/qwen \
+    --dry-run
 ```
 
-Add `--dry-run` to inspect the evaluation command without loading the model.
-The output directory contains generated answers in `answers.jsonl` and scores
-in `metrics.json`. The `reporting_summary` field separates numeric, categorical,
-and boundary metrics. This command evaluates the downloaded weights.
+Run the same command without `--dry-run` to load the host model and evaluate the
+released translator. Generated answers are written to `answers.jsonl` and
+scores to `metrics.json` in the output directory. The `reporting_summary` field
+separates numeric, categorical, and boundary metrics.
 
-Replace `qwen` in the download and runtime paths to use another variant:
-
-| variant | pinned host model |
-|---|---|
-| `qwen` | Qwen/Qwen3.5-9B |
-| `gemma` | unsloth/gemma-3-12b-it |
-| `llama` | unsloth/Meta-Llama-3.1-8B-Instruct |
-| `mistral` | unsloth/Mistral-Nemo-Instruct-2407 |
-
-Each `translator_config.json` records the host-model revision, projector
-dimensions, adapter path, and prompt format. The input contains 65 tokens of
-width 256 and a 65-element validity mask. Token 0 summarizes the tile, followed
-by 64 spatial-cell tokens in row-major order.
+For new tile representations, use the [Encoder guide](../../egms_encoder/README.md)
+and follow the [translator input contract](https://huggingface.co/risenyard/egms-qa-translator#input-and-output).
 
 ## Reproduce training
 
-With the Dataset and variant files installed, run the complete training recipe:
+With the Dataset and variant files from [setup](#prepare-data-and-model),
+preview the complete training recipe:
 
 ```bash
 python -m egms_qa.reproduce translator \
-    --variant-dir outputs/runs/qwen --output-dir outputs/training/qwen
+    --variant-dir outputs/runs/qwen \
+    --output-dir outputs/training/qwen \
+    --dry-run
 ```
 
-The runner reads `training_args.json` and starts with the pinned base model, a
-fresh LoRA adapter, and a randomly initialized projector. Each subsequent stage
-loads the preceding stage's best adapter and projector, then initializes a new
-optimizer and scheduler. Add `--dry-run` to inspect all stage commands and task
-lists.
+Run the same command without `--dry-run` to start training. The runner reads
+`training_args.json`. Its first stage initializes a fresh LoRA adapter and
+projector on the pinned host model. Each subsequent stage loads the preceding
+stage's best adapter and projector, then initializes a new optimizer and
+scheduler.
 
-Training uses model-specific schedules recorded in the recipes. Checkpoints
-appear under `outputs/training/<variant>/<stage>/best/`. To evaluate a newly
-trained checkpoint, supply that directory as `--variant-dir` to the evaluation
-command. The test split is reserved for evaluation.
+Checkpoints appear under `outputs/training/<variant>/<stage>/best/`. To evaluate
+a newly trained checkpoint, supply that directory as `--variant-dir` in the
+evaluation command. The test split is reserved for evaluation.
 
 ## Evaluation protocol
 
-Evaluation measures numerical answers, categorical answers, and refusals to
-questions outside the supported scope. The
-[EGMS-QA task catalog](../qa_construction/README.md) defines the question targets
-and scoring rules for these three answer types.
-
-The reported evaluation uses 71 tasks on 1,000 held-out tiles, yielding
-71,000 answers per model. Results average R² over 29 numeric tasks and balanced
-accuracy over 28 categorical and 14 boundary tasks.
-
-The [evaluation configuration](https://huggingface.co/risenyard/egms-qa-translator/blob/main/evaluation_config.json)
-records the reporting subset, question-phrasing pool, model-specific seeds,
-and greedy-decoding settings. Parse counts and per-task scores remain in the
-outputs. After evaluating all four variants, combine the results:
+The [HF evaluation section](https://huggingface.co/risenyard/egms-qa-translator#evaluation)
+explains the reported metrics. The
+[evaluation configuration](https://huggingface.co/risenyard/egms-qa-translator/blob/main/evaluation_config.json)
+defines the reporting subset and generation settings used by the reproduction
+command. After evaluating all four variants, combine their outputs:
 
 ```bash
 python -m egms_qa.translator.summarize_results \
     --evaluation-root outputs/evaluation
 ```
+
+The lower-level training and evaluation entry points support custom
+experiments. Their defaults differ from the published recipes and reporting
+protocol.
 
 ## Code reference
 
@@ -102,14 +141,9 @@ python -m egms_qa.translator.summarize_results \
 | `compute_ci.py` | per-task bootstrap confidence intervals |
 | `summarize_results.py` | four-model summary tables |
 
-The lower-level training and evaluation entry points support custom
-experiments. Their generic defaults differ from the published recipes and
-reporting protocol.
-
 ## Scope
 
-The translators require the released encoder's token representation and
-questions within the EGMS-QA task definitions. Answers describe measured
-vertical displacement histories. They do not establish causes, forecast
-motion, or certify structural safety. Host-model weights are downloaded
-separately and remain subject to their respective licenses.
+Use the released encoder's token representation and questions within the
+[EGMS-QA task definitions](../qa_construction/README.md). The
+[model card](https://huggingface.co/risenyard/egms-qa-translator#scope-and-license)
+describes application limits and model licensing.
