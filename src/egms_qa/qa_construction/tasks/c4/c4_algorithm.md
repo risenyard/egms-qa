@@ -15,10 +15,11 @@ The 10k final table uses:
 
 The fast-motion threshold `T_fast` is **corpus-relative**: it is the p95 of the
 per-bin abs-velocity p90 over the full European candidate pool (83,323 tiles).
-Like the B-family European typicality cutoffs, its value is **baked into the
-script** (`FAST_THRESHOLD_MM_YR = 4.8`), so the `final` step is self-contained —
-no external pool or JSON is needed. Only re-deriving `T_fast` (the `reference`
-subcommand) needs the full pool, which is not shipped.
+The `final` subcommand uses the fixed value in the code
+(`FAST_THRESHOLD_MM_YR = 4.8`, in mm/yr). Re-estimating `T_fast` with the
+optional `reference` subcommand requires the full candidate pool, which is
+not included in the Dataset. That subcommand generates a reference JSON that
+can be supplied to `final` through `--reference-json`.
 
 Derived reference distribution over the pool (for provenance):
 
@@ -123,8 +124,12 @@ C42 class counts:
 
 ## File Inventory
 
-- `c4_compute.py`: reference and final computation script.
-- `c4_bin_level_reference_thresholds.json`: frozen full-Europe reference statistics.
-- `c4_bin_level_reference_distribution.png`: diagnostic reference distribution plot.
-- `c4_final_table.csv`: canonical final table with C41 and C42.
-- `c4_final_summary.json`: frozen final distribution and class-count summary.
+GitHub provides `c4_compute.py` and this algorithm note. The Dataset publishes
+`artifacts/reference_tables/c4/c4_final_table.csv`, which the release installer
+exposes at `outputs/tasks/c4/c4_final_table.csv`.
+
+The `final` subcommand writes `c4_final_table.csv` and `c4_final_summary.json`
+to its `--out-dir`. The optional `reference` subcommand writes
+`c4_bin_level_reference_thresholds.json`, diagnostic CSV tables, a sampled NPZ,
+and `c4_bin_level_reference_distribution.png`. These reference-run outputs are
+generated locally and are not included in the Dataset.
