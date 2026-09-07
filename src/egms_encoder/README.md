@@ -3,70 +3,67 @@
 > 🤗 [Encoder weights](https://huggingface.co/risenyard/egms-qa-encoder) ·
 > [tiles and token cache](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
 
-The EGMS-QA Encoder maps a variable-size tile of persistent-scatterer displacement
-histories to a fixed 65-token representation used by the rest of EGMS-QA. It is a
-self-supervised spatio-temporal model:
+The EGMS-QA Encoder maps a variable number of persistent-scatterer histories
+from one 7 km tile to a fixed representation. Each point contributes a
+294-step displacement history and centred coordinates. A temporal Transformer
+and spatial Transformer produce one 256-dimensional embedding per point;
+deterministic 8×8 pooling produces 65 tokens: one tile summary followed by 64
+row-major spatial cells.
 
-![EGMS Encoder framework](../../docs/assets/egms-encoder.png)
+The package contains only the public model, data-contract, training, loading,
+and token-extraction code. It does not depend on another source checkout,
+private paths, or QA task implementations.
 
-- each point's 294-step history is normalized and split into 37 eight-step
-  temporal patches; a temporal Transformer + mean pooling gives one temporal
-  feature per point;
-- point coordinates (relative to the tile centre, scaled by the tile half-width)
-  are projected and added;
-- a spatial Transformer exchanges information across points, producing one
-  256-d contextual feature per point;
-- training is masked reconstruction: a synchronized block hides the same 30%
-  interval in every point history within a tile, recovered from the contextual
-  features.
+## Direct inference from Hugging Face
 
-At inference the encoder is frozen and applied without masking. A deterministic
-pooling step assigns points to an 8×8 grid and mean-pools features per cell,
-yielding 65 tokens (1 tile summary + 64 cells) with a validity mask.
-
-This directory contains the encoder model and data code (`models/`, `data/`,
-`pretrain.py`). Loading the checkpoint, extracting tokens, and
-**retraining the encoder from scratch** are all self-contained on the released
-data: the model-ready 294-step EGMS tiles ship as NPZ under
-`artifacts/source_tiles/` in `risenyard/egms-qa-dataset`; the release installer
-links them to `data/tiles/`. The split manifest and normalization ship with the
-HF repositories. The encoder was trained on this 10k tile set's train split.
-The code does not depend on a private repository, another source checkout, or
-a machine-specific path.
-
-## Data support boundary
-
-The public encoder code consumes the EGMS-QA NPZ tile contract together with a
-split manifest, data config, and normalization file. It supports reproducing
-the released encoder and training or inference on already prepared compatible
-tiles. The released NPZ files store `[N,294]` displacement arrays and the
-encoder reads `[0,294)` directly; this is the same physical window as
-`[8,302)` on the original 304-step prepared axis. It does not download official EGMS products, convert arbitrary EGMS
-ZIP/CSV releases, or infer a valid time window and normalization for another
-reference period. New product versions require a separate, empirically audited
-preparation step before this encoder entrypoint can be used.
-
-## Token extraction
+From an installed GitHub checkout, the extractor can resolve both published HF
+repositories itself. It resolves `main` to immutable revisions before
+downloading files:
 
 ```bash
-# encoder checkpoint + split manifest come from the data release (data/encoder/)
 python -m egms_encoder.extract_tokens \
-    --checkpoint data/encoder/checkpoint/encoder.safetensors \
-    --model-config data/encoder/checkpoint/config.json \
-    --normalization data/encoder/checkpoint/normalization.json \
-    --manifest   data/encoder/manifest/split.parquet \
-    --data-config data/encoder/manifest/data_config.json \
-    --output-dir outputs/tokens
-# -> outputs/tokens/egms_tokens_10k.pt   (spatial_tokens [10000, 65, 256], mask, ids, splits)
+    --encoder-repo risenyard/egms-qa-encoder \
+    --dataset-repo risenyard/egms-qa-dataset \
+    --output-dir outputs/tokens \
+    --device cuda:0
 ```
 
-The released token cache (`data/encoder/tokens/egms_tokens_10k.pt`) lets you
-skip this step and train/evaluate the translator directly. Encoder provenance is
-documented in the
-[dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset) and
-[encoder card](https://huggingface.co/risenyard/egms-qa-encoder).
+Use `--max-tiles 1` for a small smoke run. The full release writes:
 
-Install the structured dataset before pretraining or token extraction:
+```text
+outputs/tokens/
+├── egms_tokens_10k.pt
+└── egms_tokens_10k_metadata.json
+```
+
+The tensor payload contains `spatial_tokens [10000,65,256]`, `token_mask`, tile
+IDs, split labels, per-cell point counts, and reproducibility metadata.
+
+## Compatible local inputs
+
+Local model inputs are atomic: provide the checkpoint, model config, and
+normalization together. Local data inputs likewise require a manifest and data
+config together:
+
+```bash
+python -m egms_encoder.extract_tokens \
+    --checkpoint /path/to/encoder.safetensors \
+    --model-config /path/to/config.json \
+    --normalization /path/to/normalization.json \
+    --manifest /path/to/split_manifest.parquet \
+    --data-config /path/to/data_config.json \
+    --source-tiles-root /path/to/artifacts/source_tiles \
+    --output-dir outputs/tokens \
+    --device cuda:0
+```
+
+`--source-tiles-root` is needed only when relative manifest paths do not resolve
+from the working directory. Local inputs are recorded by current file hashes;
+they are not labelled as official EGMS-QA repositories.
+
+## Install the released data for training
+
+The Encoder has its own data installer and does not require the QA installer:
 
 ```bash
 hf download risenyard/egms-qa-dataset \
@@ -77,9 +74,12 @@ hf download risenyard/egms-qa-encoder \
     --local-dir data/encoder/checkpoint
 ```
 
+This creates only the runtime paths used by the Encoder: tiles, manifest, data
+config, and the optional released token cache.
+
 ## Training
 
-Reproduce pretraining with the released recipe:
+Reproduce pretraining with the released architecture and recipe:
 
 ```bash
 python -m egms_encoder.pretrain \
@@ -87,7 +87,8 @@ python -m egms_encoder.pretrain \
     --device cuda:0
 ```
 
-The output contains a reusable inference bundle and resumable training state:
+The output contains both resumable training state and a directly reusable
+inference bundle:
 
 ```text
 outputs/my_encoder/
@@ -101,7 +102,7 @@ outputs/my_encoder/
 └── metrics.csv
 ```
 
-Resume an interrupted run without writing conversion code:
+Resume training with the generated files:
 
 ```bash
 python -m egms_encoder.pretrain \
@@ -113,7 +114,7 @@ python -m egms_encoder.pretrain \
     --device cuda:0
 ```
 
-Use the trained encoder directly for token extraction:
+Use the best trained model without conversion code:
 
 ```bash
 python -m egms_encoder.extract_tokens \
@@ -126,10 +127,18 @@ python -m egms_encoder.extract_tokens \
     --device cuda:0
 ```
 
-`latest.pt` is for `--resume-from`; `best.safetensors` is for inference. Users
-do not need to write conversion code between training and token extraction.
+`latest.pt` is for `--resume-from`; `best.safetensors` is pure model state for
+strict inference loading.
 
-Token metadata records input hashes automatically. Add
-`--encoder-repository` and `--dataset-repository` only when those repository
-identifiers are true provenance for the supplied files; custom inputs are not
-labelled as official EGMS-QA artifacts by default.
+## Data boundary
+
+The public runtime accepts the EGMS-QA NPZ contract with stored
+`time_series [N,294]`, schema `egms-qa-data-config-1.1`, and stored window
+`[0,294)`. This corresponds scientifically to indices `[8,302)` on the
+304-step prepared source axis. The code deliberately rejects implicit or
+repeated cropping.
+
+It does not authenticate to the official EGMS service, convert arbitrary
+ZIP/CSV products, choose a valid time window, or estimate normalization for a
+new reference period. A different product version must be prepared and audited
+before it is supplied to this Encoder.

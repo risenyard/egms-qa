@@ -135,8 +135,11 @@ the new corpus before training.
 # 0. (optional) retrain the frozen encoder from the installed NPZ tile store
 python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
 
-# 1. tokens: either use the downloaded cache, or extract from the tile store
-python -m egms_encoder.extract_tokens --output-dir outputs/tokens
+# 1. tokens: either use the downloaded cache, or resolve both HF repos directly
+python -m egms_encoder.extract_tokens \
+    --encoder-repo risenyard/egms-qa-encoder \
+    --dataset-repo risenyard/egms-qa-dataset \
+    --output-dir outputs/tokens
 
 # 2. task labels + QA records (or download them)
 python -m egms_qa.qa_construction.build_labels

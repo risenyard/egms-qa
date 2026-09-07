@@ -118,8 +118,11 @@ Ortho Vertical 产品的修改与重打包衍生物(© European Union, Copernicu
 # 0.(可选)从安装好的 NPZ tile store 重训冻结编码器
 python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
 
-# 1. token:使用下载缓存,或从 NPZ tile store 提取
-python -m egms_encoder.extract_tokens --output-dir outputs/tokens
+# 1. token:使用下载缓存,或直接解析两个 HF 仓库
+python -m egms_encoder.extract_tokens \
+    --encoder-repo risenyard/egms-qa-encoder \
+    --dataset-repo risenyard/egms-qa-dataset \
+    --output-dir outputs/tokens
 
 # 2. 任务标签 + QA 记录(或直接下载)
 python -m egms_qa.qa_construction.build_labels

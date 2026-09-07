@@ -181,6 +181,7 @@ class TileStore:
         manifest_path: str | Path,
         data_config_path: str | Path,
         data_root: str | Path | None = None,
+        source_tiles_root: str | Path | None = None,
     ) -> "TileStore":
         """Build a store from the released manifest and data configuration."""
         manifest_path = Path(manifest_path)
@@ -191,6 +192,25 @@ class TileStore:
             raise FileNotFoundError(f"data config is required: {config_path}")
 
         manifest = pd.read_parquet(manifest_path)
+        if source_tiles_root is not None:
+            source_root = Path(source_tiles_root)
+
+            def resolve_source_path(value: object) -> str:
+                path = Path(str(value))
+                if path.is_absolute():
+                    return str(path)
+                if path.parts[:2] == ("data", "tiles"):
+                    relative = Path(*path.parts[2:])
+                elif path.parts[:2] == ("artifacts", "source_tiles"):
+                    relative = Path(*path.parts[2:])
+                else:
+                    raise ValueError(
+                        f"manifest path is outside the source-tile tree: {path}"
+                    )
+                return str(source_root / relative)
+
+            manifest = manifest.copy()
+            manifest["path"] = manifest["path"].map(resolve_source_path)
         config = json.loads(config_path.read_text(encoding="utf-8"))
         if config.get("schema_version") != DATA_CONFIG_SCHEMA:
             raise ValueError(

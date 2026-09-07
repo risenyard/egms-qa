@@ -457,7 +457,7 @@ def test_train_exports_inference_bundle_consumed_by_token_cli(
     assert "source_repositories" not in tokens["metadata"]
 
 
-def test_standalone_encoder_install_and_default_cli(
+def test_standalone_encoder_install_and_local_cli(
     release_dirs: tuple[Path, Path],
     tmp_path: Path,
 ) -> None:
@@ -476,6 +476,16 @@ def test_standalone_encoder_install_and_default_cli(
             sys.executable,
             "-m",
             "egms_encoder.extract_tokens",
+            "--checkpoint",
+            "data/encoder/checkpoint/encoder.safetensors",
+            "--model-config",
+            "data/encoder/checkpoint/config.json",
+            "--normalization",
+            "data/encoder/checkpoint/normalization.json",
+            "--manifest",
+            "data/encoder/manifest/split.parquet",
+            "--data-config",
+            "data/encoder/manifest/data_config.json",
             "--device",
             "cuda:0",
             "--max-tiles",
