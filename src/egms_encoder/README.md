@@ -6,16 +6,38 @@ histories and their coordinates from each 7 km tile. It first produces a
 representations into 65 tile tokens: one summary token and 64 spatial-cell
 tokens, each with 256 dimensions.
 
-[Project guide](../../README.md) ·
-[Model and training recipe](https://huggingface.co/risenyard/egms-qa-encoder) ·
-[Dataset and token cache](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
+![EGMS Encoder framework](../../docs/assets/egms-encoder.png)
+
+This guide provides the code workflows for [EGMS-QA](../../README.md).
+The [Hugging Face model repository](https://huggingface.co/risenyard/egms-qa-encoder)
+provides the weights, model settings, training recipe, and evaluation results.
+The [Dataset repository](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
+provides the prepared tiles and precomputed tokens.
+
+| goal | where to start |
+|---|---|
+| Try the released encoder | [Install the code](#installation), then [extract tokens](#extract-tokens) |
+| Train an encoder | [Reproduce training](#reproduce-training) |
+| Use your own tiles or checkpoint | [Use local inputs](#use-local-inputs) |
+| Inspect the released model | Hugging Face [files](https://huggingface.co/risenyard/egms-qa-encoder#files) and [evaluation](https://huggingface.co/risenyard/egms-qa-encoder#evaluation) |
+
+## Installation
+
+Python 3.10 or later is required. Clone and install the code once, then run all
+commands below from the `egms-qa` repository root.
+
+```bash
+git clone https://github.com/risenyard/egms-qa
+cd egms-qa
+pip install -e .
+```
 
 ## Extract tokens
 
-Start with one tile. Run the following commands from the repository root.
+Start with one tile. The command retrieves the released encoder from its
+Hugging Face model repository and the tile from the Dataset repository.
 
 ```bash
-pip install -e .
 python -m egms_encoder.extract_tokens \
     --encoder-repo risenyard/egms-qa-encoder \
     --dataset-repo risenyard/egms-qa-dataset \
@@ -23,20 +45,17 @@ python -m egms_encoder.extract_tokens \
     --output-dir outputs/tokens
 ```
 
-The command downloads the released encoder and one tile, then saves
-`outputs/tokens/egms_tokens_1.pt` with token shape `[1,65,256]`. The outputs
-include validity masks, tile IDs, and metadata recording the model and dataset
-revisions. Add `--device cpu` for a CPU run.
+The output is `outputs/tokens/egms_tokens_1.pt`, with token shape `[1,65,256]`,
+validity masks, and the tile identifier. The accompanying metadata records the
+model and Dataset revisions. Add `--device cpu` for a CPU run.
 
 Remove `--max-tiles 1` to process all 10,000 tiles and write
 `outputs/tokens/egms_tokens_10k.pt` with shape `[10000,65,256]`. GPU execution
 is recommended for the full dataset.
 
-The Dataset also provides a precomputed token cache. After installing the
-Dataset with `egms_encoder.install_data`, the cache is available at
-`data/encoder/tokens/egms_tokens_10k.pt`. Translator use also requires the QA
-labels and task tables, installed through the
-[Translator guide](../egms_qa/translator/README.md).
+For question answering with the precomputed tokens, follow the
+[Translator guide](../egms_qa/translator/README.md). Its setup installs the
+released tokens together with the QA labels and task tables.
 
 ## Input requirements
 
@@ -58,8 +77,9 @@ split and save it with the checkpoint.
 
 ## Use local inputs
 
-For local tiles, provide `--manifest` and `--data-config` together. Use
-`--source-tiles-root` to resolve relative tile paths against a different
+After [installing the code](#installation), provide `--manifest` and
+`--data-config` together. Use `--source-tiles-root` to resolve relative tile
+paths against a different
 directory. Encoder inference uses displacement histories and coordinates.
 
 For a local checkpoint, provide `--checkpoint`, `--model-config`, and
@@ -68,8 +88,9 @@ use a checkpoint produced by training.
 
 ## Reproduce training
 
-The encoder provides a data installer that links the tiles, manifests, and
-token cache into its runtime paths. Download the Dataset and training files:
+Complete the [installation](#installation) first. From the repository root,
+download the Dataset and the model settings from Hugging Face, then start
+training:
 
 ```bash
 hf download risenyard/egms-qa-dataset --repo-type dataset \
@@ -114,14 +135,12 @@ python -m egms_encoder.extract_tokens \
 
 ## Architecture
 
-![EGMS Encoder framework](../../docs/assets/egms-encoder.png)
-
 Each normalized history is divided into temporal patches. A temporal
 Transformer and mean pooling form a 256-dimensional representation for each
 point. A coordinate embedding is added before spatial attention exchanges
 information across points. Pretraining reconstructs a synchronized masked
-interval shared by all points in a tile. Inference uses the frozen encoder without masking and pools
-the point features into an 8×8 grid.
+interval shared by all points in a tile. Token extraction runs the frozen
+encoder without masking and pools the point features into an 8×8 grid.
 
 | module | purpose |
 |---|---|
