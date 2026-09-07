@@ -6,11 +6,23 @@ histories and their coordinates from each 7 km tile. It first produces a
 representations into 65 tile tokens: one summary token and 64 spatial-cell
 tokens, each with 256 dimensions.
 
+## Architecture
+
 ![EGMS Encoder framework](../../docs/assets/egms-encoder.png)
 
-This guide provides the code workflows for [EGMS-QA](../../README.md).
-The [Hugging Face model repository](https://huggingface.co/risenyard/egms-qa-encoder)
-provides the weights, model settings, training recipe, and evaluation results.
+Each normalized history is divided into temporal patches. A temporal
+Transformer and mean pooling form a 256-dimensional representation for each
+point. A coordinate embedding is added before spatial attention exchanges
+information across points. Pretraining reconstructs a synchronized masked
+interval shared by all points in a tile. Token extraction runs the frozen
+encoder without masking and pools the point features into an 8×8 grid.
+
+## Workflows
+
+This guide covers installation, token extraction, and training for
+[EGMS-QA](../../README.md). The
+[Hugging Face model card](https://huggingface.co/risenyard/egms-qa-encoder)
+documents the released files, input requirements, and evaluation results.
 The [Dataset repository](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
 provides the prepared tiles and precomputed tokens.
 
@@ -59,28 +71,16 @@ released tokens together with the QA labels and task tables.
 
 ## Input requirements
 
-| input | released contract |
-|---|---|
-| displacement | vertical displacement in mm, stored as `[N,294]` |
-| coordinates | EPSG:3035 easting and northing in meters, `[N,2]` |
-| tile geometry | 7 km side length, with a variable number of points |
-| time axis | stored `[0,294)`, corresponding to source indices `[8,302)` |
-| preprocessing | normalization paired with the encoder checkpoint |
-
-The data config records the six-day cadence and source index offset.
-Coordinates are centered within each tile and scaled using the model config.
-
-New collections must match the input requirements above. Keep the released
-normalization when using the frozen encoder, and check its performance on the
-new data. When training a new encoder, fit normalization on the new training
-split and save it with the checkpoint.
+The released workflows use prepared EGMS-QA NPZ tiles. For a new collection,
+check the [model's input requirements](https://huggingface.co/risenyard/egms-qa-encoder#input-requirements)
+before using the local-input options below. The extractor normalizes
+displacement values and centers coordinates within each tile.
 
 ## Use local inputs
 
 After [installing the code](#installation), provide `--manifest` and
 `--data-config` together. Use `--source-tiles-root` to resolve relative tile
-paths against a different
-directory. Encoder inference uses displacement histories and coordinates.
+paths against a different directory. Encoder inference uses displacement histories and coordinates.
 
 For a local checkpoint, provide `--checkpoint`, `--model-config`, and
 `--normalization` together. The token-extraction example below shows how to
@@ -133,14 +133,7 @@ python -m egms_encoder.extract_tokens \
     --output-dir outputs/my_tokens --device cuda:0
 ```
 
-## Architecture
-
-Each normalized history is divided into temporal patches. A temporal
-Transformer and mean pooling form a 256-dimensional representation for each
-point. A coordinate embedding is added before spatial attention exchanges
-information across points. Pretraining reconstructs a synchronized masked
-interval shared by all points in a tile. Token extraction runs the frozen
-encoder without masking and pools the point features into an 8×8 grid.
+## Code reference
 
 | module | purpose |
 |---|---|
@@ -152,8 +145,7 @@ encoder without masking and pools the point features into an 8×8 grid.
 
 ## Scope
 
-The encoder consumes prepared EGMS-QA tiles. Downloading official EGMS products,
-converting their source formats, and selecting a valid window for another
-reference period require a separate data-preparation workflow. Its
-representations describe observed deformation histories and do not establish
-causes, predict future motion, or certify structural safety.
+Official EGMS downloads and conversion to the required NPZ tiles need a
+separate data-preparation workflow. The
+[model card](https://huggingface.co/risenyard/egms-qa-encoder#scope-and-license)
+describes the encoder's application limits and model license.
