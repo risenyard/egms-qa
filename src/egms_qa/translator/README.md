@@ -76,8 +76,7 @@ and scoring rules for these three answer types.
 
 The reported evaluation uses 71 tasks on 1,000 held-out tiles, yielding
 71,000 answers per model. Results average R² over 29 numeric tasks and balanced
-accuracy over 28 categorical and 14 boundary tasks. Training uses the full
-catalog of 78 tasks.
+accuracy over 28 categorical and 14 boundary tasks.
 
 The [evaluation configuration](https://huggingface.co/risenyard/egms-qa-translator/blob/main/evaluation_config.json)
 records the reporting subset, question-phrasing pool, model-specific seeds,
