@@ -1,82 +1,109 @@
-# Translator (language-model adaptation)
+# EGMS-QA Translator
 
-> 🤗 Released adapters + projectors (4 host models): [`risenyard/egms-qa-translator`](https://huggingface.co/risenyard/egms-qa-translator)
+The translator answers questions from frozen EGMS tile tokens. A two-layer
+projector maps the 256-dimensional tokens to the host model's embedding width.
+The projected tokens precede the question, and a LoRA adapter tunes the
+language model while its base weights remain frozen.
 
-The translator adapts a host language model to answer EGMS-QA questions from the
-frozen tile tokens alone. A two-layer projector maps each 256-d token to the host
-model's embedding width; the projected tokens form a prefix before the tokenized
-question, and a LoRA adapter is trained on the answer tokens with the base
-weights frozen. Training uses bf16, AdamW, and cross-entropy on answer tokens
-only.
+[Models and recipes](https://huggingface.co/risenyard/egms-qa-translator) ·
+[Encoder](https://huggingface.co/risenyard/egms-qa-encoder) ·
+[Dataset](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
 
-Files:
+## Evaluate a released model
 
-- `train.py` — sampling and the training loop (entry point).
-- `modeling.py` — projector, batch construction, loss, evaluation building blocks.
-- `generation.py` — decoding utilities (prompt builder, greedy decode).
-- `evaluate.py` — free-generation evaluation on the test split, scoring generated
-  answers against the canonical task labels; supports a shuffled-token control.
-- `answer_extractor.py` — deterministic extraction of the canonical value from a
-  visible natural-language answer (numeric via quantulum3; categorical via label
-  aliases).
-- `compute_ci.py` — bootstrap 95% confidence intervals per task.
-- `summarize_results.py` — aggregate the four host-model test summaries into one
-  report (JSON + per-task CSV + Markdown table).
-
-## Host models
-
-EGMS-QA provides four variants with the same projector-plus-LoRA architecture
-and model-specific training configurations (ids in `../paths.py`):
-
-| key | base LLM |
-|---|---|
-| qwen | Qwen/Qwen3.5-9B |
-| gemma | unsloth/gemma-3-12b-it |
-| llama | unsloth/Meta-Llama-3.1-8B-Instruct |
-| mistral | unsloth/Mistral-Nemo-Instruct-2407 |
-
-## Reproduce the published training and evaluation
-
-From the checkout root, install `pip install -e '.[translator]'` and follow the
-top-level README to install the Dataset and download the translator bundle.
-The complete recipes live in each HF variant's `training_args.json`;
-`evaluation_config.json` defines the reported 71-task protocol. CUDA is required.
+Run the following commands from the repository root. Evaluation requires CUDA
+and GPU memory for the host model in bfloat16 plus generation state.
 
 ```bash
-python -m egms_qa.reproduce translator \
-    --variant-dir outputs/runs/qwen --output-dir outputs/training/qwen
-python -m egms_qa.reproduce evaluate --variant-dir outputs/runs/qwen \
+pip install -e '.[translator]'
+hf download risenyard/egms-qa-translator \
+    --include 'qwen/*' --include 'evaluation_config.json' \
+    --local-dir outputs/runs
+hf download risenyard/egms-qa-dataset --repo-type dataset \
+    --local-dir release/egms-qa-dataset
+python -m egms_qa.release install \
+    --release-dir release/egms-qa-dataset --target-root .
+python -m egms_qa.reproduce evaluate \
+    --variant-dir outputs/runs/qwen \
     --evaluation-config outputs/runs/evaluation_config.json \
     --output-dir outputs/evaluation/qwen
 ```
 
-Use `--dry-run` to inspect the resolved commands. The runner starts from the
-pinned host model, then connects all required training stages. Evaluation
-selects 71 reported tasks and samples one phrasing for each of 1,000 test tiles
-per task. Numeric, categorical, and boundary means are reported separately.
+Add `--dry-run` to inspect the evaluation command without loading the model.
+The output directory contains `answers.jsonl` and `metrics.json`. The
+`reporting_summary` field separates numeric, categorical, and boundary metrics.
 
-## Custom training and sampled evaluation
+Replace `qwen` in the download and runtime paths to use another variant:
 
-These lower-level examples use generic defaults, not the published recipe:
+| variant | pinned host model |
+|---|---|
+| `qwen` | Qwen/Qwen3.5-9B |
+| `gemma` | unsloth/gemma-3-12b-it |
+| `llama` | unsloth/Meta-Llama-3.1-8B-Instruct |
+| `mistral` | unsloth/Mistral-Nemo-Instruct-2407 |
+
+Each `translator_config.json` records the host-model revision, projector
+dimensions, adapter path, and prompt format. The input contains 65 tokens of
+width 256 and a 65-element validity mask. Token 0 summarizes the tile, followed
+by 64 spatial-cell tokens in row-major order.
+
+## Reproduce training
+
+With the Dataset and variant files installed, run the complete training recipe:
 
 ```bash
-# train (GPU); --host-model selects the frozen language model
-python -m egms_qa.translator.train \
-    --host-model Qwen/Qwen3.5-9B \
-    --token-cache data/encoder/tokens/egms_tokens_10k.pt \
-    --output-dir outputs/runs/qwen
-
-# evaluate a trained checkpoint on the test split
-python -m egms_qa.translator.evaluate \
-    --adapter-dir outputs/runs/qwen/best \
-    --token-cache data/encoder/tokens/egms_tokens_10k.pt \
-    --split test
-
-# combine the four host-model summaries into the results report
-python -m egms_qa.translator.summarize_results
+python -m egms_qa.reproduce translator \
+    --variant-dir outputs/runs/qwen --output-dir outputs/training/qwen
 ```
 
-Training writes compatible checkpoints under `outputs/runs/<key>/best/`.
-Released variants download directly to `outputs/runs/<key>/` and contain
-`projector.safetensors`, `translator_config.json`, and `adapter/`; see the
-top-level README for the download link.
+The runner reads `training_args.json` and starts with the pinned base model, a
+fresh LoRA adapter, and a randomly initialized projector. Each subsequent stage
+loads the preceding stage's best adapter and projector, then initializes a new
+optimizer and scheduler. Add `--dry-run` to inspect all stage commands and task
+lists.
+
+Training uses model-specific schedules recorded in the recipes. Checkpoints
+appear under `outputs/training/<variant>/<stage>/best/`. To evaluate a newly
+trained checkpoint, supply that directory as `--variant-dir` to the evaluation
+command. The test split is reserved for evaluation.
+
+## Evaluation protocol
+
+The reporting protocol covers 71 tasks across 1,000 test tiles, yielding
+71,000 answers per model. One phrasing is sampled per tile and task from the
+20-phrasing pool. The protocol records the task list, model-specific seeds,
+greedy decoding, and a limit of 96 new tokens.
+
+Reporting excludes A12, A52, C13, C32, D24, D35, and S43 from the 78-task catalog.
+Training retains the full catalog. Results are macro averages over 29 numeric,
+28 categorical, and 14 boundary tasks, with extraction coverage and per-task
+results retained. After evaluating all four variants, combine the outputs:
+
+```bash
+python -m egms_qa.translator.summarize_results \
+    --evaluation-root outputs/evaluation
+```
+
+## Code reference
+
+| module | purpose |
+|---|---|
+| `train.py` | sampling, optimization, and checkpoint selection |
+| `checkpoint.py` | configuration validation and projector loading |
+| `modeling.py` | projector, batching, and training loss |
+| `evaluate.py` | free generation and task-level scoring |
+| `answer_extractor.py` | numeric and categorical answer extraction |
+| `compute_ci.py` | per-task bootstrap confidence intervals |
+| `summarize_results.py` | four-model summary tables |
+
+The lower-level training and evaluation entry points support custom
+experiments. Their generic defaults differ from the published recipes and
+reporting protocol.
+
+## Scope
+
+The translators require the released encoder's token representation and
+questions within the EGMS-QA task definitions. Answers describe measured
+vertical displacement histories. They do not establish causes, forecast
+motion, or certify structural safety. Host-model weights are downloaded
+separately and remain subject to their respective licenses.

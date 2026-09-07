@@ -1,103 +1,108 @@
-# Encoder (tile representation)
+# EGMS-QA Encoder
 
-> 🤗 Released weights & token cache: [`risenyard/egms-qa-encoder`](https://huggingface.co/risenyard/egms-qa-encoder)
+The encoder maps point displacement histories within a 7 km tile to
+256-dimensional point representations. Spatial pooling produces 65 tokens for
+the translator, comprising one tile-summary token and 64 spatial-cell tokens.
 
-The EGMS encoder maps a variable-size tile of persistent-scatterer displacement
-histories to a fixed 65-token representation used by the rest of EGMS-QA. It is a
-self-supervised spatio-temporal model:
+[Model and training recipe](https://huggingface.co/risenyard/egms-qa-encoder) ·
+[Dataset and token cache](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
 
-![EGMS Encoder framework](../../docs/assets/egms-encoder.png)
+## Extract tokens
 
-- each point's 294-step history is normalized and split into 37 eight-step
-  temporal patches; a temporal Transformer + mean pooling gives one temporal
-  feature per point;
-- point coordinates (relative to the tile centre, scaled by the tile half-width)
-  are projected and added;
-- a spatial Transformer exchanges information across points, producing one
-  256-d contextual feature per point;
-- training is masked reconstruction: a synchronized block hides the same 30%
-  interval in every point history within a tile, recovered from the contextual
-  features.
-
-At inference the encoder is frozen and applied without masking. A deterministic
-pooling step assigns points to an 8×8 grid and mean-pools features per cell,
-yielding 65 tokens (1 tile summary + 64 cells) with a validity mask.
-
-This directory vendors the encoder model and data code (`models/`, `data/`,
-`pretrain.py`). Loading the checkpoint, extracting tokens, and
-**retraining the encoder from scratch** are all self-contained on the released
-data: the model-ready 294-step EGMS tiles ship as NPZ under
-`artifacts/source_tiles/` in `risenyard/egms-qa-dataset`; the release installer
-links them to `data/tiles/`. The split manifest and normalization ship with the
-code/model release. The encoder was trained on this 10k tile set's train split.
-The release has no external dependency. (One family-C4 threshold is
-corpus-relative, derived from the full European candidate pool, but its value
-ships in the C4 reference JSON, so re-deriving it is optional and never required
-to reproduce the release.)
-
-## Data support boundary
-
-The public encoder code consumes the EGMS-QA NPZ tile contract together with a
-split manifest, data config, and normalization file. It supports reproducing
-the released encoder and training or inference on already prepared compatible
-tiles. The released NPZ files store `[N,294]` displacement arrays and the
-encoder reads `[0,294)` directly; this is the same physical window as
-`[8,302)` on the original 304-step prepared axis. It does not download official EGMS products, convert arbitrary EGMS
-ZIP/CSV releases, or infer a valid time window and normalization for another
-reference period. New product versions require a separate, empirically audited
-preparation step before this encoder entrypoint can be used.
-
-## Token extraction
-
-From the published GitHub checkout, identify both published HF repositories
-directly. The command resolves and pins their current revisions in the HF cache:
+Run the following commands from the repository root:
 
 ```bash
+pip install -e .
 python -m egms_encoder.extract_tokens \
     --encoder-repo risenyard/egms-qa-encoder \
     --dataset-repo risenyard/egms-qa-dataset \
     --output-dir outputs/tokens
-# -> outputs/tokens/egms_tokens_10k.pt   (spatial_tokens [10000, 65, 256], mask, ids, splits)
 ```
 
-The repository mode reads `encoder.safetensors`, `config.json`, and
-`normalization.json` from the published Encoder tree. It reads
-`metadata/{split_manifest.parquet,data_config.json}` and
-`artifacts/source_tiles/` from the published Dataset tree.
+The command downloads the required model and tile data into the HF cache and
+records the resolved repository revisions. The full dataset produces
+`outputs/tokens/egms_tokens_10k.pt` with token shape `[10000,65,256]`, validity
+masks, and tile identifiers. Add `--max-tiles 1` for a small check. GPU execution
+is recommended for the full collection.
 
-For another compatible local NPZ collection, provide `--checkpoint`,
-`--model-config`, and `--normalization` together, plus `--manifest` and
-`--data-config`. Use `--source-tiles-root` when manifest paths are relative to a
-separate tile root.
+The Dataset also provides a precomputed token cache. After installing the
+Dataset with `egms_qa.release install`, the cache is available at
+`data/encoder/tokens/egms_tokens_10k.pt` for translator training and evaluation.
 
-Compatibility requires consistent displacement units (mm), vertical component,
-temporal sampling and preprocessing, and metric point coordinates appropriate
-for the 7 km tile geometry. Having 294 columns alone does not establish this.
-Keep the released normalization when applying the released frozen encoder;
-do not refit it on each inference collection. Distribution shifts require
-validation. For a new encoder trained on another corpus, fit normalization on
-that corpus's training split and pair it with the new checkpoint. Auxiliary
-NPZ fields can affect QA construction even though encoder inference uses
-displacement histories and coordinates.
+## Input requirements
 
-The released token cache (`data/encoder/tokens/egms_tokens_10k.pt`) lets you
-skip this step and train/evaluate the translator directly. Encoder provenance is
-documented in the
-[dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset) and
-[encoder card](https://huggingface.co/risenyard/egms-qa-encoder).
+| input | released contract |
+|---|---|
+| displacement | vertical displacement in mm, stored as `[N,294]` |
+| coordinates | EPSG:3035 easting and northing in meters, `[N,2]` |
+| tile geometry | 7 km side length, with a variable number of points |
+| time axis | stored `[0,294)`, corresponding to source indices `[8,302)` |
+| preprocessing | normalization paired with the encoder checkpoint |
 
-To reproduce the published encoder training recipe, first install the Dataset
-as described in the top-level README, then download the model configuration
-and run the recipe. The runner reads architecture, masking, sampling, loss,
-optimizer, and validation settings from the downloaded JSON files:
+The data config defines the stored window and retains source offset 8 and the
+six-day cadence for physical-time calculations. Token extraction centers
+coordinates within each tile. The encoder applies the coordinate scale recorded
+in its model config.
+
+A new NPZ collection must match the displacement component, units, temporal
+sampling, preprocessing, and coordinate geometry. Matching array dimensions
+alone is insufficient. Keep the checkpoint's normalization when using the
+released frozen encoder, and validate performance under distribution shifts.
+When training a new encoder on another corpus, fit normalization on its
+training split and retain that file with the new checkpoint.
+
+For local inputs, provide `--manifest` and `--data-config` together. Local model
+overrides require `--checkpoint`, `--model-config`, and `--normalization`
+together. Use `--source-tiles-root` when manifest paths refer to a separate tile
+root. Auxiliary fields such as velocity, acceleration, and RMSE affect QA
+construction, while encoder inference uses displacement histories and
+coordinates.
+
+## Reproduce training
+
+Download and install the Dataset, then obtain the encoder configuration and
+training recipe:
 
 ```bash
+hf download risenyard/egms-qa-dataset --repo-type dataset \
+    --local-dir release/egms-qa-dataset
+python -m egms_qa.release install \
+    --release-dir release/egms-qa-dataset --target-root .
 hf download risenyard/egms-qa-encoder --include '*.json' \
     --local-dir release/egms-qa-encoder
 python -m egms_qa.reproduce encoder \
     --model-dir release/egms-qa-encoder --output-dir outputs/encoder_pretrain
 ```
 
-Add `--dry-run` to inspect the resolved command. This starts training from
-scratch; weights from the released encoder are not loaded. The generic
-`egms_encoder.pretrain` defaults are not the published training recipe.
+The runner reads architecture and training settings from `config.json` and
+`training_args.json`, then starts training from scratch with the released
+train-fitted normalization. Add `--dry-run` to inspect the resolved command.
+The lower-level `egms_encoder.pretrain` entry point supports custom experiments
+and uses generic defaults.
+
+## Architecture
+
+![EGMS Encoder framework](../../docs/assets/egms-encoder.png)
+
+Each normalized history is divided into 37 eight-step patches. A temporal
+Transformer and mean pooling form one feature per point. A coordinate
+embedding is added before spatial attention exchanges information across
+points. Pretraining reconstructs a synchronized masked interval shared by all
+points in a tile. Inference uses the frozen encoder without masking and pools
+the point features into an 8×8 grid.
+
+| module | purpose |
+|---|---|
+| `models/tile_encoder.py` | temporal and spatial encoder |
+| `data/tile_store.py` | NPZ loading and stored-window validation |
+| `checkpoint.py` | model configuration and weight loading |
+| `extract_tokens.py` | encoding and spatial pooling |
+| `pretrain.py` | masked-reconstruction training |
+
+## Scope
+
+The encoder consumes prepared EGMS-QA tiles. Downloading official EGMS products,
+converting their source formats, and selecting a valid window for another
+reference period require a separate data-preparation workflow. Its
+representations describe observed deformation histories and do not establish
+causes, predict future motion, or certify structural safety.
