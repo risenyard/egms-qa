@@ -69,15 +69,20 @@ command. The test split is reserved for evaluation.
 
 ## Evaluation protocol
 
-The reporting protocol covers 71 tasks across 1,000 test tiles, yielding
-71,000 answers per model. One phrasing is sampled per tile and task from the
-20-phrasing pool. The protocol records the task list, model-specific seeds,
-greedy decoding, and a limit of 96 new tokens.
+Evaluation measures numerical answers, categorical answers, and refusals to
+questions outside the supported scope. The
+[EGMS-QA task catalog](../qa_construction/README.md) defines the question targets
+and scoring rules for these three answer types.
 
-Reporting excludes A12, A52, C13, C32, D24, D35, and S43 from the 78-task catalog.
-Training retains the full catalog. Results are macro averages over 29 numeric,
-28 categorical, and 14 boundary tasks, with extraction coverage and per-task
-results retained. After evaluating all four variants, combine the outputs:
+The reported evaluation uses 71 tasks on 1,000 held-out tiles, yielding
+71,000 answers per model. Results average R² over 29 numeric tasks and balanced
+accuracy over 28 categorical and 14 boundary tasks. Training uses the full
+catalog of 78 tasks.
+
+The [evaluation configuration](https://huggingface.co/risenyard/egms-qa-translator/blob/main/evaluation_config.json)
+records the reporting subset, question-phrasing pool, model-specific seeds,
+and greedy-decoding settings. Parse counts and per-task scores remain in the
+outputs. After evaluating all four variants, combine the results:
 
 ```bash
 python -m egms_qa.translator.summarize_results \
