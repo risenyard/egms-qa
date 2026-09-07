@@ -8,7 +8,7 @@ Official leaf tasks:
 
 | ID | Field | Meaning |
 |---|---|---|
-| S21 | `S21_local_isolation_score` | mean cosine distance to the nearest 20 train neighbors in the train-defined CLS representation space |
+| S21 | `S21_local_isolation_score` | mean cosine distance to the nearest 20 train neighbors in the train-defined summary-token representation space |
 | S22 | `S22_representation_rarity_class` | corpus-relative rarity class derived from S21 |
 
 ## Algorithms
@@ -21,8 +21,8 @@ data/encoder/tokens/egms_tokens_10k.pt
 
 Steps:
 
-1. Extract CLS embeddings from `spatial_tokens[:, 0, :]`.
-2. Fit `StandardScaler` on train CLS embeddings only.
+1. Extract summary embeddings from `spatial_tokens[:, 0, :]`.
+2. Fit `StandardScaler` on train summary embeddings only.
 3. Fit `PCA(n_components=25)` on train embeddings only.
 4. L2-normalize PCA features.
 5. Use train tiles as the reference library.

@@ -12,8 +12,10 @@
 *[English](README.md) · [中文](README.zh-CN.md)*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Data: CC BY 4.0](https://img.shields.io/badge/Data-CC%20BY%204.0-blue.svg)](DATA_LICENSE)
+[![Data terms](https://img.shields.io/badge/data-CC%20BY%204.0%20%2B%20CLMS-blue.svg)](DATA_LICENSE)
 [![Python](https://img.shields.io/badge/python-%E2%89%A5%203.10-blue.svg)](pyproject.toml)
+[![CI](https://github.com/risenyard/egms-qa/actions/workflows/ci.yml/badge.svg)](https://github.com/risenyard/egms-qa/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/release-v1.0.0-green.svg)](CHANGELOG.md)
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-EGMS--QA-yellow)](https://huggingface.co/collections/risenyard/egms-qa)
 
 面向[欧洲地面运动服务](https://egms.land.copernicus.eu/)(EGMS)的持久散射体形变
@@ -25,7 +27,7 @@ token,再由一个宿主语言模型用自然语言回答监测类问题,并对�
 
 ```
 瓦片(点数可变,294 步历史)
-   → 冻结的 EGMS 编码器 + 8×8 池化 → 65 × 256 token
+   → 冻结的 EGMS-QA Encoder + 8×8 池化 → 65 × 256 EGMS token
    → 两层投影器 → 前缀 ; "Question: …\nAnswer:" → 冻结宿主 LLM + LoRA → 答案
 ```
 
@@ -119,8 +121,11 @@ Ortho Vertical 产品的修改与重打包衍生物(© European Union, Copernicu
 python -m egms_qa.reproduce encoder \
     --model-dir data/encoder/checkpoint --output-dir outputs/encoder_pretrain
 
-# 1. token:使用下载缓存,或从 NPZ tile store 提取
-python -m egms_encoder.extract_tokens --output-dir outputs/tokens
+# 1. token:使用下载缓存,或直接解析两个 HF 仓库
+python -m egms_encoder.extract_tokens \
+    --encoder-repo risenyard/egms-qa-encoder \
+    --dataset-repo risenyard/egms-qa-dataset \
+    --output-dir outputs/tokens
 
 # 2. 任务标签 + QA 记录(或直接下载)
 python -m egms_qa.qa_construction.build_labels
@@ -137,11 +142,10 @@ python -m egms_qa.reproduce evaluate --variant-dir outputs/runs/qwen \
     --output-dir outputs/evaluation/qwen
 ```
 
-加 `--dry-run` 可查看完整命令。配方读取 HF 中的当前配置，通用入口的默认
-参数不等于发布配方。评测新训练的模型时，将 `--variant-dir` 指向最后一个
+加 `--dry-run` 可查看完整命令。配方读取 HF 中的当前配置。评测新训练的模型时，将 `--variant-dir` 指向最后一个
 训练阶段的 `best/`。报告使用 71 个任务，训练仍保留完整的 78 个任务。
 
-`pytest` 运行接口和答案提取器测试。
+`pytest` 运行数据契约、encoder、release、接口和答案提取器测试。
 
 ## 许可
 

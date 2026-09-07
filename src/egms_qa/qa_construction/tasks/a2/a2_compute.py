@@ -34,8 +34,7 @@ TRAINING_ARGS = ENCODER_TRAINING_ARGS
 MANIFEST = ENCODER_DATA / "manifest/split.parquet"
 DATA_CONFIG = ENCODER_DATA / "manifest/data_config.json"
 
-from egms_encoder.data.tile_store import TileStore  # noqa: E402
-from egms_encoder.pretrain import FEATURE_COLUMNS  # noqa: E402
+from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT, TileStore  # noqa: E402
 
 
 def stable_seed(text: str) -> int:
@@ -116,7 +115,7 @@ def main() -> None:
     block_len = max(1, int(round(input_length * mask_ratio)))
     mask_start = (input_length - block_len) // 2
     mask_end = mask_start + block_len
-    fc = len(FEATURE_COLUMNS)
+    feature_columns_count = FEATURE_COLUMNS_COUNT
 
     all_indices = np.arange(store.num_tiles, dtype=np.int64)[: args.sample_tiles]
     indices = shard_items(all_indices, args.shard_index, args.num_shards)
@@ -144,7 +143,7 @@ def main() -> None:
             else:
                 sub = tile
 
-            series = sub[:, fc:fc + input_length].copy()
+            series = sub[:, feature_columns_count:feature_columns_count + input_length].copy()
             finite = np.isfinite(series)
             norm_series = np.nan_to_num(
                 (series - norm_mean) / norm_std,

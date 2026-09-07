@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from egms_qa.release import audit_release, build_manifest, install_release
 
@@ -46,3 +47,36 @@ def test_release_manifest_audit_and_install(tmp_path: Path) -> None:
     assert (target / "data/encoder/manifest/split.parquet").is_symlink()
     assert (target / "outputs/qa/v1_val.jsonl").read_bytes() == b"{}\n"
     assert (target / "outputs/tasks/a1/a1_final_table.csv").exists()
+
+
+def test_release_installer_rejects_legacy_token_names(tmp_path: Path) -> None:
+    release = tmp_path / "release"
+    _write(release / "artifacts/source_tiles/E00N00/tile_0.npz", b"tile")
+    _write(release / "artifacts/representations/encoder_tokens_10k.pt", b"legacy")
+    _write(
+        release / "artifacts/representations/encoder_tokens_10k_metadata.json",
+        b"{}",
+    )
+    _write(release / "artifacts/labels/labels.parquet", b"labels")
+    _write(release / "artifacts/reference_tables/a1/a1_final_table.csv", b"tile_id\n")
+    _write(release / "artifacts/labels/metadata.json", b"{}")
+    _write(release / "metadata/qa_audit.json", b"{}")
+    _write(release / "metadata/data_config.json", b"{}")
+    for split in ("train", "validation", "test"):
+        _write(release / f"data/qa/{split}.jsonl", b"{}\n")
+    pd.DataFrame(
+        [
+            {
+                "tile_id": "tile_0",
+                "path": "data/tiles/E00N00/tile_0.npz",
+                "grid_id": "0_0",
+                "split": "train",
+                "centroid_x": 1.0,
+                "centroid_y": 2.0,
+                "n_points": 3,
+            }
+        ]
+    ).to_parquet(release / "metadata/split_manifest.parquet", index=False)
+    build_manifest(release, workers=1)
+    with pytest.raises(FileNotFoundError, match="egms_tokens_10k"):
+        install_release(release, tmp_path / "target")

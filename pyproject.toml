@@ -31,6 +31,27 @@ translator = [
   "bitsandbytes>=0.43",
   "quantulum3>=0.10,<0.11",
 ]
+test = [
+  "pytest>=8,<10",
+  "quantulum3>=0.10,<0.11",
+]
+
+[project.scripts]
+egms-qa-release = "egms_qa.release:main"
+egms-encoder-install-data = "egms_encoder.install_data:main"
+egms-encoder-pretrain = "egms_encoder.pretrain:main"
+egms-encoder-extract-tokens = "egms_encoder.extract_tokens:main"
+egms-qa-build-labels = "egms_qa.qa_construction.build_labels:main"
+egms-qa-generate = "egms_qa.qa_construction.generate_qa:main"
+egms-qa-train = "egms_qa.translator.train:main"
+egms-qa-evaluate = "egms_qa.translator.evaluate:main"
+
+[project.urls]
+Homepage = "https://github.com/risenyard/egms-qa"
+Repository = "https://github.com/risenyard/egms-qa"
+Issues = "https://github.com/risenyard/egms-qa/issues"
+Dataset = "https://huggingface.co/datasets/risenyard/egms-qa-dataset"
+Models = "https://huggingface.co/risenyard"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -38,3 +59,6 @@ include = ["egms_qa*", "egms_encoder*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "hf_integration: checks the staged or downloaded Hugging Face release artifacts",
+]

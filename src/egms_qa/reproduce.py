@@ -40,12 +40,12 @@ def encoder_plan(model_dir: Path, output_dir: Path) -> dict:
         raise ValueError('Unsupported encoder training recipe')
     args = dict(
         output_dir=output_dir, normalization=model_dir/'normalization.json',
+        model_config=model_dir/'config.json', training_args=model_dir/'training_args.json',
         input_length=model['input_length'], patch_size=model['patch_size'],
         d_model=model['d_model'], temporal_layers=model['temporal_layers'],
         temporal_heads=model['temporal_heads'], num_layers=model['spatial_layers'],
         num_heads=model['spatial_heads'], dropout=model['dropout'],
         coord_scale=model['coord_scale_m'], residual_head_mode=model['residual_head_mode'],
-        tile_size=data['tile_size_m'], min_tile_points=data['minimum_points_per_tile'],
         max_tile_points=data['maximum_points_per_tile'],
         mask_strategy='block', sync_mask=True, mask_ratio=mask['train_ratio'],
         eval_mask_ratio=mask['evaluation_ratio'], mask_schedule=mask['schedule'],

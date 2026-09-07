@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
+import pytest
 import torch
 from safetensors.torch import save_file
 
@@ -33,7 +35,7 @@ def model_config() -> dict:
     }
 
 
-def test_safetensors_checkpoint_round_trip(tmp_path) -> None:
+def test_safetensors_checkpoint_round_trip(tmp_path: Path) -> None:
     config = model_config()
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps(config), encoding="utf-8")
@@ -46,6 +48,7 @@ def test_safetensors_checkpoint_round_trip(tmp_path) -> None:
 
     loaded, loaded_config = load_encoder_checkpoint(weights_path, config_path)
     assert loaded_config == config
+    assert loaded.training is False
     for key, value in original.state_dict().items():
         torch.testing.assert_close(loaded.state_dict()[key], value, rtol=0, atol=0)
 
@@ -58,13 +61,33 @@ def test_safetensors_checkpoint_round_trip(tmp_path) -> None:
     torch.testing.assert_close(actual, expected, rtol=0, atol=0)
 
 
-def test_config_and_normalization_validation(tmp_path) -> None:
+def test_checkpoint_load_is_strict(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps(model_config()), encoding="utf-8")
+    model = build_encoder(model_config())
+    state = dict(model.state_dict())
+    state.pop(next(iter(state)))
+    weights_path = tmp_path / "encoder.safetensors"
+    save_file({key: value.contiguous() for key, value in state.items()}, str(weights_path))
+    with pytest.raises(RuntimeError):
+        load_encoder_checkpoint(weights_path, config_path)
+
+
+def test_config_and_normalization_validation(tmp_path: Path) -> None:
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps(model_config()), encoding="utf-8")
     assert load_encoder_config(config_path)["model_type"] == MODEL_TYPE
 
+    bad_config = model_config()
+    bad_config["dropout"] = 1.0
+    config_path.write_text(json.dumps(bad_config), encoding="utf-8")
+    with pytest.raises(ValueError, match="dropout"):
+        load_encoder_config(config_path)
+
     normalization_path = tmp_path / "normalization.json"
     normalization_path.write_text(
-        json.dumps({"mean": 0.0, "std": 2.0, "residual_std": 0.5}), encoding="utf-8"
+        json.dumps({"mean": 0.0, "std": 0.0, "residual_std": 0.5}),
+        encoding="utf-8",
     )
-    assert load_normalization(normalization_path)["std"] == 2.0
+    with pytest.raises(ValueError, match="must be positive"):
+        load_normalization(normalization_path)

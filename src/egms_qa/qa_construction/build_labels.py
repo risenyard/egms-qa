@@ -150,7 +150,7 @@ def normalize_series(s: pd.Series, label_type: str) -> pd.Series:
 def load_cache_ids(path: Path) -> tuple[list[str], list[str]]:
     import torch
 
-    cache = torch.load(path, map_location="cpu", weights_only=False)
+    cache = torch.load(path, map_location="cpu", weights_only=True)
     ids = [str(t) for t in cache["tile_ids"]]
     splits = [str(s) for s in cache.get("splits", [""] * len(ids))]
     return ids, splits

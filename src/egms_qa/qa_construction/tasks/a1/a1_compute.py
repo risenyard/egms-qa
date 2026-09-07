@@ -4,12 +4,12 @@ A11 asks one narrow question:
   Does the encoder's global tile representation drift under severe point loss?
 
 For each tile:
-  1. Use the cached full-tile CLS token as the reference.
+  1. Use the cached full-tile summary token as the reference.
   2. Keep a fixed severe fraction of points, by default 20%.
   3. Re-run the frozen encoder for several random seeds.
-  4. Compute angular drift between full CLS and subsampled CLS:
+  4. Compute angular drift between full and subsampled summary tokens:
 
-       drift = arccos(cosine(CLS_full, CLS_subsample)) / pi
+       drift = arccos(cosine(summary_full, summary_subsample)) / pi
 
 The tile-level target is the mean drift across seeds. Lower is more stable.
 No coverage, patch-token, scalar-probe, cluster, or manual threshold enters A11.
@@ -77,17 +77,10 @@ def load_encoder(
 
 
 def load_store(manifest_path: Path, data_config_path: Path):
-    from egms_encoder.data.tile_store import TileStore, TimeWindow
+    from egms_encoder.data.tile_store import TileStore
 
-    cfg = json.load(open(data_config_path))
-    tw = TimeWindow.from_config(cfg)
-    manifest = pd.read_parquet(manifest_path)
-    store = TileStore(
-        manifest=manifest,
-        time_window=tw,
-        split_assignments=dict(zip(manifest["tile_id"].astype(str), manifest["split"].astype(str))),
-    )
-    return store, manifest, tw
+    store = TileStore.from_manifest(manifest_path, data_config_path)
+    return store, store.manifest, store.time_window
 
 
 def choose_tiles(token_cache: dict, n: int, seed: int) -> list[str]:
@@ -154,7 +147,7 @@ def main() -> None:
         device = torch.device(args.device if args.device != "cuda:0" or torch.cuda.is_available() else "cpu")
     print(f"[device] {device}", flush=True)
 
-    token_cache = torch.load(args.token_cache, map_location="cpu", weights_only=False)
+    token_cache = torch.load(args.token_cache, map_location="cpu", weights_only=True)
     token_metadata = token_cache.get("metadata", {})
     full_tokens = token_cache["spatial_tokens"].numpy().astype(np.float64)
     tile_ids = [str(t) for t in token_cache["tile_ids"]]
@@ -186,7 +179,7 @@ def main() -> None:
             series = td[:, FC:FC + input_length].copy()
             n_pts = int(series.shape[0])
             full_center = coords.mean(0, keepdims=True)
-            ref_cls = full_tokens[ci, 0]
+            reference_summary = full_tokens[ci, 0]
 
             k = max(8, int(round(n_pts * args.subsample_frac)))
             for seed in seeds:
@@ -202,9 +195,9 @@ def main() -> None:
                 pmask = torch.ones(1, series_sub.shape[0], dtype=torch.bool, device=device)
                 out = model(series_t, coords=coords_t, point_mask=pmask)
                 emb = out["embedding"].squeeze(0).float().cpu().numpy()
-                sub_cls = emb.mean(axis=0)
-                cls_cos = cosine(ref_cls, sub_cls)
-                drift = angular_drift(cls_cos)
+                subsampled_summary = emb.mean(axis=0)
+                summary_cosine = cosine(reference_summary, subsampled_summary)
+                drift = angular_drift(summary_cosine)
                 rows.append({
                     "tile_id": tile_id,
                     "split": splits[ci],
@@ -212,7 +205,7 @@ def main() -> None:
                     "subsample_frac": float(args.subsample_frac),
                     "seed": int(seed),
                     "n_subsample_points": int(len(idx)),
-                    "cls_cosine": cls_cos,
+                    "summary_cosine": summary_cosine,
                     "A11_global_angular_drift": drift,
                     "A11_global_stability": float(1.0 - drift) if np.isfinite(drift) else float("nan"),
                 })
@@ -227,8 +220,8 @@ def main() -> None:
     tile = (
         obs.groupby(["tile_id", "split", "n_points"], as_index=False)
         .agg(
-            cls_cosine_mean=("cls_cosine", "mean"),
-            cls_cosine_min=("cls_cosine", "min"),
+            summary_cosine_mean=("summary_cosine", "mean"),
+            summary_cosine_min=("summary_cosine", "min"),
             A11_global_angular_drift=("A11_global_angular_drift", "mean"),
             A11_global_angular_drift_p50=("A11_global_angular_drift", "median"),
             A11_global_angular_drift_max=("A11_global_angular_drift", "max"),
@@ -243,7 +236,7 @@ def main() -> None:
         "method": "severe global representation instability under point subsampling",
         "target": "A11_global_angular_drift",
         "target_type": "continuous_regression",
-        "target_definition": "mean over seeds of arccos(cosine(CLS_full, CLS_20pct_subsample)) / pi; lower is more stable.",
+        "target_definition": "mean over seeds of arccos(cosine(summary_full, summary_20pct_subsample)) / pi; lower is more stable.",
         "sample_tiles_total": int(len(all_chosen)),
         "sample_tiles_this_shard": int(len(chosen)),
         "num_shards": int(args.num_shards),
@@ -252,12 +245,12 @@ def main() -> None:
         "seeds": seeds,
         "checkpoint": str(Path(args.checkpoint).resolve()),
         "token_cache": str(Path(args.token_cache).resolve()),
-        "token_cache_checkpoint": token_metadata.get("encoder_checkpoint"),
-        "coord_scale": train_args.get("coord_scale"),
+        "token_cache_checkpoint_sha256": token_metadata.get("input_sha256", {}).get("checkpoint"),
+        "coord_scale": model_config["coord_scale_m"],
         "metric_diagnostics": {
             "A11_global_angular_drift": metric_summary(tile["A11_global_angular_drift"].to_numpy(dtype=float)),
             "A11_global_stability": metric_summary(tile["A11_global_stability"].to_numpy(dtype=float)),
-            "cls_cosine_mean": metric_summary(tile["cls_cosine_mean"].to_numpy(dtype=float)),
+            "summary_cosine_mean": metric_summary(tile["summary_cosine_mean"].to_numpy(dtype=float)),
         },
         "outputs": {
             "observations": str(obs_path),

@@ -12,8 +12,10 @@
 *[English](README.md) · [中文](README.zh-CN.md)*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Data: CC BY 4.0](https://img.shields.io/badge/Data-CC%20BY%204.0-blue.svg)](DATA_LICENSE)
+[![Data terms](https://img.shields.io/badge/data-CC%20BY%204.0%20%2B%20CLMS-blue.svg)](DATA_LICENSE)
 [![Python](https://img.shields.io/badge/python-%E2%89%A5%203.10-blue.svg)](pyproject.toml)
+[![CI](https://github.com/risenyard/egms-qa/actions/workflows/ci.yml/badge.svg)](https://github.com/risenyard/egms-qa/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/release-v1.0.0-green.svg)](CHANGELOG.md)
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-EGMS--QA-yellow)](https://huggingface.co/collections/risenyard/egms-qa)
 
 Natural-language question answering over persistent-scatterer displacement time
@@ -26,7 +28,7 @@ plain language — with calibrated refusal for out-of-scope questions.
 
 ```
 tile (variable # points, 294-step histories)
-   → frozen EGMS encoder + 8×8 pooling → 65 × 256 tokens
+   → frozen EGMS-QA Encoder + 8×8 pooling → 65 × 256 EGMS tokens
    → 2-layer projector → prefix ; "Question: …\nAnswer:" → frozen host LLM + LoRA → answer
 ```
 
@@ -135,8 +137,11 @@ the new corpus before training.
 python -m egms_qa.reproduce encoder \
     --model-dir data/encoder/checkpoint --output-dir outputs/encoder_pretrain
 
-# 1. tokens: either use the downloaded cache, or extract from the tile store
-python -m egms_encoder.extract_tokens --output-dir outputs/tokens
+# 1. tokens: either use the downloaded cache, or resolve both HF repos directly
+python -m egms_encoder.extract_tokens \
+    --encoder-repo risenyard/egms-qa-encoder \
+    --dataset-repo risenyard/egms-qa-dataset \
+    --output-dir outputs/tokens
 
 # 2. task labels + QA records (or download them)
 python -m egms_qa.qa_construction.build_labels
@@ -154,12 +159,12 @@ python -m egms_qa.reproduce evaluate --variant-dir outputs/runs/qwen \
 ```
 
 Add `--dry-run` to inspect a reproduction command's complete command list.
-Training recipes come from HF; generic defaults are not the published protocol.
+Training recipes come from HF.
 To evaluate newly trained weights, point `--variant-dir` at the final stage's
 `best/` directory. Reporting uses 71 tasks (29 numeric, 28 categorical, 14
 boundary); training retains all 78 tasks.
 
-`pytest` runs the interface and answer-extractor tests.
+`pytest` runs the data-contract, encoder, release, interface, and answer-extractor tests.
 
 ## Licence
 

@@ -53,6 +53,8 @@ class SinusoidalPosEncoding(nn.Module):
 
     def __init__(self, d_model: int, max_len: int = 512) -> None:
         super().__init__()
+        if d_model % 2:
+            raise ValueError("d_model must be even for sinusoidal positional encoding")
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(
@@ -77,7 +79,7 @@ class TemporalPatchEncoder(nn.Module):
         self,
         input_length: int,
         d_model: int,
-        patch_size: int = 16,
+        patch_size: int = 8,
         num_layers: int = 2,
         num_heads: int = 4,
         dropout: float = 0.1,
@@ -100,7 +102,11 @@ class TemporalPatchEncoder(nn.Module):
             batch_first=True,
             norm_first=True,
         )
-        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.transformer = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=num_layers,
+            enable_nested_tensor=False,
+        )
         self.norm_out = nn.LayerNorm(d_model)
 
     def forward(self, series: torch.Tensor) -> torch.Tensor:
@@ -156,7 +162,7 @@ class TileEncoder(nn.Module):
         input_length: int,
         output_length: int | None = None,
         d_model: int = 256,
-        patch_size: int = 16,
+        patch_size: int = 8,
         temporal_layers: int = 2,
         temporal_heads: int = 4,
         spatial_layers: int = 6,
@@ -182,7 +188,9 @@ class TileEncoder(nn.Module):
         # Divisor applied to centered coords before coord_embedding. Set to the
         # tile half-width (e.g. 3500) to bring centered coords to ~+-1 and balance
         # the temporal and coordinate branches.
-        self.coord_scale = float(coord_scale) if coord_scale else None
+        if coord_scale is not None and coord_scale <= 0:
+            raise ValueError("coord_scale must be positive when provided")
+        self.coord_scale = float(coord_scale) if coord_scale is not None else None
         self.residual_head_mode = residual_head_mode
 
         # Temporal encoder: patches + transformer
@@ -229,25 +237,19 @@ class TileEncoder(nn.Module):
         )
         self._zero_init_residual_output()
 
-        total = sum(p.numel() for p in self.parameters())
-        print(
-            f"TileEncoder: {total:,} parameters ({total/1e6:.1f}M), "
-            f"residual_mode={residual_head_mode}, residual_scale={float(self.residual_scale):.6f}"
-        )
-
     def _zero_init_residual_output(self) -> None:
         last = self.residual_head[-1]
         if isinstance(last, nn.Linear):
             nn.init.zeros_(last.weight)
             nn.init.zeros_(last.bias)
 
-    def _encode(
+    def encode(
         self,
         series: torch.Tensor,
-        coords: torch.Tensor | None,
-        point_mask: torch.Tensor | None,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Temporal + spatial backbone -> (embedding, base reconstruction)."""
+        coords: torch.Tensor | None = None,
+        point_mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Return point embeddings without running the reconstruction heads."""
         batch_size, num_points, _ = validate_series(series, self.input_length, self.max_points)
         if point_mask is not None and point_mask.shape != (batch_size, num_points):
             raise ValueError(f"Expected point_mask shape [B, N], got {tuple(point_mask.shape)}")
@@ -271,21 +273,18 @@ class TileEncoder(nn.Module):
             embedding = block(embedding, key_padding_mask=key_padding_mask)
             embedding = mask_points(embedding, point_mask)
 
-        base_reconstruction = self.reconstruction_head(embedding)
-        base_reconstruction = mask_points(base_reconstruction, point_mask)
-        return embedding, base_reconstruction
+        return embedding
 
     def forward(
         self,
         series: torch.Tensor,
         coords: torch.Tensor | None = None,
-        static: torch.Tensor | None = None,
         point_mask: torch.Tensor | None = None,
-        **kwargs,
     ) -> dict[str, torch.Tensor]:
         """series: [B, N, T], coords: [B, N, 2], point_mask: [B, N] bool."""
-        del static, kwargs
-        embedding, base_reconstruction = self._encode(series, coords, point_mask)
+        embedding = self.encode(series, coords, point_mask)
+        base_reconstruction = self.reconstruction_head(embedding)
+        base_reconstruction = mask_points(base_reconstruction, point_mask)
 
         residual_raw = self.residual_head(embedding)
         residual_prediction = linear_detrend_tensor(residual_raw)
@@ -301,7 +300,6 @@ class TileEncoder(nn.Module):
         reconstruction = mask_points(reconstruction, point_mask)
 
         return {
-            "prediction": reconstruction,
             "reconstruction": reconstruction,
             "embedding": embedding,
             "base_reconstruction": base_reconstruction,

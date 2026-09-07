@@ -41,7 +41,7 @@ S42_LABELS = [
 
 
 def load_tokens(token_cache: Path) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
-    obj = torch.load(token_cache, map_location="cpu")
+    obj = torch.load(token_cache, map_location="cpu", weights_only=True)
     tokens = obj["spatial_tokens"].float().numpy().astype(np.float32)
     token_mask = obj["token_mask"].numpy().astype(bool)
     meta = pd.DataFrame({"tile_id": obj["tile_ids"], "split": obj["splits"]})
@@ -152,7 +152,7 @@ def summarize(
         "computed_tasks": [S41_COL, S42_COL, S43_COL],
         "n_tiles": int(len(final)),
         "n_missing": final[[S41_COL, S42_COL, S43_COL]].isna().sum().astype(int).to_dict(),
-        "single_tile_inputs": "current tile valid patch tokens only; no CLS, no geographic neighbors, no A/B/C/D labels",
+        "single_tile_inputs": "current tile valid spatial-cell tokens only; no summary token, geographic neighbors, or A/B/C/D labels",
         "token_cache": str(token_cache),
         "s41_formula": "RMS(patch_token - patch_centroid) / RMS(patch_token)",
         "s41_interpretation": "Strength of encoder-perceived local spatial structure inside the tile.",

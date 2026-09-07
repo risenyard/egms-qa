@@ -26,7 +26,7 @@ masks, and tile identifiers. Add `--max-tiles 1` for a small check. GPU executio
 is recommended for the full collection.
 
 The Dataset also provides a precomputed token cache. After installing the
-Dataset with `egms_qa.release install`, the cache is available at
+Dataset with `egms_encoder.install_data`, the cache is available at
 `data/encoder/tokens/egms_tokens_10k.pt` for translator training and evaluation.
 
 ## Input requirements
@@ -60,25 +60,49 @@ coordinates.
 
 ## Reproduce training
 
-Download and install the Dataset, then obtain the encoder configuration and
-training recipe:
+The encoder provides a data installer that links the tiles, manifests, and
+token cache into its runtime paths. Download the Dataset and training files:
 
 ```bash
 hf download risenyard/egms-qa-dataset --repo-type dataset \
     --local-dir release/egms-qa-dataset
-python -m egms_qa.release install \
+python -m egms_encoder.install_data \
     --release-dir release/egms-qa-dataset --target-root .
 hf download risenyard/egms-qa-encoder --include '*.json' \
-    --local-dir release/egms-qa-encoder
-python -m egms_qa.reproduce encoder \
-    --model-dir release/egms-qa-encoder --output-dir outputs/encoder_pretrain
+    --local-dir data/encoder/checkpoint
+python -m egms_encoder.pretrain \
+    --output-dir outputs/my_encoder --device cuda:0
 ```
 
-The runner reads architecture and training settings from `config.json` and
-`training_args.json`, then starts training from scratch with the released
-train-fitted normalization. Add `--dry-run` to inspect the resolved command.
-The lower-level `egms_encoder.pretrain` entry point supports custom experiments
-and uses generic defaults.
+Training reads the architecture, recipe, and normalization from
+`data/encoder/checkpoint/`. It starts from scratch with the released
+train-fitted normalization. Command-line overrides support custom experiments.
+
+The output directory contains `best.safetensors` for inference, `latest.pt`
+for resuming training, and the corresponding `config.json`,
+`training_args.json`, and `normalization.json`. Resume with those files:
+
+```bash
+python -m egms_encoder.pretrain \
+    --model-config outputs/my_encoder/config.json \
+    --training-args outputs/my_encoder/training_args.json \
+    --normalization outputs/my_encoder/normalization.json \
+    --resume-from outputs/my_encoder/latest.pt \
+    --output-dir outputs/my_encoder --device cuda:0
+```
+
+To extract tokens with the trained encoder, pass its inference bundle and the
+installed data contract:
+
+```bash
+python -m egms_encoder.extract_tokens \
+    --checkpoint outputs/my_encoder/best.safetensors \
+    --model-config outputs/my_encoder/config.json \
+    --normalization outputs/my_encoder/normalization.json \
+    --manifest data/encoder/manifest/split.parquet \
+    --data-config data/encoder/manifest/data_config.json \
+    --output-dir outputs/my_tokens --device cuda:0
+```
 
 ## Architecture
 

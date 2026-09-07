@@ -37,7 +37,7 @@ def main() -> None:
     ap.add_argument("--out-path", default=str(OUT_PATH))
     args = ap.parse_args()
 
-    cache = torch.load(args.token_cache, map_location="cpu", weights_only=False)
+    cache = torch.load(args.token_cache, map_location="cpu", weights_only=True)
     counts = cache["point_count_per_bin"]
     tile_ids = [str(x) for x in cache["tile_ids"]]
     splits = [str(x) for x in cache["splits"]]

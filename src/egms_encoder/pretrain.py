@@ -9,6 +9,7 @@ to the configured time window (default 294). See `TileEncoder` for the model.
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import json
 import math
@@ -20,21 +21,32 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from safetensors.torch import save_file
 
+from egms_encoder.checkpoint import load_encoder_config, load_normalization
 from egms_encoder.data.tile_batching import iter_tile_batches
-from egms_encoder.data.tile_store import TileStore
+from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT, TileStore
 from egms_encoder.models.tile_encoder import TileEncoder
 
-STATIC_COLUMNS = [
-    "height", "rmse", "mean_velocity", "mean_velocity_std",
-    "acceleration", "acceleration_std", "seasonality", "seasonality_std",
-]
-FEATURE_COLUMNS = ["easting", "northing", *STATIC_COLUMNS]
+DEFAULT_MODEL_CONFIG = "data/encoder/checkpoint/config.json"
+DEFAULT_TRAINING_ARGS = "data/encoder/checkpoint/training_args.json"
 
 
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Encoder masked-reconstruction pretraining on the released 10k tile set.")
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="EGMS-QA Encoder masked-reconstruction pretraining."
+    )
     # Released tile data: split manifest + data config + normalization
+    p.add_argument(
+        "--model-config",
+        default=DEFAULT_MODEL_CONFIG,
+        help="Public encoder architecture config.json.",
+    )
+    p.add_argument(
+        "--training-args",
+        default=DEFAULT_TRAINING_ARGS,
+        help="Public training recipe training_args.json.",
+    )
     p.add_argument("--manifest", default="data/encoder/manifest/split.parquet",
                    help="Split manifest parquet (tile_id, path, split, ...).")
     p.add_argument("--data-config", default="data/encoder/manifest/data_config.json",
@@ -43,76 +55,287 @@ def parse_args() -> argparse.Namespace:
                    help="Precomputed normalization JSON (mean/std/residual_std).")
     p.add_argument("--output-dir", default="outputs/encoder_pretrain")
     # Tile parameters
-    p.add_argument("--tile-size", type=float, default=7000.0, help="Tile side length in metres")
-    p.add_argument("--min-tile-points", type=int, default=200, help="Discard tiles with fewer points")
-    p.add_argument("--max-tile-points", type=int, default=2048, help="Truncate tiles larger than this (dense attention is O(N^2))")
-    p.add_argument("--tiles-per-batch", type=int, default=16, help="Number of tiles per GPU batch")
+    p.add_argument(
+        "--max-tile-points",
+        type=int,
+        default=None,
+        help="Maximum points sampled from a tile; dense attention is O(N^2).",
+    )
+    p.add_argument(
+        "--tiles-per-batch",
+        type=int,
+        default=None,
+        help="Number of tiles per GPU batch.",
+    )
     # Model parameters
-    p.add_argument("--d-model", type=int, default=256)
-    p.add_argument("--num-layers", type=int, default=6)
-    p.add_argument("--num-heads", type=int, default=8)
-    p.add_argument("--dropout", type=float, default=0.1)
+    p.add_argument("--d-model", type=int, default=None)
+    p.add_argument("--num-layers", type=int, default=None)
+    p.add_argument("--num-heads", type=int, default=None)
+    p.add_argument("--dropout", type=float, default=None)
     p.add_argument("--input-length", type=int, default=None,
-                   help="Number of time steps to use; defaults to all metadata time columns")
+                   help="Number of time steps; defaults to config.json.")
     # Masking
-    p.add_argument("--mask-ratio", type=float, default=0.3)
-    p.add_argument("--mask-strategy", default="block", choices=["random", "block"])
-    p.add_argument("--sync-mask", dest="sync_mask", action=argparse.BooleanOptionalAction, default=True,
+    p.add_argument("--mask-ratio", type=float, default=None)
+    p.add_argument("--mask-strategy", default=None, choices=["random", "block"])
+    p.add_argument("--sync-mask", dest="sync_mask", action=argparse.BooleanOptionalAction, default=None,
                    help="Synchronized masking: all points in a tile share the same time mask. "
                         "Default: on. Disabling lets points 'borrow' masked-position values from "
                         "neighbors, which drops reconstruction loss but corrupts embedding quality "
                         "(experiments confirmed ACC probe R^2 collapsed from 0.84 to 0.45).")
-    p.add_argument("--mask-schedule", default="fixed", choices=["fixed", "short_mix"],
+    p.add_argument("--mask-schedule", default=None, choices=["fixed", "short_mix"],
                    help="training mask schedule; validation uses eval_mask_ratio")
-    p.add_argument("--eval-mask-ratio", type=float, default=0.30,
+    p.add_argument("--eval-mask-ratio", type=float, default=None,
                    help="fixed validation mask ratio")
-    p.add_argument("--patch-size", type=int, default=16, help="time patch size")
-    p.add_argument("--temporal-layers", type=int, default=2, help="temporal Transformer layers")
-    p.add_argument("--temporal-heads", type=int, default=4, help="temporal attention heads")
-    p.add_argument("--residual-loss-weight", type=float, default=0.0,
+    p.add_argument("--patch-size", type=int, default=None, help="Time patch size.")
+    p.add_argument("--temporal-layers", type=int, default=None)
+    p.add_argument("--temporal-heads", type=int, default=None)
+    p.add_argument("--residual-loss-weight", type=float, default=None,
                    help="residual auxiliary loss weight")
-    p.add_argument("--residual-consistency-weight", type=float, default=0.1,
+    p.add_argument("--residual-consistency-weight", type=float, default=None,
                    help="weight for final reconstruction residual consistency")
-    p.add_argument("--residual-head-mode", default="additive", choices=["additive", "aux_only"],
+    p.add_argument("--residual-head-mode", default=None, choices=["additive", "aux_only"],
                    help="add residual correction to reconstruction or train it only as an auxiliary head")
     p.add_argument("--coord-scale", type=float, default=None,
-                   help="Divide centered coords by this before coord_embedding (e.g. 3500 = tile half-width). "
-                        "None keeps unscaled raw-metre coordinates (~+-3700).")
+                   help="Positive coordinate divisor; defaults to config.json.")
     p.add_argument("--residual-head-lr", type=float, default=None,
                    help="optional learning rate for residual head parameters")
     p.add_argument("--init-from-checkpoint", default=None,
                    help="Warm-start compatible model weights without loading optimizer/scaler state")
-    p.add_argument("--point-sampling", default="uniform", choices=["uniform", "residual_weighted"],
+    p.add_argument("--point-sampling", default=None, choices=["uniform", "residual_weighted"],
                    help="point sampling strategy for oversized training tiles")
-    p.add_argument("--residual-sampling-alpha", type=float, default=0.5,
+    p.add_argument("--residual-sampling-alpha", type=float, default=None,
                    help="fraction of oversized tile points sampled by residual RMS")
     # Training
     p.add_argument("--max-steps", type=int, default=None)
     p.add_argument("--duration-hours", type=float, default=None)
-    p.add_argument("--lr", type=float, default=3e-4)
-    p.add_argument("--min-lr", type=float, default=3e-5)
-    p.add_argument("--lr-scheduler", default="cosine", choices=["none", "cosine"])
-    p.add_argument("--scheduler-total-steps", type=int, default=20000)
-    p.add_argument("--warmup-steps", type=int, default=1000)
-    p.add_argument("--weight-decay", type=float, default=1e-2)
-    p.add_argument("--precision", default="bf16", choices=["fp32", "bf16", "fp16"])
+    p.add_argument("--lr", type=float, default=None)
+    p.add_argument("--min-lr", type=float, default=None)
+    p.add_argument("--lr-scheduler", default=None, choices=["none", "cosine"])
+    p.add_argument("--scheduler-total-steps", type=int, default=None)
+    p.add_argument("--warmup-steps", type=int, default=None)
+    p.add_argument("--weight-decay", type=float, default=None)
+    p.add_argument("--precision", default=None, choices=["fp32", "bf16", "fp16"])
     p.add_argument("--device", default="cuda:0")
-    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--seed", type=int, default=None)
     # Validation (train/val/test split is precomputed in the manifest)
-    p.add_argument("--val-batches", type=int, default=16)
+    p.add_argument("--val-batches", type=int, default=None)
     p.add_argument(
         "--resample-val-batches",
         action="store_true",
         help="Draw a new, reproducible set of non-overlapping validation batches at each validation step.",
     )
-    p.add_argument("--val-every-steps", type=int, default=500)
-    p.add_argument("--val-seed", type=int, default=1729)
+    p.add_argument("--val-every-steps", type=int, default=None)
+    p.add_argument("--val-seed", type=int, default=None)
     # Logging / checkpointing
-    p.add_argument("--checkpoint-every-steps", type=int, default=1000)
-    p.add_argument("--log-every-steps", type=int, default=20)
-    p.add_argument("--train-window-steps", type=int, default=1000)
+    p.add_argument("--checkpoint-every-steps", type=int, default=None)
+    p.add_argument("--log-every-steps", type=int, default=None)
+    p.add_argument("--train-window-steps", type=int, default=None)
     p.add_argument("--resume-from", default=None)
-    return p.parse_args()
+    return p.parse_args(argv)
+
+
+def apply_release_config(
+    args: argparse.Namespace,
+    model_config: dict,
+    training_args: dict,
+) -> argparse.Namespace:
+    """Fill unspecified CLI options from the public model and training files."""
+    if training_args.get("schema_version") != "egms-qa-encoder-training-1.0":
+        raise ValueError("unsupported encoder training_args schema")
+    data = training_args["data"]
+    masking = training_args["masking"]
+    point_sampling = training_args["point_sampling"]
+    loss = training_args["loss"]
+    optimization = training_args["optimization"]
+    validation = training_args["validation"]
+    checkpointing = training_args.get("checkpointing", {})
+    if int(data["model_input_steps"]) != int(model_config["input_length"]):
+        raise ValueError("training_args model_input_steps does not match config.json")
+    strategy = str(masking["strategy"])
+    defaults = {
+        "max_tile_points": data["maximum_points_per_tile"],
+        "tiles_per_batch": optimization["tiles_per_batch"],
+        "d_model": model_config["d_model"],
+        "num_layers": model_config["spatial_layers"],
+        "num_heads": model_config["spatial_heads"],
+        "dropout": model_config["dropout"],
+        "input_length": model_config["input_length"],
+        "mask_ratio": masking["train_ratio"],
+        "mask_strategy": "block" if strategy == "synchronized_block" else strategy,
+        "sync_mask": strategy == "synchronized_block",
+        "mask_schedule": masking["schedule"],
+        "eval_mask_ratio": masking["evaluation_ratio"],
+        "patch_size": model_config["patch_size"],
+        "temporal_layers": model_config["temporal_layers"],
+        "temporal_heads": model_config["temporal_heads"],
+        "residual_loss_weight": loss["residual_loss_weight"],
+        "residual_consistency_weight": loss["residual_consistency_weight"],
+        "residual_head_mode": model_config["residual_head_mode"],
+        "coord_scale": model_config["coord_scale_m"],
+        "residual_head_lr": optimization["residual_head_learning_rate"],
+        "point_sampling": point_sampling["method"],
+        "residual_sampling_alpha": point_sampling["residual_sampling_alpha"],
+        "max_steps": optimization["maximum_steps"],
+        "lr": optimization["learning_rate"],
+        "min_lr": optimization["minimum_learning_rate"],
+        "lr_scheduler": optimization["scheduler"],
+        "scheduler_total_steps": optimization["scheduler_total_steps"],
+        "warmup_steps": optimization["warmup_steps"],
+        "weight_decay": optimization["weight_decay"],
+        "precision": optimization["precision"],
+        "seed": optimization["seed"],
+        "val_batches": validation["batches"],
+        "val_every_steps": validation["interval_steps"],
+        "val_seed": validation["seed"],
+        "checkpoint_every_steps": checkpointing.get("interval_steps", 5_000),
+        "log_every_steps": checkpointing.get("log_interval_steps", 200),
+        "train_window_steps": checkpointing.get("rolling_window_steps", 1_000),
+    }
+    for name, value in defaults.items():
+        if getattr(args, name) is None:
+            setattr(args, name, value)
+    return args
+
+
+def validate_training_args(args: argparse.Namespace) -> None:
+    positive = (
+        "max_tile_points", "tiles_per_batch", "d_model", "num_layers", "num_heads",
+        "patch_size", "temporal_layers", "temporal_heads", "max_steps",
+        "scheduler_total_steps", "val_batches", "checkpoint_every_steps",
+        "log_every_steps", "train_window_steps",
+    )
+    for name in positive:
+        if int(getattr(args, name)) <= 0:
+            raise ValueError(f"--{name.replace('_', '-')} must be positive")
+    for name in ("mask_ratio", "eval_mask_ratio", "residual_sampling_alpha"):
+        value = float(getattr(args, name))
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"--{name.replace('_', '-')} must be in [0,1]")
+    if float(args.coord_scale) <= 0:
+        raise ValueError("--coord-scale must be positive")
+    if float(args.lr) <= 0 or float(args.min_lr) < 0:
+        raise ValueError("learning rates must be non-negative and --lr must be positive")
+
+
+def resolved_model_config(model_config: dict, args: argparse.Namespace) -> dict:
+    """Return the inference config that exactly matches the effective model."""
+    resolved = copy.deepcopy(model_config)
+    resolved.update(
+        {
+            "input_length": int(args.input_length),
+            "patch_size": int(args.patch_size),
+            "d_model": int(args.d_model),
+            "temporal_layers": int(args.temporal_layers),
+            "temporal_heads": int(args.temporal_heads),
+            "spatial_layers": int(args.num_layers),
+            "spatial_heads": int(args.num_heads),
+            "dropout": float(args.dropout),
+            "coord_scale_m": float(args.coord_scale),
+            "residual_head_mode": str(args.residual_head_mode),
+        }
+    )
+    return resolved
+
+
+def resolved_training_recipe(training_args: dict, args: argparse.Namespace) -> dict:
+    """Return the public training schema with all CLI overrides applied."""
+    resolved = copy.deepcopy(training_args)
+    resolved.pop("checkpoint_selection", None)
+    resolved["data"].update(
+        {
+            "model_input_steps": int(args.input_length),
+            "maximum_points_per_tile": int(args.max_tile_points),
+        }
+    )
+    strategy = (
+        "synchronized_block"
+        if args.mask_strategy == "block" and args.sync_mask
+        else str(args.mask_strategy)
+    )
+    resolved["masking"].update(
+        {
+            "strategy": strategy,
+            "train_ratio": float(args.mask_ratio),
+            "evaluation_ratio": float(args.eval_mask_ratio),
+            "schedule": str(args.mask_schedule),
+        }
+    )
+    resolved["point_sampling"].update(
+        {
+            "method": str(args.point_sampling),
+            "residual_sampling_alpha": float(args.residual_sampling_alpha),
+        }
+    )
+    resolved["loss"].update(
+        {
+            "residual_loss_weight": float(args.residual_loss_weight),
+            "residual_consistency_weight": float(args.residual_consistency_weight),
+        }
+    )
+    resolved["optimization"].update(
+        {
+            "maximum_steps": int(args.max_steps),
+            "tiles_per_batch": int(args.tiles_per_batch),
+            "learning_rate": float(args.lr),
+            "minimum_learning_rate": float(args.min_lr),
+            "residual_head_learning_rate": float(args.residual_head_lr),
+            "scheduler": str(args.lr_scheduler),
+            "scheduler_total_steps": int(args.scheduler_total_steps),
+            "warmup_steps": int(args.warmup_steps),
+            "weight_decay": float(args.weight_decay),
+            "precision": str(args.precision),
+            "seed": int(args.seed),
+        }
+    )
+    resolved["validation"].update(
+        {
+            "batches": int(args.val_batches),
+            "interval_steps": int(args.val_every_steps),
+            "seed": int(args.val_seed),
+        }
+    )
+    resolved.setdefault("checkpointing", {}).update(
+        {
+            "interval_steps": int(args.checkpoint_every_steps),
+            "log_interval_steps": int(args.log_every_steps),
+            "rolling_window_steps": int(args.train_window_steps),
+        }
+    )
+    return resolved
+
+
+def write_inference_bundle_metadata(
+    output_dir: Path,
+    model_config: dict,
+    training_args: dict,
+    normalizer: dict,
+    args: argparse.Namespace,
+) -> None:
+    """Write configs that can be reused directly by token extraction."""
+    payloads = {
+        "config.json": resolved_model_config(model_config, args),
+        "training_args.json": resolved_training_recipe(training_args, args),
+        "normalization.json": normalizer,
+        "run_args.json": vars(args),
+    }
+    for filename, payload in payloads.items():
+        with (output_dir / filename).open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+
+
+def save_inference_state(path: Path, state: dict[str, torch.Tensor]) -> None:
+    """Save a pure model state in the public Safetensors format."""
+    tensors = {
+        key: value.detach().cpu().contiguous()
+        for key, value in state.items()
+    }
+    save_file(tensors, str(path), metadata={"model_type": "egms_encoder"})
+
+
+def save_inference_weights(path: Path, model: TileEncoder) -> None:
+    """Save the current model for strict inference loading."""
+    save_inference_state(path, model.state_dict())
 
 
 def collect_validation_batches(args, tile_store, rng, *, resampled: bool) -> list[dict]:
@@ -122,7 +345,7 @@ def collect_validation_batches(args, tile_store, rng, *, resampled: bool) -> lis
         rng=rng,
         max_batches=None if resampled else args.val_batches,
         max_points=args.max_tile_points,
-        feature_columns_count=len(FEATURE_COLUMNS), input_length=args.input_length,
+        feature_columns_count=FEATURE_COLUMNS_COUNT, input_length=args.input_length,
         point_sampling="uniform", residual_sampling_alpha=args.residual_sampling_alpha,
     )
     if resampled:
@@ -136,6 +359,19 @@ def validation_tile_ids(val_batches) -> list[int]:
 
 def main() -> None:
     args = parse_args()
+    model_config_path = Path(args.model_config)
+    if not model_config_path.is_file():
+        raise FileNotFoundError(
+            f"Encoder config not found: {model_config_path}. "
+            "Download risenyard/egms-qa-encoder into data/encoder/checkpoint first."
+        )
+    training_args_path = Path(args.training_args)
+    if not training_args_path.is_file():
+        raise FileNotFoundError(f"Training recipe not found: {training_args_path}")
+    model_config = load_encoder_config(model_config_path)
+    training_args = json.loads(training_args_path.read_text(encoding="utf-8"))
+    args = apply_release_config(args, model_config, training_args)
+    validate_training_args(args)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
@@ -145,23 +381,11 @@ def main() -> None:
     # Load data via TileStore
     tile_store = TileStore.from_manifest(args.manifest, args.data_config)
     configured_input_length = tile_store.time_window.input_length
-    if args.input_length is None:
-        args.input_length = configured_input_length
-    elif args.input_length > configured_input_length:
+    if args.input_length != configured_input_length:
         raise ValueError(
-            f"Requested input_length={args.input_length} exceeds the configured window "
-            f"{configured_input_length}"
+            f"Model input_length={args.input_length} does not match the data contract "
+            f"({configured_input_length})"
         )
-    elif args.input_length < configured_input_length:
-        print(
-            f"NOTE: --input-length={args.input_length} < the configured window "
-            f"{configured_input_length} "
-            f"(trailing steps will be unused)",
-            flush=True,
-        )
-    with (output_dir / "training_args.json").open("w", encoding="utf-8") as f:
-        json.dump(vars(args), f, indent=2, sort_keys=True)
-
     train_indices = tile_store.split_tile_indices("train")
     val_indices = tile_store.split_tile_indices("val")
     test_indices = tile_store.split_tile_indices("test")
@@ -172,11 +396,11 @@ def main() -> None:
     )
 
     # Load precomputed normalization (skip the fit step)
-    with open(args.normalization) as f:
-        normalizer = json.load(f)
+    normalizer = load_normalization(args.normalization)
     normalizer.pop("_meta", None)  # strip annotation block before passing into trainer
-    with (output_dir / "normalization.json").open("w", encoding="utf-8") as f:
-        json.dump(normalizer, f, indent=2)
+    write_inference_bundle_metadata(
+        output_dir, model_config, training_args, normalizer, args
+    )
     print(
         f"normalizer: mean={normalizer['mean']:.6f} std={normalizer['std']:.6f} "
         f"residual_std={normalizer.get('residual_std',1.0):.6f}",
@@ -197,10 +421,12 @@ def main() -> None:
     step = 0
     epoch = 0
     best_val_loss = float("inf")
+    best_weights_path = output_dir / "best.safetensors"
+    best_weights_ready = bool(args.resume_from and best_weights_path.is_file())
     resume_elapsed_hours = 0.0
     resume_train_losses: list[float] = []
     if args.resume_from:
-        checkpoint = torch.load(args.resume_from, map_location=device)
+        checkpoint = torch.load(args.resume_from, map_location=device, weights_only=True)
         model.load_state_dict(checkpoint["model"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         if "scaler" in checkpoint:
@@ -275,7 +501,7 @@ def main() -> None:
                 split="train",
                 rng=data_rng,
                 max_points=args.max_tile_points,
-                feature_columns_count=len(FEATURE_COLUMNS), input_length=args.input_length,
+                feature_columns_count=FEATURE_COLUMNS_COUNT, input_length=args.input_length,
                 point_sampling=args.point_sampling, residual_sampling_alpha=args.residual_sampling_alpha,
             )
 
@@ -320,6 +546,8 @@ def main() -> None:
                     if val_metrics["loss"] < best_val_loss:
                         best_val_loss = val_metrics["loss"]
                         save_checkpoint(output_dir / "best.pt", model, optimizer, scaler, args, step, epoch, best_val_loss)
+                        save_inference_weights(best_weights_path, model)
+                        best_weights_ready = True
 
                 writer.writerow(row)
                 if step % args.log_every_steps == 0:
@@ -355,9 +583,27 @@ def main() -> None:
                     break
 
     save_checkpoint(output_dir / "latest.pt", model, optimizer, scaler, args, step, epoch, best_val_loss)
+    best_checkpoint_path = output_dir / "best.pt"
+    if not best_checkpoint_path.is_file():
+        save_checkpoint(
+            best_checkpoint_path,
+            model,
+            optimizer,
+            scaler,
+            args,
+            step,
+            epoch,
+            best_val_loss,
+        )
+    if not best_weights_ready:
+        best_checkpoint = torch.load(
+            best_checkpoint_path, map_location="cpu", weights_only=True
+        )
+        save_inference_state(best_weights_path, best_checkpoint["model"])
     print(f"Training complete: {step} steps, best_val_loss={best_val_loss:.6f}")
     print(f"wrote {metrics_path}")
     print(f"wrote {output_dir / 'latest.pt'}")
+    print(f"wrote {best_weights_path}")
 
 
 def build_model(args, normalizer):
@@ -623,8 +869,8 @@ def evaluate(args, model, val_batches, device, normalizer):
     model.eval()
     total_se, total_ae, total_residual_se, total_base_se = 0.0, 0.0, 0.0, 0.0
     total_residual_head_se, total_weighted_loss, count = 0.0, 0.0, 0
+    rng = np.random.default_rng(args.val_seed)
     for tile_batch in val_batches:
-        rng = np.random.default_rng(args.val_seed)
         series, coords, pmask, loss_mask, target = prepare_batch(
             tile_batch, args, rng, normalizer, device, is_eval=True,
         )
@@ -660,71 +906,6 @@ def evaluate(args, model, val_batches, device, normalizer):
         "global_rmse": rmse,
         "global_mae": mae,
     }
-
-
-def fit_tile_normalizer(tile_store, args):
-    """Compute global mean/std from training tiles."""
-    train_indices = tile_store.split_tile_indices("train")
-    total, sq_total, residual_sq_total, count, residual_count = 0.0, 0.0, 0.0, 0, 0
-    fc = len(FEATURE_COLUMNS)
-    for idx in train_indices:
-        tile = tile_store.get_tile(int(idx))
-        series = tile[:, fc : fc + args.input_length]
-        finite = np.isfinite(series)
-        vals = np.where(finite, series, 0.0).astype(np.float64)
-        n = int(finite.sum())
-        total += float(vals.sum())
-        sq_total += float((vals ** 2).sum())
-        count += n
-        res_sq, res_count = residual_sum_squares_np(series)
-        residual_sq_total += res_sq
-        residual_count += res_count
-    if count == 0:
-        return None
-    mean = total / count
-    std = max(math.sqrt(sq_total / count - mean * mean), 1e-6)
-    normalizer = {"mean": float(mean), "std": float(std), "count": count}
-    if residual_count > 0:
-        residual_raw_std = max(math.sqrt(residual_sq_total / residual_count), 1e-6)
-        normalizer["residual_std"] = float(residual_raw_std / std)
-        normalizer["residual_raw_std"] = float(residual_raw_std)
-        normalizer["residual_count"] = int(residual_count)
-    print(
-        f"fitted tile normalizer: mean={mean:.6f} std={std:.6f} "
-        f"residual_std={normalizer.get('residual_std', 1.0):.6f} from {count:,} values",
-        flush=True,
-    )
-    return normalizer
-
-
-def residual_sum_squares_np(series: np.ndarray) -> tuple[float, int]:
-    """Sum squared linear-detrended residuals for raw series values."""
-    values = series.astype(np.float64, copy=False)
-    finite = np.isfinite(values)
-    counts = finite.sum(axis=1)
-    valid = counts > 1
-    if not valid.any():
-        return 0.0, 0
-
-    t = np.linspace(-1.0, 1.0, values.shape[1], dtype=np.float64)
-    sub = values[valid]
-    sub_finite = finite[valid]
-    sub_counts = counts[valid].astype(np.float64)
-    y_sum = np.where(sub_finite, sub, 0.0).sum(axis=1, keepdims=True)
-    t_sum = np.where(sub_finite, t, 0.0).sum(axis=1, keepdims=True)
-    y_mean = y_sum / sub_counts[:, None]
-    t_mean = t_sum / sub_counts[:, None]
-    centered_t = np.where(sub_finite, t - t_mean, 0.0)
-    centered_y = np.where(sub_finite, sub - y_mean, 0.0)
-    denom = np.square(centered_t).sum(axis=1, keepdims=True)
-    slope = np.divide(
-        (centered_y * centered_t).sum(axis=1, keepdims=True),
-        denom,
-        out=np.zeros_like(denom),
-        where=denom > 1e-12,
-    )
-    residual = np.where(sub_finite, sub - (y_mean + slope * (t - t_mean)), 0.0)
-    return float(np.square(residual).sum()), int(sub_counts.sum())
 
 
 def get_lr(args, step):
