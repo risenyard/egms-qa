@@ -30,7 +30,7 @@ provides the prepared tiles and precomputed tokens.
 |---|---|
 | Try the released encoder | [Install the code](#installation), then [extract tokens](#extract-tokens) |
 | Train an encoder | [Reproduce training](#reproduce-training) |
-| Use your own tiles or checkpoint | [Use local inputs](#use-local-inputs) |
+| Use your own tiles or checkpoint | [Input requirements](#Input-requirements), [Use local inputs](#use-local-inputs) |
 | Inspect the released model | Hugging Face [files](https://huggingface.co/risenyard/egms-qa-encoder#files) and [evaluation](https://huggingface.co/risenyard/egms-qa-encoder#evaluation) |
 
 ## Installation
