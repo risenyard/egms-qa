@@ -70,15 +70,34 @@ For another compatible local NPZ collection, provide `--checkpoint`,
 `--data-config`. Use `--source-tiles-root` when manifest paths are relative to a
 separate tile root.
 
+Compatibility requires consistent displacement units (mm), vertical component,
+temporal sampling and preprocessing, and metric point coordinates appropriate
+for the 7 km tile geometry. Having 294 columns alone does not establish this.
+Keep the released normalization when applying the released frozen encoder;
+do not refit it on each inference collection. Distribution shifts require
+validation. For a new encoder trained on another corpus, fit normalization on
+that corpus's training split and pair it with the new checkpoint. Auxiliary
+NPZ fields can affect QA construction even though encoder inference uses
+displacement histories and coordinates.
+
 The released token cache (`data/encoder/tokens/egms_tokens_10k.pt`) lets you
 skip this step and train/evaluate the translator directly. Encoder provenance is
 documented in the
 [dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset) and
 [encoder card](https://huggingface.co/risenyard/egms-qa-encoder).
 
-To pretrain, first install the structured Dataset into its documented local
-runtime paths as described in the top-level README, then run:
+To reproduce the published encoder training recipe, first install the Dataset
+as described in the top-level README, then download the model configuration
+and run the recipe. The runner reads architecture, masking, sampling, loss,
+optimizer, and validation settings from the downloaded JSON files:
 
 ```bash
-python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
+hf download risenyard/egms-qa-encoder --include '*.json' \
+    --local-dir release/egms-qa-encoder
+python -m egms_qa.reproduce encoder \
+    --model-dir release/egms-qa-encoder --output-dir outputs/encoder_pretrain
 ```
+
+Add `--dry-run` to inspect the resolved command. This starts training from
+scratch; weights from the released encoder are not loaded. The generic
+`egms_encoder.pretrain` defaults are not the published training recipe.

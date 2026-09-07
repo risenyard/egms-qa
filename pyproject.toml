@@ -25,8 +25,8 @@ tasks = [
 ]
 # Translator training / evaluation on host language models.
 translator = [
-  "transformers>=4.40",
-  "peft>=0.10",
+  "transformers>=5.5.3,<6",
+  "peft>=0.18.1,<1",
   "accelerate>=0.28",
   "bitsandbytes>=0.43",
   "quantulum3>=0.10,<0.11",

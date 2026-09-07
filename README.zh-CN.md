@@ -47,10 +47,12 @@ datasheet 记录在 [`src/egms_qa/qa_construction/README.md`](src/egms_qa/qa_con
 ## 结果(留出测试集)
 
 冻结编码器对被掩盖区间的重建 RMSE 为 1.510 mm,接近源产品的残差噪声。四个宿主模型
-(Qwen、Gemma、Llama、Mistral)以相同配方训练后,数值任务平均 R² 最高达 0.778,
+(Qwen、Gemma、Llama、Mistral)以各自的训练日程训练后,数值任务平均 R² 最高达 0.778,
 分类任务平衡准确率最高达 0.777,对超范围问题接近满分拒答;在打乱 token 的对照下退化
 到接近随机——说明答案确实依赖于所给瓦片。用
-`python -m egms_qa.translator.summarize_results` 可重新生成完整结果表。
+完成四个模型的评测后，用
+`python -m egms_qa.translator.summarize_results --evaluation-root outputs/evaluation`
+可重新生成完整结果表。
 
 ## 安装
 
@@ -114,7 +116,8 @@ Ortho Vertical 产品的修改与重打包衍生物(© European Union, Copernicu
 
 ```bash
 # 0.(可选)从安装好的 NPZ tile store 重训冻结编码器
-python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
+python -m egms_qa.reproduce encoder \
+    --model-dir data/encoder/checkpoint --output-dir outputs/encoder_pretrain
 
 # 1. token:使用下载缓存,或从 NPZ tile store 提取
 python -m egms_encoder.extract_tokens --output-dir outputs/tokens
@@ -123,16 +126,22 @@ python -m egms_encoder.extract_tokens --output-dir outputs/tokens
 python -m egms_qa.qa_construction.build_labels
 python -m egms_qa.qa_construction.generate_qa --out-dir outputs/qa
 
-# 3. 训练并评测一个宿主模型
-python -m egms_qa.translator.train --host-model Qwen/Qwen3.5-9B \
-    --token-cache data/encoder/tokens/egms_tokens_10k.pt --output-dir outputs/runs/qwen
-python -m egms_qa.translator.evaluate --adapter-dir outputs/runs/qwen/best --split test
+# 3. 按完整配方从宿主基座模型训练
+pip install -e '.[translator]'
+python -m egms_qa.reproduce translator \
+    --variant-dir outputs/runs/qwen --output-dir outputs/training/qwen
 
-# 4. 四模型汇总报告
-python -m egms_qa.translator.summarize_results
+# 4. 在报告采用的 71 个任务上评测下载的发布权重
+python -m egms_qa.reproduce evaluate --variant-dir outputs/runs/qwen \
+    --evaluation-config outputs/runs/evaluation_config.json \
+    --output-dir outputs/evaluation/qwen
 ```
 
-`pytest` 运行答案提取器的测试。
+加 `--dry-run` 可查看完整命令。配方读取 HF 中的当前配置，通用入口的默认
+参数不等于发布配方。评测新训练的模型时，将 `--variant-dir` 指向最后一个
+训练阶段的 `best/`。报告使用 71 个任务，训练仍保留完整的 78 个任务。
+
+`pytest` 运行接口和答案提取器测试。
 
 ## 许可
 

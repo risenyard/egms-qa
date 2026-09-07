@@ -15,7 +15,9 @@ where <model> is one of qwen, gemma, llama, mistral.
 from __future__ import annotations
 
 import csv
+import argparse
 import json
+from pathlib import Path
 from statistics import mean
 
 from egms_qa.paths import OUTPUTS_DIR, HOST_MODELS
@@ -56,17 +58,22 @@ def summarize(data: dict) -> dict:
     }
 
 
-def load_run(key: str) -> dict:
-    path = RUNS_ROOT / key / "generation_eval" / "test_normal_summary.json"
+def load_run(key: str, evaluation_root: Path | None = None) -> dict:
+    path = (evaluation_root / key / 'metrics.json' if evaluation_root is not None
+            else RUNS_ROOT / key / "generation_eval" / "test_normal_summary.json")
     if not path.is_file():
         raise FileNotFoundError(path)
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--evaluation-root', type=Path,
+                        help='Directory containing <variant>/metrics.json from the reproduction runner.')
+    args = parser.parse_args()
     data = {}
     for name, key in MODELS.items():
-        raw = load_run(key)
+        raw = load_run(key, args.evaluation_root)
         data[name] = {"raw": raw, "summary": summarize(raw)}
 
     task_ids = next(iter(data.values()))["raw"]["task_ids"]

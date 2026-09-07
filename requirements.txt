@@ -10,8 +10,8 @@ torch>=2.1
 scipy>=1.10
 
 # Translator training / evaluation on host language models
-transformers>=4.40
-peft>=0.10
+transformers>=5.5.3,<6
+peft>=0.18.1,<1
 accelerate>=0.28
 bitsandbytes>=0.43
 quantulum3>=0.10,<0.11
