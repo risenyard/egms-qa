@@ -16,22 +16,21 @@ Translator 通过投影器与 LoRA 适配宿主语言模型，使其根据冻结
 
 ![EGMS-QA 总体框架](docs/assets/egms-framework.png)
 
-## 代码与模型
 
-| 模块 | 指南 | 发布产物 |
-|---|---|---|
-| Encoder | [编码瓦片与复现预训练](src/egms_encoder/README.md) | [权重、归一化参数与训练配方](https://huggingface.co/risenyard/egms-qa-encoder) |
-| QA construction | [生成问答与查看任务目录](src/egms_qa/qa_construction/README.md) | [瓦片、tokens、标签、QA split 与参考值表](https://huggingface.co/datasets/risenyard/egms-qa-dataset) |
-| Translator | [训练与评测宿主语言模型](src/egms_qa/translator/README.md) | [四套投影器与 LoRA 模型](https://huggingface.co/risenyard/egms-qa-translator) |
+## 模块
 
-GitHub 提供代码，Hugging Face 提供数据、权重与训练配方，集中于
+三个模块指南分别提供数据安装、训练与评测命令。对应的数据、权重与配方集中于
 [EGMS-QA Collection](https://huggingface.co/collections/risenyard/egms-qa)。
-各模块指南包含数据安装、训练、评测和输出文件说明。
+
+| 模块 | 代码与指南 | Hugging Face 发布内容 |
+|---|---|---|
+| Encoder | [预训练与 token 提取](src/egms_encoder/README.md) | [编码器权重、配置与归一化参数](https://huggingface.co/risenyard/egms-qa-encoder) |
+| QA construction | [任务定义与 QA 生成](src/egms_qa/qa_construction/README.md) | [源瓦片、tokens、标签、参考值表与 QA 记录](https://huggingface.co/datasets/risenyard/egms-qa-dataset) |
+| Translator | [语言模型适配与评测](src/egms_qa/translator/README.md) | [Qwen、Gemma、Llama 和 Mistral 四个版本](https://huggingface.co/risenyard/egms-qa-translator) |
 
 ## 安装
 
-环境要求 Python 3.10 或更高版本。从仓库根目录安装 encoder、QA construction
-和 translator 共用的代码包：
+环境要求 Python 3.10 或更高版本。从源码安装三个模块共用的代码包：
 
 ```bash
 git clone https://github.com/risenyard/egms-qa
@@ -39,27 +38,39 @@ cd egms-qa
 pip install -e .
 ```
 
-基础安装支持 encoder 工作流、标签聚合与 QA 渲染。计算任务参考值或训练、评测
-宿主模型时，安装相应的可选依赖：
+基础安装支持 encoder 工作流、标签聚合与 QA 渲染。其他工作流使用对应的可选依赖：
 
 ```bash
 pip install -e '.[tasks]'        # QA 任务参考值计算
 pip install -e '.[translator]'   # Translator 训练与评测
 ```
 
-[Encoder 指南](src/egms_encoder/README.md)介绍预训练与 token 提取，
-[QA 构建指南](src/egms_qa/qa_construction/README.md)介绍任务参考值、标签和问答记录，
-[Translator 指南](src/egms_qa/translator/README.md)介绍语言模型适配与评测。
-各指南列明所需的 HF 发布文件与运行命令。
-
 标签聚合、QA 渲染和少量 encoder 检查可在 CPU 上运行。Encoder 训练与完整集合
-的 token 提取建议使用 GPU，translator 训练与评测需要 CUDA。发布数据集包含
-参考值表、标签、QA 记录及预计算 tokens，可直接用于基于发布产物的工作流。
+的 token 提取建议使用 GPU，translator 训练与评测需要 CUDA。按上方模块指南
+下载所需产物，并从仓库根目录运行各工作流。
+
+## 数据集
+
+发布数据包含 EGMS Level-3 Ortho Vertical 产品 2019–2023 参考期内的
+10,000 个重叠 7 km 瓦片。每个瓦片以 `[N,294]` 数组存储位移历史，固定瓦片级
+划分为 8,000 个训练瓦片、1,000 个验证瓦片和 1,000 个测试瓦片。
+
+QA construction 定义 78 个任务，覆盖观测质量、运动特征、空间组织、时间动态、
+表示属性和拒答边界。参考值表与标签提供生成问答记录所需的目标值。
+训练保留完整任务目录。
+
+发布数据集包含源瓦片、预计算 encoder tokens、参考值表、标签和 QA split，
+支持三个模块的直接使用与复现。
+[数据集卡片](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
+说明文件布局和数据契约。
 
 ## 评测
 
 编码器评测衡量掩码区间的重建误差。Translator 评测分别衡量数值答案、类别答案，
 以及对超范围问题的拒答。
+
+Translator 报告采用 1,000 个测试瓦片上的 71 个任务，分别对 29 个数值任务的 R²、
+28 个分类任务和 14 个拒答任务的平衡准确率取宏平均。
 
 | 模型 | 评测 | 报告结果 |
 |---|---|---|
@@ -67,23 +78,17 @@ pip install -e '.[translator]'   # Translator 训练与评测
 | Mistral translator | 数值答案 | 平均 R² 为 0.778 |
 | Llama translator | 类别答案 | 平均平衡准确率为 0.777 |
 
-Translator 协议采用 1,000 个测试瓦片上的 71 个任务，分别对 29 个数值任务的 R²、
-28 个分类任务和 14 个拒答任务的平衡准确率取宏平均。表中的 Mistral 和 Llama
-分别取得四个版本中这两类答案的最高平均指标。完整结果与协议设置见
-[模型卡](https://huggingface.co/risenyard/egms-qa-translator)。
-
-## 数据集
-
-数据集包含 10,000 个可直接输入模型的瓦片，位移数组形状为 `[N,294]`，固定
-train/validation/test 划分为 8,000/1,000/1,000。训练使用完整的 78 个任务。
-[QA 构建指南](src/egms_qa/qa_construction/README.md)提供任务定义和记录说明。
+表中的 Mistral 和 Llama 分别取得四个版本中对应答案类型的最高平均指标。
+完整结果与协议设置见 [Encoder](https://huggingface.co/risenyard/egms-qa-encoder)
+和 [Translator](https://huggingface.co/risenyard/egms-qa-translator) 模型卡。
 
 ## 适用范围
 
-新数据集合需满足[编码器输入要求](src/egms_encoder/README.md#input-requirements)。
-使用发布的冻结 checkpoint 时保留其配套 normalization；在另一语料上训练新
-encoder 时，仅用新语料的训练集拟合 normalization。官方产品下载与数据准备
-需要单独的工作流。
+代码使用已准备好的 EGMS-QA 瓦片。新数据集合需满足
+[编码器输入要求](src/egms_encoder/README.md#input-requirements)，包括位移单位、
+分量、时间采样与坐标几何。使用发布的冻结 checkpoint 时保留其配套 normalization；
+在另一语料上训练新 encoder 时，仅用新语料的训练集拟合 normalization。
+官方产品下载与数据准备需要单独的工作流。
 
 EGMS-QA 描述已观测的形变历史。答案不用于确定成因、预测未来运动或认证结构安全。
 
@@ -96,5 +101,5 @@ EGMS-QA 描述已观测的形变历史。答案不用于确定成因、预测未
 ## 许可
 
 代码采用 [MIT License](LICENSE)，EGMS-QA 创建的数据与模型产物采用 CC-BY-4.0。
-重打包的 EGMS Level-3 Ortho Vertical 测量保留 Copernicus Land Monitoring Service
-的来源标注与修改说明要求，详见 [DATA_LICENSE](DATA_LICENSE)。
+重打包的 EGMS 测量保留 Copernicus Land Monitoring Service 的来源标注与修改说明
+要求，详见 [DATA_LICENSE](DATA_LICENSE)。
