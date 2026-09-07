@@ -1,7 +1,7 @@
 """EGMS-QA token extraction with the EGMS encoder on Europe-wide 10k tiles.
 
-Applies the frozen encoder and ViT-style 65-token pooling (CLS + 8x8 spatial
-bins) over the per-tile point histories in the TileStore.
+Applies the frozen encoder and 65-token pooling (one tile summary plus an 8x8
+spatial grid) over the per-tile point histories in the TileStore.
 
 Output
 ------
@@ -21,42 +21,174 @@ import argparse
 import datetime as dt
 import json
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
 
 
-# The encoder package (egms_encoder) is installed. The checkpoint, split manifest,
-# data config and processed source tiles all ship with the release (see the data repo);
-# the split manifest's tile paths are relative, so run from the checkout root.
 from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
-from egms_qa.paths import (
-    ENCODER_CKPT,
-    ENCODER_CONFIG,
-    ENCODER_NORMALIZATION,
-    SPLIT_MANIFEST,
-)
 
 TILE_SIZE = 7000.0
 GRID = 8
+DEFAULT_ENCODER_REPO = "risenyard/egms-qa-encoder"
+DEFAULT_DATASET_REPO = "risenyard/egms-qa-dataset"
 
 
-def parse_args():
-    p = argparse.ArgumentParser()
-    p.add_argument("--checkpoint", default=str(ENCODER_CKPT))
-    p.add_argument("--model-config", default=str(ENCODER_CONFIG))
-    p.add_argument("--normalization", default=str(ENCODER_NORMALIZATION))
-    p.add_argument("--manifest", default=str(SPLIT_MANIFEST))
-    p.add_argument("--data-config",
-                   default=str(SPLIT_MANIFEST.parent / "data_config.json"))
+@dataclass(frozen=True)
+class EncoderInputs:
+    checkpoint: Path
+    model_config: Path
+    normalization: Path
+    repository: str | None
+    revision: str | None
+
+
+@dataclass(frozen=True)
+class DatasetInputs:
+    manifest: Path
+    data_config: Path
+    source_tiles_root: Path | None
+    repository: str | None
+    revision: str | None
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Download the published EGMS-QA artifacts and extract pooled tokens."
+    )
+    p.add_argument("--encoder-repo", default=DEFAULT_ENCODER_REPO)
+    p.add_argument("--encoder-revision", default="main")
+    p.add_argument("--dataset-repo", default=DEFAULT_DATASET_REPO)
+    p.add_argument("--dataset-revision", default="main")
+    p.add_argument("--cache-dir", default=None)
+    p.add_argument(
+        "--checkpoint",
+        default="",
+        help="Local override for encoder.safetensors; requires --model-config and --normalization.",
+    )
+    p.add_argument("--model-config", default="")
+    p.add_argument("--normalization", default="")
+    p.add_argument(
+        "--manifest",
+        default="",
+        help="Local override for split.parquet; requires --data-config.",
+    )
+    p.add_argument("--data-config", default="")
+    p.add_argument(
+        "--source-tiles-root",
+        default="",
+        help="Optional local root containing the manifest's source tile paths.",
+    )
     p.add_argument("--output-dir", default="outputs/tokens")
+    p.add_argument("--output-name", default="")
     p.add_argument("--grid", type=int, default=GRID)
     p.add_argument("--tile-size", type=float, default=TILE_SIZE)
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--max-tiles", type=int, default=None)
     p.add_argument("--log-every", type=int, default=500)
-    return p.parse_args()
+    return p.parse_args(argv)
+
+
+def resolve_encoder_inputs(args: argparse.Namespace) -> EncoderInputs:
+    local_values = (args.checkpoint, args.model_config, args.normalization)
+    if any(local_values):
+        if not all(local_values):
+            raise ValueError(
+                "Local encoder overrides require --checkpoint, --model-config, "
+                "and --normalization together."
+            )
+        return EncoderInputs(
+            checkpoint=Path(args.checkpoint),
+            model_config=Path(args.model_config),
+            normalization=Path(args.normalization),
+            repository=None,
+            revision=None,
+        )
+
+    from huggingface_hub import HfApi, hf_hub_download
+
+    revision = HfApi().model_info(
+        args.encoder_repo,
+        revision=args.encoder_revision,
+    ).sha
+    def download(filename: str) -> Path:
+        return Path(hf_hub_download(
+            repo_id=args.encoder_repo,
+            filename=filename,
+            revision=revision,
+            cache_dir=args.cache_dir,
+        ))
+    return EncoderInputs(
+        checkpoint=download("encoder.safetensors"),
+        model_config=download("config.json"),
+        normalization=download("normalization.json"),
+        repository=args.encoder_repo,
+        revision=revision,
+    )
+
+
+def resolve_dataset_inputs(args: argparse.Namespace) -> DatasetInputs:
+    local_values = (args.manifest, args.data_config)
+    if any(local_values) or args.source_tiles_root:
+        if not all(local_values):
+            raise ValueError(
+                "Local dataset overrides require --manifest and --data-config together."
+            )
+        return DatasetInputs(
+            manifest=Path(args.manifest),
+            data_config=Path(args.data_config),
+            source_tiles_root=(Path(args.source_tiles_root) if args.source_tiles_root else None),
+            repository=None,
+            revision=None,
+        )
+
+    from huggingface_hub import HfApi, hf_hub_download, snapshot_download
+
+    revision = HfApi().dataset_info(
+        args.dataset_repo,
+        revision=args.dataset_revision,
+    ).sha
+    manifest = Path(hf_hub_download(
+        repo_id=args.dataset_repo,
+        repo_type="dataset",
+        filename="metadata/split_manifest.parquet",
+        revision=revision,
+        cache_dir=args.cache_dir,
+    ))
+    data_config = Path(hf_hub_download(
+        repo_id=args.dataset_repo,
+        repo_type="dataset",
+        filename="metadata/data_config.json",
+        revision=revision,
+        cache_dir=args.cache_dir,
+    ))
+    if args.max_tiles is None:
+        tile_patterns = ["artifacts/source_tiles/**/*.npz"]
+    else:
+        if args.max_tiles <= 0:
+            raise ValueError("--max-tiles must be positive")
+        manifest_rows = pd.read_parquet(manifest, columns=["path"])
+        tile_patterns = [
+            _published_tile_repo_path(value).as_posix()
+            for value in manifest_rows["path"].iloc[: args.max_tiles]
+        ]
+    snapshot = Path(snapshot_download(
+        repo_id=args.dataset_repo,
+        repo_type="dataset",
+        revision=revision,
+        cache_dir=args.cache_dir,
+        allow_patterns=tile_patterns,
+    ))
+    return DatasetInputs(
+        manifest=manifest,
+        data_config=data_config,
+        source_tiles_root=snapshot / "artifacts/source_tiles",
+        repository=args.dataset_repo,
+        revision=revision,
+    )
 
 
 def load_encoder(checkpoint_path: Path, config_path: Path, device: torch.device):
@@ -66,15 +198,57 @@ def load_encoder(checkpoint_path: Path, config_path: Path, device: torch.device)
     return model, config
 
 
-def load_tile_store(manifest_path: Path, data_config_path: Path):
-    from egms_encoder.data.tile_store import TileStore
+def _published_tile_repo_path(value: object) -> Path:
+    path = Path(str(value))
+    parts = path.parts
+    if parts[:2] == ("data", "tiles"):
+        return Path("artifacts/source_tiles").joinpath(*parts[2:])
+    if parts[:2] == ("artifacts", "source_tiles"):
+        return path
+    raise ValueError(f"manifest path is outside the published source-tile tree: {path}")
+
+
+def _resolve_source_tile_path(value: object, source_tiles_root: Path) -> Path:
+    path = Path(str(value))
+    if path.is_absolute():
+        return path
+    repository_path = _published_tile_repo_path(path)
+    return source_tiles_root.joinpath(*repository_path.parts[2:])
+
+
+def load_tile_store(
+    manifest_path: Path,
+    data_config_path: Path,
+    source_tiles_root: Path | None = None,
+):
+    from egms_encoder.data.tile_store import TileStore, TimeWindow
 
     print(f"[manifest] reading {manifest_path}", flush=True)
-    store = TileStore.from_manifest(manifest_path, data_config_path)
+    manifest = pd.read_parquet(manifest_path)
+    with data_config_path.open(encoding="utf-8") as handle:
+        data_config = json.load(handle)
+    if source_tiles_root is not None:
+        manifest = manifest.copy()
+        manifest["path"] = [
+            str(_resolve_source_tile_path(value, source_tiles_root))
+            for value in manifest["path"]
+        ]
+    split_assignments = None
+    if "split" in manifest.columns:
+        split_assignments = dict(
+            zip(manifest["tile_id"].astype(str), manifest["split"].astype(str))
+        )
+    store = TileStore(
+        manifest=manifest,
+        time_window=TimeWindow.from_config(data_config),
+        split_assignments=split_assignments,
+        feature_columns_count=int(
+            data_config["tile_field_layout"]["feature_columns_count"]
+        ),
+    )
     tw = store.time_window
-    manifest = store.manifest
     print(f"[manifest] {store.num_tiles} tiles, input_length={tw.input_length}", flush=True)
-    return store, tw, manifest
+    return store, tw, store.manifest
 
 
 def pool_to_vit_tokens(embedding, coords_centered, grid, tile_size):
@@ -104,19 +278,29 @@ def main():
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    ckpt_path = Path(args.checkpoint)
-    norm = load_normalization(args.normalization)
+    encoder_inputs = resolve_encoder_inputs(args)
+    dataset_inputs = resolve_dataset_inputs(args)
+    ckpt_path = encoder_inputs.checkpoint
+    norm = load_normalization(encoder_inputs.normalization)
     norm_mean = float(norm["mean"]); norm_std = float(norm["std"])
     print(f"[norm] mean={norm_mean:.4f} std={norm_std:.4f}", flush=True)
 
-    model, model_config = load_encoder(ckpt_path, Path(args.model_config), device)
+    model, model_config = load_encoder(
+        ckpt_path,
+        encoder_inputs.model_config,
+        device,
+    )
     print(f"[encoder] d_model={model_config['d_model']}, "
           f"layers={model_config['spatial_layers']}, "
           f"heads={model_config['spatial_heads']}", flush=True)
     input_length = int(model_config["input_length"])
     fc = 10  # FEATURE_COLUMNS_COUNT in TileStore
 
-    store, tw, manifest = load_tile_store(Path(args.manifest), Path(args.data_config))
+    store, tw, manifest = load_tile_store(
+        dataset_inputs.manifest,
+        dataset_inputs.data_config,
+        dataset_inputs.source_tiles_root,
+    )
     if tw.input_length != input_length:
         raise ValueError(f"time_window len {tw.input_length} != checkpoint input_length {input_length}")
 
@@ -180,18 +364,46 @@ def main():
     print(f"n_points mean={n_points_per_tile.mean():.1f}  "
           f"min={n_points_per_tile.min()}  max={n_points_per_tile.max()}", flush=True)
 
-    out_pt = out_dir / "egms_tokens_10k.pt"
-    with Path(args.data_config).open(encoding="utf-8") as handle:
+    output_name = args.output_name or (
+        "egms_tokens_10k.pt" if n_tiles == 10_000 else f"egms_tokens_{n_tiles}.pt"
+    )
+    out_pt = out_dir / output_name
+    with dataset_inputs.data_config.open(encoding="utf-8") as handle:
         data_config = json.load(handle)
     configured_axis = data_config["time_window"]
+    encoder_source = (
+        {
+            "type": "huggingface",
+            "repository": encoder_inputs.repository,
+            "revision": encoder_inputs.revision,
+        }
+        if encoder_inputs.repository
+        else {
+            "type": "local",
+            "checkpoint": encoder_inputs.checkpoint.name,
+            "config": encoder_inputs.model_config.name,
+            "normalization": encoder_inputs.normalization.name,
+        }
+    )
+    dataset_source = (
+        {
+            "type": "huggingface",
+            "repository": dataset_inputs.repository,
+            "revision": dataset_inputs.revision,
+        }
+        if dataset_inputs.repository
+        else {
+            "type": "local",
+            "manifest": dataset_inputs.manifest.name,
+            "data_config": dataset_inputs.data_config.name,
+        }
+    )
     metadata = {
         "schema_version": "egms-tokens-1.1",
-        "encoder_checkpoint": str(ckpt_path.resolve()),
-        "encoder_config_path": str(Path(args.model_config).resolve()),
+        "encoder_source": encoder_source,
+        "dataset_source": dataset_source,
         "coord_scale": float(model_config["coord_scale_m"]),
         "encoder_config": dict(model_config),
-        "manifest_path": str(Path(args.manifest).resolve()),
-        "data_config_path": str(Path(args.data_config).resolve()),
         "normalizer_mean": norm_mean,
         "normalizer_std": norm_std,
         "tile_size": float(args.tile_size),
@@ -217,9 +429,12 @@ def main():
             ),
             "cadence_days": configured_axis.get("cadence_days"),
         },
-        "token_layout": f"index 0 = CLS, 1..{n_patch} = {args.grid}x{args.grid} bins row-major",
-        "extraction_script": str(Path(__file__).resolve()),
-        "extraction_date_utc": dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "token_layout": (
+            f"index 0 = tile summary; 1..{n_patch} = "
+            f"{args.grid}x{args.grid} cells in row-major order"
+        ),
+        "extraction_module": "egms_encoder.extract_tokens",
+        "extraction_date_utc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "bin_occupancy_mean": float(occ.mean()),
         "bin_occupancy_median": float(np.median(occ)),
         "n_points_per_tile_mean": float(n_points_per_tile.mean()),
@@ -236,9 +451,11 @@ def main():
         "n_points_per_tile": torch.from_numpy(n_points_per_tile),
         "metadata": metadata,
     }, out_pt)
-    with open(out_dir / "extraction_metadata.json", "w") as f:
+    metadata_path = out_dir / f"{Path(output_name).stem}_metadata.json"
+    with metadata_path.open("w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, default=str)
     print(f"\nwrote {out_pt}", flush=True)
+    print(f"wrote {metadata_path}", flush=True)
 
 
 if __name__ == "__main__":

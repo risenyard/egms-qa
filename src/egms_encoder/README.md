@@ -49,31 +49,26 @@ preparation step before this encoder entrypoint can be used.
 
 ## Token extraction
 
-From the published GitHub checkout, download the current Encoder and Dataset
-trees into the runtime locations used by the code:
+From the published GitHub checkout, identify both published HF repositories
+directly. The command resolves and pins their current revisions in the HF cache:
 
 ```bash
-hf download risenyard/egms-qa-encoder \
-    --local-dir data/encoder/checkpoint
-hf download risenyard/egms-qa-dataset \
-    --repo-type dataset --local-dir release/egms-qa-dataset
-python -m egms_qa.release audit \
-    --release-dir release/egms-qa-dataset
-python -m egms_qa.release install \
-    --release-dir release/egms-qa-dataset --target-root .
-
 python -m egms_encoder.extract_tokens \
-    --checkpoint data/encoder/checkpoint/encoder.safetensors \
-    --model-config data/encoder/checkpoint/config.json \
-    --normalization data/encoder/checkpoint/normalization.json \
-    --manifest data/encoder/manifest/split.parquet \
-    --data-config data/encoder/manifest/data_config.json \
+    --encoder-repo risenyard/egms-qa-encoder \
+    --dataset-repo risenyard/egms-qa-dataset \
     --output-dir outputs/tokens
 # -> outputs/tokens/egms_tokens_10k.pt   (spatial_tokens [10000, 65, 256], mask, ids, splits)
 ```
 
-For another compatible NPZ collection, replace only `--manifest` and
-`--data-config` with that collection's published or prepared contract paths.
+The repository mode reads `encoder.safetensors`, `config.json`, and
+`normalization.json` from the published Encoder tree. It reads
+`metadata/{split_manifest.parquet,data_config.json}` and
+`artifacts/source_tiles/` from the published Dataset tree.
+
+For another compatible local NPZ collection, provide `--checkpoint`,
+`--model-config`, and `--normalization` together, plus `--manifest` and
+`--data-config`. Use `--source-tiles-root` when manifest paths are relative to a
+separate tile root.
 
 The released token cache (`data/encoder/tokens/egms_tokens_10k.pt`) lets you
 skip this step and train/evaluate the translator directly. Encoder provenance is
@@ -81,7 +76,8 @@ documented in the
 [dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset) and
 [encoder card](https://huggingface.co/risenyard/egms-qa-encoder).
 
-To pretrain on the installed released tiles:
+To pretrain, first install the structured Dataset into its documented local
+runtime paths as described in the top-level README, then run:
 
 ```bash
 python -m egms_encoder.pretrain --output-dir outputs/encoder_pretrain
