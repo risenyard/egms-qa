@@ -4,12 +4,13 @@ The encoder maps point displacement histories within a 7 km tile to
 256-dimensional point representations. Spatial pooling produces 65 tokens for
 the translator, comprising one tile-summary token and 64 spatial-cell tokens.
 
+[Project guide](../../README.md) ·
 [Model and training recipe](https://huggingface.co/risenyard/egms-qa-encoder) ·
 [Dataset and token cache](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
 
 ## Extract tokens
 
-Run the following commands from the repository root:
+Run the following commands from the repository root.
 
 ```bash
 pip install -e .
@@ -27,7 +28,9 @@ is recommended for the full collection.
 
 The Dataset also provides a precomputed token cache. After installing the
 Dataset with `egms_encoder.install_data`, the cache is available at
-`data/encoder/tokens/egms_tokens_10k.pt` for translator training and evaluation.
+`data/encoder/tokens/egms_tokens_10k.pt`. Translator use also requires the QA
+labels and task tables, installed through the
+[Translator guide](../egms_qa/translator/README.md).
 
 ## Input requirements
 

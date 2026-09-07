@@ -5,6 +5,7 @@ projector maps the 256-dimensional tokens to the host model's embedding width.
 The projected tokens precede the question, and a LoRA adapter tunes the
 language model while its base weights remain frozen.
 
+[Project guide](../../../README.md) ·
 [Models and recipes](https://huggingface.co/risenyard/egms-qa-translator) ·
 [Encoder](https://huggingface.co/risenyard/egms-qa-encoder) ·
 [Dataset](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
@@ -30,8 +31,9 @@ python -m egms_qa.reproduce evaluate \
 ```
 
 Add `--dry-run` to inspect the evaluation command without loading the model.
-The output directory contains `answers.jsonl` and `metrics.json`. The
-`reporting_summary` field separates numeric, categorical, and boundary metrics.
+The output directory contains generated answers in `answers.jsonl` and scores
+in `metrics.json`. The `reporting_summary` field separates numeric, categorical,
+and boundary metrics. This command evaluates the downloaded weights.
 
 Replace `qwen` in the download and runtime paths to use another variant:
 
