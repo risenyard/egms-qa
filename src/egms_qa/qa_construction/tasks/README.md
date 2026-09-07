@@ -48,13 +48,13 @@ The release installer exposes these under `outputs/tasks/<group>/`.
 | C3 | C31–C33 | Deformation fronts | [script](c3/c3_compute.py) | [method](c3/c3_algorithm.md) | NPZ tiles |
 | C4 | C41–C42 | Fast-tail spatial extent | [script](c4/c4_compute.py) | [method](c4/c4_algorithm.md) | NPZ tiles |
 | C5 | C51–C52 | Monitoring priority | [script](c5/c5_compute.py) | [method](c5/c5_algorithm.md) | B2, B3, B6, C3 tables |
-| D1 | D11–D14 | Trend geometry and changepoints | [script](d1/d1_compute.py) | [method](d1/d1_algorithm.md) | Published table; additional fit inputs required for rebuilding |
+| D1 | D11–D14 | Trend geometry and changepoints | [script](d1/d1_compute.py) | [method](d1/d1_algorithm.md) | NPZ tiles, split manifest and data config |
 | D2 | D21–D24 | Seasonal phase and amplitude | [script](d2/d2_compute.py) | [method](d2/d2_algorithm.md) | NPZ tiles, data config, B5 table |
 | D3 | D31–D35 | Motion intensification | [script](d3/d3_compute.py) | [method](d3/d3_algorithm.md) | NPZ tiles |
 | D4 | D41–D42 | Dominant temporal process | [script](d4/d4_compute.py) | [method](d4/d4_algorithm.md) | B3, B4, B5, D1, D2, D3 tables |
 | S1 | S11–S15 | Representation anchors | [script](s1/s1_compute.py) | [method](s1/s1_algorithm.md) | Token cache |
 | S2 | S21–S22 | Representation isolation | [script](s2/s2_compute.py) | [method](s2/s2_algorithm.md) | Token cache |
-| S3 | S31–S33 | Representation–monitoring relation | [script](s3/s3_compute.py) | [method](s3/s3_algorithm.md) | Published table; computation inputs need contract reconciliation |
+| S3 | S31–S33 | Representation–monitoring relation | [script](s3/s3_compute.py) | [method](s3/s3_algorithm.md) | A4, B3–B5, C1–C4, D2–D3, S2 tables and frozen S3 temporal inputs |
 | S4 | S41–S43 | Local representation structure | [script](s4/s4_compute.py) | [method](s4/s4_algorithm.md) | Token cache |
 | X1 | X11–X15 | Unsupported inference | [script](x1/x1_compute.py) | [method](x1/x1_algorithm.md) | Static refusal catalog |
 | X2 | X21–X26 | Unavailable data or scale | [script](x2/x2_compute.py) | [method](x2/x2_algorithm.md) | Static refusal catalog |
@@ -72,15 +72,16 @@ rebuild labels, then render questions and answers. The Dataset supplies all 27
 tables needed for that workflow. The [QA guide](../README.md) gives commands
 that write new outputs separately from the downloaded artifacts.
 
-Full reconstruction of every reference table from NPZ tiles is not yet a
-self-contained public workflow:
+D1 computes the published geometry scores directly from the model-ready NPZ
+tiles and source time axis. S3 reads the frozen posterior estimates in
+`s3/s3_temporal_inputs.csv`, alongside the other released reference tables.
+These inputs define the exact published S3 targets.
 
-- D1's script requires a fitted geometry table and summary that are not part
-  of the published inputs. Use the canonical D1 table from the Dataset.
-- S3's implementation expects temporal sentinel columns that are not present
-  in the published D1 table. Use the released S3 table; substituting different
-  temporal targets would change the scientific definition and requires a
-  separate validation.
+The [S3 temporal estimator](s3/s3_temporal_compute.py) provides an optional
+BEAST refit from NPZ tiles. Its Monte Carlo estimates can vary across builds
+and hardware even with fixed tile seeds. A fresh posterior realization is not
+a byte-for-byte replacement for the frozen S3 inputs. See the
+[S3 method](s3/s3_algorithm.md) for the commands and provenance.
 
 For other groups, consult the linked method and script for the full input,
 parameter and execution requirements. The index records dependencies; it does

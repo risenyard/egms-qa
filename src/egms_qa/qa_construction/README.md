@@ -21,8 +21,12 @@ python -m egms_qa.release install \
 ```
 
 The release provides QA under `data/qa/`, labels under `artifacts/labels/`,
-and task-family tables under `artifacts/reference_tables/`. The installer links
+and task-group tables under `artifacts/reference_tables/`. The installer links
 these files to `outputs/qa/` and `outputs/tasks/` for use by the code.
+
+The installer checks the release inventory before creating links. To verify
+every file's SHA256 as well, run `python -m egms_qa.release audit
+--release-dir release/egms-qa-dataset --verify-hashes`.
 
 ## Generate question–answer records
 
@@ -34,10 +38,15 @@ python -m egms_qa.qa_construction.generate_qa \
 ```
 
 Generated JSONL files appear in `outputs/qa-generated/qa/`, with record counts
-and rendering metadata in the parent directory. Each token-dependent
-tile–task pair receives one phrasing per training cycle from a pool of 20.
-Training cycles rotate the phrasing. Refusal tasks use a capped sample of
-tiles per task.
+and rendering metadata in the parent directory. The default command writes
+two training phrasing cycles (`v1_train_e00.jsonl` and `v1_train_e01.jsonl`),
+plus `v1_val.jsonl` and `v1_test.jsonl`. Each token-dependent tile–task pair
+receives one phrasing per cycle from a pool of 20. Refusal tasks use a capped
+sample of tiles per task.
+
+These are newly rendered corpora. The canonical published QA files remain
+`data/qa/{train,validation,test}.jsonl` in the Dataset. Matching record counts
+alone does not establish byte-for-byte reproduction of those files.
 
 Add `--max-tiles 2 --train-cycles 1` for a small rendering check. These options
 reduce the generated records and do not reproduce the full release counts.
@@ -46,12 +55,12 @@ reduce the generated records and do not reproduce the full release counts.
 
 | step | implementation | output |
 |---|---|---|
-| Task reference values | family scripts and algorithm notes in `tasks/` | one reference table per task family |
+| Task reference values | group scripts and algorithm notes in `tasks/` | one reference table per task group |
 | Label aggregation | `build_labels.py` | `labels.parquet` and `labels_meta.json` |
 | Question and answer rendering | `generate_qa.py` and `qa_lib.py` | split JSONL files and rendering metadata |
 
 The [task implementation index](tasks/README.md) links all 27 task groups,
-their algorithms, dependencies, and reconstruction scope. The task-family
+their algorithms, dependencies, and reconstruction scope. The task-group
 notes define the inputs, formulas, thresholds, and target columns used by the
 reference tables. Label aggregation joins the tables by
 tile ID and split. Rendering converts the resulting targets into visible
@@ -68,11 +77,35 @@ python -m egms_qa.qa_construction.generate_qa \
     --out-dir outputs/qa-generated
 ```
 
-This command checks table identities and splits against the published encoder
+The label builder checks table identities and splits against the published encoder
 token cache, then aligns label rows to its tile order. No additional
 representation cache is required. The released label file remains the canonical
 input for reproducing model results. The optional
 [temporal summary](temporal_summary.md) combines the D1–D4 tables for analysis.
+
+## Recompute D1 and S3
+
+D1 fits temporal geometry directly from the installed NPZ tiles and data
+configuration. Its curvature and changepoint thresholds are fitted on the
+training split. S3 combines the released monitoring tables with the frozen
+Bayesian temporal inputs in `outputs/tasks/s3/s3_temporal_inputs.csv`.
+
+```bash
+python -m egms_qa.qa_construction.tasks.d1.d1_compute \
+    --out-dir outputs/tasks-rebuilt/d1 --workers 8
+python -m egms_qa.qa_construction.tasks.s3.s3_compute \
+    --out-dir outputs/tasks-rebuilt/s3
+```
+
+Both commands write new outputs separately from the installed tables. The
+[D1 method](tasks/d1/d1_algorithm.md) and [S3 method](tasks/s3/s3_algorithm.md)
+describe their inputs and formulas. S3 uses posterior trend order and
+changepoint probability from BEAST. Exact S3 reproduction uses the frozen
+posterior table supplied in the Dataset. The S3 guide also provides a refitting
+command for new estimates, which can vary across estimator builds and hardware.
+
+The label-generation examples above use the canonical released tables.
+Consult the task index for other groups' dependencies and reconstruction scope.
 
 ## Dataset contract
 
@@ -94,8 +127,9 @@ describes the source product and preparation contract.
 
 ## Task catalog
 
-The full catalog contains 78 tasks in six groups. Groups A–D and S contain
-64 token-dependent tasks with numeric or categorical targets. Group X contains
+The catalog contains 78 tasks in 27 task groups under six families
+(A/B/C/D/S/X). Families A–D and S contain 64 token-dependent tasks with numeric
+or categorical targets. Family X contains
 14 refusal tasks for questions outside the supported scope. Numeric targets
 describe quantities, categorical targets assign classes, and refusal targets
 state the evidence boundary.
@@ -177,7 +211,7 @@ Questions that require a designated refusal.
 | X21–X26 | unavailable data or scale (exact assets, sub-cell points, other components, external context, live status, open rankings) |
 | X31–X33 | representation boundary |
 
-Each task-family directory contains its algorithm note, such as
+Each task-group directory contains its algorithm note, such as
 [`tasks/d2/d2_algorithm.md`](tasks/d2/d2_algorithm.md). Refer to these notes for
 task-specific inputs, reference-value definitions, and validity conditions.
 

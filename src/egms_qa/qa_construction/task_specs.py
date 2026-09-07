@@ -45,10 +45,10 @@ TASK_SPECS: list[dict[str, Any]] = [
     dict(id="C51", source_family="c5", target_column="C51_monitoring_priority", label_type="categorical", name="monitoring priority"),
     dict(id="C52", source_family="c5", target_column="C52_hidden_local_risk", label_type="categorical", name="hidden local risk"),
     # D. Temporal dynamics
-    dict(id="D11", source_family="d1", target_column="D11_long_term_trend_shape", label_type="categorical", name="D12/D13 p85 primitive trend shape"),
+    dict(id="D11", source_family="d1", target_column="D11_long_term_trend_shape", label_type="categorical", name="long-term trend shape"),
     dict(id="D12", source_family="d1", target_column="D12_curvature_strength", label_type="numeric", name="geometry curvature strength"),
     dict(id="D13", source_family="d1", target_column="D13_changepoint_strength", label_type="numeric", name="geometry changepoint strength"),
-    dict(id="D14", source_family="d1", target_column="D14_dominant_changepoint_time_year", label_type="numeric", name="D13 strong changepoint time"),
+    dict(id="D14", source_family="d1", target_column="D14_dominant_changepoint_time_year", label_type="numeric", name="changepoint time for strong-change tiles"),
     dict(id="D21", source_family="d2", target_column="D21_dominant_seasonal_peak", label_type="categorical", name="coherent dominant seasonal phase"),
     dict(id="D22", source_family="d2", target_column="D22_phase_coherence", label_type="numeric", name="seasonal phase coherence"),
     dict(id="D23", source_family="d2", target_column="D23_phase_dispersion_days", label_type="numeric", name="seasonal phase dispersion"),

@@ -9,34 +9,31 @@ S33 is the monitoring-side most distinctive dimension.
 """
 from __future__ import annotations
 
+import argparse
+import hashlib
 import json
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-
-ROOT = Path(".")
-OUT_DIR = ROOT / "outputs/tasks/s3"
+from egms_qa.paths import OUTPUTS_DIR, TASKS_DIR
+from egms_qa.qa_construction.tables import align_family_to_base, read_family
 
 SOURCES = [
-    (ROOT / "outputs/tasks/s2/s2_final_table.csv", ["S21_local_isolation_score"]),
-    (ROOT / "outputs/tasks/a4/a4_final_table.csv", ["A41_median_rmse_mm"]),
-    (ROOT / "outputs/tasks/b3/b3_final_table.csv", ["B33_vel_abs_p90_mm_yr"]),
-    (ROOT / "outputs/tasks/b4/b4_final_table.csv", ["B41_acc_abs_p90"]),
-    (ROOT / "outputs/tasks/b5/b5_final_table.csv", ["B51_seasonality_p90"]),
-    (ROOT / "outputs/tasks/c1/c1_final_table.csv", ["C11_noise_aware_moving_fraction"]),
-    (ROOT / "outputs/tasks/c2/c2_final_table.csv", ["C21_spatial_concentration_score"]),
-    (ROOT / "outputs/tasks/c3/c3_final_table.csv", ["C31_deformation_front_strength_mm_yr"]),
-    (ROOT / "outputs/tasks/c4/c4_final_table.csv", ["C41_fast_tail_bin_fraction"]),
-    (ROOT / "outputs/tasks/d1/d1_final_table.csv", ["D12_trend_order_mean", "D13_top_changepoint_probability"]),
-    (ROOT / "outputs/tasks/d2/d2_final_table.csv", ["D22_phase_coherence"]),
-    (ROOT / "outputs/tasks/d3/d3_final_table.csv", ["D31_motion_intensification_mm_yr2"]),
+    ("s2", ["S21_local_isolation_score"]),
+    ("a4", ["A41_median_rmse_mm"]),
+    ("b3", ["B33_vel_abs_p90_mm_yr"]),
+    ("b4", ["B41_acc_abs_p90"]),
+    ("b5", ["B51_seasonality_p90"]),
+    ("c1", ["C11_noise_aware_moving_fraction"]),
+    ("c2", ["C21_spatial_concentration_score"]),
+    ("c3", ["C31_deformation_front_strength_mm_yr"]),
+    ("c4", ["C41_fast_tail_bin_fraction"]),
+    ("d2", ["D22_phase_coherence"]),
+    ("d3", ["D31_motion_intensification_mm_yr2"]),
 ]
+TEMPORAL_COLUMNS = ["S3_trend_order_mean", "S3_top_changepoint_probability"]
 
 AXES = {
     "quality": ["A41_median_rmse_mm"],
@@ -48,8 +45,8 @@ AXES = {
         "C41_fast_tail_bin_fraction",
     ],
     "temporal": [
-        "D12_trend_order_mean",
-        "D13_top_changepoint_probability",
+        "S3_trend_order_mean",
+        "S3_top_changepoint_probability",
         "D22_phase_coherence",
         "D31_motion_intensification_mm_yr2",
     ],
@@ -70,19 +67,33 @@ S32_CLASS_ORDER = [
 S33_CLASS_ORDER = ["quality", "motion", "spatial", "temporal"]
 
 
-def merge_sources() -> pd.DataFrame:
+def merge_sources(tasks_root: Path, temporal_inputs: Path) -> pd.DataFrame:
     base = None
-    for path, cols in SOURCES:
-        missing_path = not path.exists()
-        if missing_path:
-            raise FileNotFoundError(path)
-        df = pd.read_csv(path, usecols=["tile_id", "split", *cols])
+    for family, cols in SOURCES:
+        df = read_family(tasks_root, family)[["tile_id", "split", *cols]]
         if base is None:
             base = df
         else:
-            base = base.merge(df, on=["tile_id", "split"], how="left", validate="one_to_one")
+            index = pd.MultiIndex.from_frame(base[["tile_id", "split"]])
+            aligned = align_family_to_base(df, index, family)
+            base = pd.concat([base, aligned[cols]], axis=1)
     if base is None:
         raise RuntimeError("No source tables configured.")
+    posterior = pd.read_csv(temporal_inputs, usecols=["tile_id", "split", *TEMPORAL_COLUMNS])
+    if posterior["tile_id"].duplicated().any():
+        raise ValueError("S3 temporal inputs contain duplicate tile IDs")
+    index = pd.MultiIndex.from_frame(base[["tile_id", "split"]])
+    aligned = align_family_to_base(posterior, index, "S3 temporal inputs")
+    values = aligned[TEMPORAL_COLUMNS].to_numpy(dtype=float)
+    if np.isinf(values).any():
+        raise ValueError("S3 temporal inputs must not contain infinity")
+    order = values[np.isfinite(values[:, 0]), 0]
+    probability = values[np.isfinite(values[:, 1]), 1]
+    if not ((order >= 0) & (order <= 2)).all():
+        raise ValueError("S3 mean posterior trend order must be within [0,2]")
+    if not ((probability >= 0) & (probability <= 1)).all():
+        raise ValueError("S3 changepoint probabilities must be within [0,1]")
+    base = pd.concat([base, aligned[TEMPORAL_COLUMNS]], axis=1)
     return base
 
 
@@ -250,7 +261,12 @@ def summarize(final: pd.DataFrame, diagnostics: pd.DataFrame) -> dict[str, objec
     return summary
 
 
-def plot_distribution(final: pd.DataFrame, diagnostics: pd.DataFrame) -> None:
+def plot_distribution(final: pd.DataFrame, diagnostics: pd.DataFrame, out_dir: Path) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     gap = final[S31_COL].dropna()
     thresholds = diagnostics.attrs["s32_thresholds"]
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.8))
@@ -283,17 +299,30 @@ def plot_distribution(final: pd.DataFrame, diagnostics: pd.DataFrame) -> None:
     axes[2].tick_params(axis="x", rotation=25)
 
     fig.tight_layout()
-    fig.savefig(OUT_DIR / "s3_distribution.png", dpi=180)
+    fig.savefig(out_dir / "s3_distribution.png", dpi=180)
     plt.close(fig)
 
 
 def main() -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    final, diagnostics = compute_s31(merge_sources())
-    final.to_csv(OUT_DIR / "s3_final_table.csv", index=False)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--tasks-root", type=Path, default=TASKS_DIR)
+    parser.add_argument("--temporal-inputs", type=Path, help="Defaults to <tasks-root>/s3/s3_temporal_inputs.csv")
+    parser.add_argument("--out-dir", type=Path, default=OUTPUTS_DIR / "tasks-rebuilt/s3")
+    parser.add_argument("--plot", action="store_true", help="Also write a distribution plot (requires tasks extra)")
+    args = parser.parse_args()
+    temporal_inputs = args.temporal_inputs or args.tasks_root / "s3/s3_temporal_inputs.csv"
+    final, diagnostics = compute_s31(merge_sources(args.tasks_root, temporal_inputs))
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    final.to_csv(args.out_dir / "s3_final_table.csv", index=False)
     summary = summarize(final, diagnostics)
-    (OUT_DIR / "s3_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-    plot_distribution(final, diagnostics)
+    summary["temporal_inputs"] = {
+        "sha256": hashlib.sha256(temporal_inputs.read_bytes()).hexdigest(),
+        "columns": TEMPORAL_COLUMNS,
+    }
+    (args.out_dir / "s3_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    if args.plot:
+        plot_distribution(final, diagnostics, args.out_dir)
+    print(f"wrote {len(final)} S3 rows to {args.out_dir}", flush=True)
 
 
 if __name__ == "__main__":
