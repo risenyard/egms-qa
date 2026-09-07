@@ -1,11 +1,7 @@
 # EGMS-QA Translator
 
 The translator adapts a host language model to answer questions from frozen
-EGMS tile tokens using a token projector and a LoRA adapter.
-
-## Architecture
-
-The projector maps tile tokens to the host model's embedding width. The
+EGMS tile tokens using a token projector and a LoRA adapter. The projector maps tile tokens to the host model's embedding width. The
 projected tokens form a prefix before the question. Training updates the
 projector and LoRA adapter. The encoder and host-model base weights remain
 frozen.
