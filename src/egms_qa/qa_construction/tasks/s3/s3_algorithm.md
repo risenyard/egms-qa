@@ -168,6 +168,7 @@ After installing the Dataset using the [QA guide](../../README.md), reproduce
 the published targets from the released inputs:
 
 ```bash
+pip install -e '.[tasks]'
 python -m egms_qa.qa_construction.tasks.s3.s3_compute \
     --out-dir outputs/tasks-rebuilt/s3
 ```
@@ -180,7 +181,6 @@ published target columns are written alongside `tile_id` and `split`.
 To refit the Bayesian inputs as a separate experiment:
 
 ```bash
-pip install -e '.[tasks]'
 python -m egms_qa.qa_construction.tasks.s3.s3_temporal_compute \
     --out-dir outputs/s3-temporal-refit --workers 8
 python -m egms_qa.qa_construction.tasks.s3.s3_compute \

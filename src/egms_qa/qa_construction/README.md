@@ -91,6 +91,7 @@ training split. S3 combines the released monitoring tables with the frozen
 Bayesian temporal inputs in `outputs/tasks/s3/s3_temporal_inputs.csv`.
 
 ```bash
+pip install -e '.[tasks]'
 python -m egms_qa.qa_construction.tasks.d1.d1_compute \
     --out-dir outputs/tasks-rebuilt/d1 --workers 8
 python -m egms_qa.qa_construction.tasks.s3.s3_compute \
