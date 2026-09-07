@@ -30,25 +30,31 @@ GitHub 提供代码，Hugging Face 提供数据、权重与训练配方，集中
 
 ## 安装
 
-编码一个发布瓦片，检查安装是否可用：
+环境要求 Python 3.10 或更高版本。从仓库根目录安装 encoder、QA construction
+和 translator 共用的代码包：
 
 ```bash
 git clone https://github.com/risenyard/egms-qa
 cd egms-qa
 pip install -e .
-python -m egms_encoder.extract_tokens \
-    --encoder-repo risenyard/egms-qa-encoder \
-    --dataset-repo risenyard/egms-qa-dataset \
-    --max-tiles 1 --output-dir outputs/tokens
 ```
 
-这一 encoder smoke test 下载所需文件，并在 `outputs/tokens/` 写出 tokens 与
-元数据。环境要求 Python 3.10 或更高版本。少量 encoder 检查可使用 CPU，完整
-集合建议使用 GPU。
+基础安装支持 encoder 工作流、标签聚合与 QA 渲染。计算任务参考值或训练、评测
+宿主模型时，安装相应的可选依赖：
 
-要运行问答评测，先安装 `pip install -e '.[translator]'`，再按
-[发布模型评测指南](src/egms_qa/translator/README.md#evaluate-a-released-model)操作。
-Translator 训练与评测需要 CUDA。数据集包含预计算 tokens，可直接用于这些流程。
+```bash
+pip install -e '.[tasks]'        # QA 任务参考值计算
+pip install -e '.[translator]'   # Translator 训练与评测
+```
+
+[Encoder 指南](src/egms_encoder/README.md)介绍预训练与 token 提取，
+[QA 构建指南](src/egms_qa/qa_construction/README.md)介绍任务参考值、标签和问答记录，
+[Translator 指南](src/egms_qa/translator/README.md)介绍语言模型适配与评测。
+各指南列明所需的 HF 发布文件与运行命令。
+
+标签聚合、QA 渲染和少量 encoder 检查可在 CPU 上运行。Encoder 训练与完整集合
+的 token 提取建议使用 GPU，translator 训练与评测需要 CUDA。发布数据集包含
+参考值表、标签、QA 记录及预计算 tokens，可直接用于基于发布产物的工作流。
 
 ## 评测
 

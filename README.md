@@ -34,28 +34,36 @@ files.
 
 ## Installation
 
-Encode one released tile to check the installation:
+Python 3.10 or later is required. Install the shared codebase for the encoder,
+QA construction, and translator from the repository root:
 
 ```bash
 git clone https://github.com/risenyard/egms-qa
 cd egms-qa
 pip install -e .
-python -m egms_encoder.extract_tokens \
-    --encoder-repo risenyard/egms-qa-encoder \
-    --dataset-repo risenyard/egms-qa-dataset \
-    --max-tiles 1 --output-dir outputs/tokens
 ```
 
-This encoder smoke test downloads the required artifacts and writes tokens
-and metadata to `outputs/tokens/`. Python 3.10 or later is required. CPU
-execution supports small encoder checks, while GPU execution is recommended
-for the full collection.
+The core installation supports encoder workflows, label aggregation, and QA
+rendering. Add the optional dependencies needed for reference-value computation
+or host-model training and evaluation:
 
-For question answering, install `pip install -e '.[translator]'` and follow
-the [released-model evaluation guide](src/egms_qa/translator/README.md#evaluate-a-released-model).
-Translator training and evaluation require CUDA. The Dataset includes
-precomputed tokens, so those workflows can use the released representations
-directly.
+```bash
+pip install -e '.[tasks]'        # QA task reference-value computation
+pip install -e '.[translator]'   # Translator training and evaluation
+```
+
+The [Encoder guide](src/egms_encoder/README.md) covers pretraining and token
+extraction. The [QA construction guide](src/egms_qa/qa_construction/README.md)
+covers task reference values, labels, and question–answer records. The
+[Translator guide](src/egms_qa/translator/README.md) covers language-model
+adaptation and evaluation. Each guide specifies the required HF artifacts
+and commands.
+
+Label aggregation, QA rendering, and small encoder checks can run on CPU.
+GPU execution is recommended for encoder training and full-collection token
+extraction. Translator training and evaluation require CUDA. The released
+Dataset includes reference tables, labels, QA records, and precomputed tokens
+for workflows that use the published artifacts directly.
 
 ## Evaluation
 
