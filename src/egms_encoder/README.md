@@ -1,8 +1,8 @@
 # EGMS-QA Encoder
 
-The encoder maps point displacement histories within a 7 km tile to
-256-dimensional point representations. Spatial pooling produces 65 tokens for
-the translator, comprising one tile-summary token and 64 spatial-cell tokens.
+The encoder converts displacement time series within each 7 km tile into
+65 tokens: one tile-summary token and 64 spatial-cell tokens. Each token has
+256 dimensions.
 
 [Project guide](../../README.md) ·
 [Model and training recipe](https://huggingface.co/risenyard/egms-qa-encoder) ·
@@ -10,21 +10,25 @@ the translator, comprising one tile-summary token and 64 spatial-cell tokens.
 
 ## Extract tokens
 
-Run the following commands from the repository root.
+Start with one tile. Run the following commands from the repository root.
 
 ```bash
 pip install -e .
 python -m egms_encoder.extract_tokens \
     --encoder-repo risenyard/egms-qa-encoder \
     --dataset-repo risenyard/egms-qa-dataset \
+    --max-tiles 1 \
     --output-dir outputs/tokens
 ```
 
-The command downloads the required model and tile data into the HF cache and
-records the resolved repository revisions. The full dataset produces
-`outputs/tokens/egms_tokens_10k.pt` with token shape `[10000,65,256]`, validity
-masks, and tile identifiers. Add `--max-tiles 1` for a small check. GPU execution
-is recommended for the full collection.
+The command downloads the released encoder and one tile, then saves
+`outputs/tokens/egms_tokens_1.pt` with token shape `[1,65,256]`. The outputs
+include validity masks, tile IDs, and metadata recording the model and dataset
+revisions. Add `--device cpu` for a CPU run.
+
+Remove `--max-tiles 1` to process all 10,000 tiles and write
+`outputs/tokens/egms_tokens_10k.pt` with shape `[10000,65,256]`. GPU execution
+is recommended for the full dataset.
 
 The Dataset also provides a precomputed token cache. After installing the
 Dataset with `egms_encoder.install_data`, the cache is available at
@@ -42,24 +46,23 @@ labels and task tables, installed through the
 | time axis | stored `[0,294)`, corresponding to source indices `[8,302)` |
 | preprocessing | normalization paired with the encoder checkpoint |
 
-The data config defines the stored window and retains source offset 8 and the
-six-day cadence for physical-time calculations. Token extraction centers
-coordinates within each tile. The encoder applies the coordinate scale recorded
-in its model config.
+The data config records the six-day cadence and source index offset.
+Coordinates are centered within each tile and scaled using the model config.
 
-A new NPZ collection must match the displacement component, units, temporal
-sampling, preprocessing, and coordinate geometry. Matching array dimensions
-alone is insufficient. Keep the checkpoint's normalization when using the
-released frozen encoder, and validate performance under distribution shifts.
-When training a new encoder on another corpus, fit normalization on its
-training split and retain that file with the new checkpoint.
+New collections must match the input requirements above. Keep the released
+normalization when using the frozen encoder, and check its performance on the
+new data. When training a new encoder, fit normalization on the new training
+split and save it with the checkpoint.
 
-For local inputs, provide `--manifest` and `--data-config` together. Local model
-overrides require `--checkpoint`, `--model-config`, and `--normalization`
-together. Use `--source-tiles-root` when manifest paths refer to a separate tile
-root. Auxiliary fields such as velocity, acceleration, and RMSE affect QA
-construction, while encoder inference uses displacement histories and
-coordinates.
+## Use local inputs
+
+For local tiles, provide `--manifest` and `--data-config` together. Use
+`--source-tiles-root` to resolve relative tile paths against a different
+directory. Encoder inference uses displacement histories and coordinates.
+
+For a local checkpoint, provide `--checkpoint`, `--model-config`, and
+`--normalization` together. The token-extraction example below shows how to
+use a checkpoint produced by training.
 
 ## Reproduce training
 
@@ -111,11 +114,11 @@ python -m egms_encoder.extract_tokens \
 
 ![EGMS Encoder framework](../../docs/assets/egms-encoder.png)
 
-Each normalized history is divided into 37 eight-step patches. A temporal
-Transformer and mean pooling form one feature per point. A coordinate
-embedding is added before spatial attention exchanges information across
-points. Pretraining reconstructs a synchronized masked interval shared by all
-points in a tile. Inference uses the frozen encoder without masking and pools
+Each normalized history is divided into temporal patches. A temporal
+Transformer and mean pooling form a 256-dimensional representation for each
+point. A coordinate embedding is added before spatial attention exchanges
+information across points. Pretraining reconstructs a synchronized masked
+interval shared by all points in a tile. Inference uses the frozen encoder without masking and pools
 the point features into an 8×8 grid.
 
 | module | purpose |
