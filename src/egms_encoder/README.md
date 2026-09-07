@@ -1,8 +1,10 @@
 # EGMS-QA Encoder
 
-The encoder converts displacement time series within each 7 km tile into
-65 tokens: one tile-summary token and 64 spatial-cell tokens. Each token has
-256 dimensions.
+The encoder takes a variable number of persistent-scatterer displacement
+histories and their coordinates from each 7 km tile. It first produces a
+256-dimensional contextual representation for every point, then pools those
+representations into 65 tile tokens: one summary token and 64 spatial-cell
+tokens, each with 256 dimensions.
 
 [Project guide](../../README.md) ·
 [Model and training recipe](https://huggingface.co/risenyard/egms-qa-encoder) ·
