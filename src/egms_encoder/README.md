@@ -30,7 +30,7 @@ provides the prepared tiles and precomputed tokens.
 |---|---|
 | Try the released encoder | [Install the code](#installation), then [extract tokens](#extract-tokens) |
 | Train an encoder | [Reproduce training](#reproduce-training) |
-| Use your own tiles or checkpoint | [Input requirements](#Input-requirements), [Use local inputs](#use-local-inputs) |
+| Use your own tiles or checkpoint | [Use local inputs](#use-local-inputs) |
 | Inspect the released model | Hugging Face [files](https://huggingface.co/risenyard/egms-qa-encoder#files) and [evaluation](https://huggingface.co/risenyard/egms-qa-encoder#evaluation) |
 
 ## Installation
@@ -69,14 +69,12 @@ For question answering with the precomputed tokens, follow the
 [Translator guide](../egms_qa/translator/README.md). Its setup installs the
 released tokens together with the QA labels and task tables.
 
-## Input requirements
+## Use local inputs
 
 The released workflows use prepared EGMS-QA NPZ tiles. For a new collection,
 check the [model's input requirements](https://huggingface.co/risenyard/egms-qa-encoder#input-requirements)
 before using the local-input options below. The extractor normalizes
 displacement values and centers coordinates within each tile.
-
-## Use local inputs
 
 After [installing the code](#installation), provide `--manifest` and
 `--data-config` together. Use `--source-tiles-root` to resolve relative tile
