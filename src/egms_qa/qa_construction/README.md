@@ -12,16 +12,6 @@ The Dataset card documents the released files, formats, splits, and data terms.
 
 ## Construction process
 
-```mermaid
-flowchart LR
-    A[Prepared measurements and representations] --> B[Task reference tables]
-    B --> C[Task labels and metadata]
-    C --> D[Questions and reference answers]
-    D --> E[QA records and output checks]
-    X[Boundary task catalogs] --> C
-    P[Approved question phrasings] --> D
-```
-
 The [task catalog](tasks/README.md#task-groups) defines 78 tasks in 27 groups.
 A/B/C/D/S contribute 64 tile-dependent targets covering observation quality,
 motion, spatial organization, temporal dynamics, and representation properties.
