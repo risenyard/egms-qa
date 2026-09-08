@@ -101,7 +101,7 @@ settings are available in the
 ## Scope
 
 The code operates on prepared EGMS-QA tiles. New collections must satisfy the
-[encoder input requirements](src/egms_encoder/README.md#input-requirements),
+[encoder input requirements](https://huggingface.co/risenyard/egms-qa-encoder#input-requirements),
 including displacement units, component, temporal sampling, and coordinate
 geometry. Use the released normalization with the released frozen checkpoint.
 When training a new encoder on another corpus, fit normalization on that

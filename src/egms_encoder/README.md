@@ -81,8 +81,8 @@ After [installing the code](#installation), provide `--manifest` and
 paths against a different directory. Encoder inference uses displacement histories and coordinates.
 
 For a local checkpoint, provide `--checkpoint`, `--model-config`, and
-`--normalization` together. The token-extraction example above shows how to
-use a checkpoint produced by training.
+`--normalization` together. The [training guide](#reproduce-training) shows how to extract tokens with
+a checkpoint produced by training.
 
 ## Reproduce training
 

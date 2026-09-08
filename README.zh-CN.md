@@ -86,7 +86,7 @@ Translator 报告采用 1,000 个测试瓦片上的 71 个任务，分别对 29 
 ## 适用范围
 
 代码使用已准备好的 EGMS-QA 瓦片。新数据集合需满足
-[编码器输入要求](src/egms_encoder/README.md#input-requirements)，包括位移单位、
+[编码器输入要求](https://huggingface.co/risenyard/egms-qa-encoder#input-requirements)，包括位移单位、
 分量、时间采样与坐标几何。使用发布的冻结 checkpoint 时保留其配套 normalization；
 在另一语料上训练新 encoder 时，仅用新语料的训练集拟合 normalization。
 官方产品下载与数据准备需要单独的工作流。

@@ -1,5 +1,7 @@
 # EGMS-QA Translator
 
+## Architecture
+
 The translator adapts a host language model to answer questions from frozen
 EGMS tile tokens using a token projector and a LoRA adapter. The projector maps tile tokens to the host model's embedding width. The
 projected tokens form a prefix before the question. Training updates the
@@ -16,6 +18,7 @@ the encoder tokens, labels, and task tables used by these workflows.
 
 | goal | where to start |
 |---|---|
+| Ask one question | [Install the code](#installation), then [run the minimal example](#ask-one-question) |
 | Evaluate released weights | [Install the code](#installation), [prepare the data and model](#prepare-data-and-model), then [evaluate](#evaluate-a-released-model) |
 | Train a translator | Complete the same setup, then [reproduce training](#reproduce-training) |
 | Inspect model files or results | Hugging Face [files](https://huggingface.co/risenyard/egms-qa-translator#files) and [evaluation](https://huggingface.co/risenyard/egms-qa-translator#evaluation) |
@@ -33,6 +36,49 @@ pip install -e '.[translator]'
 ```
 
 Run all commands below from the `egms-qa` repository root.
+
+## Ask one question
+
+After [installation](#installation), run this example from the repository root.
+It downloads the released encoder and one source tile, extracts that tile's
+tokens on CPU, and uses the Qwen translator to generate one answer on GPU.
+
+```bash
+python -m egms_encoder.extract_tokens \
+    --max-tiles 1 --device cpu --output-dir outputs/example-tokens
+hf download risenyard/egms-qa-translator \
+    --include 'qwen/*' --local-dir outputs/runs
+python -m egms_qa.translator.ask \
+    --variant-dir outputs/runs/qwen \
+    --token-cache outputs/example-tokens/egms_tokens_1.pt \
+    --question "What is the mean vertical velocity in this tile?" \
+    --output outputs/example-answer.json
+```
+
+The last command prints the tile ID, question, and generated answer, and saves
+those three fields in `outputs/example-answer.json`. The pinned host-model
+weights are downloaded on the first run; answer generation requires CUDA.
+This example does not need the full tile collection, QA labels, or reference
+tables.
+
+One run of this example produced:
+
+```json
+{
+  "tile_id": "E30N33_x3006050_y3355750",
+  "question": "What is the mean vertical velocity in this tile?",
+  "answer": "The mean vertical ground velocity is -1.33 mm/yr."
+}
+```
+
+The answer is a model prediction; exact wording and values may vary across
+runtime environments.
+
+To ask another question, change `--question` within the
+[supported task definitions](../qa_construction/tasks/README.md#task-groups).
+With a multi-tile token cache, use `--tile-id` to select a tile; the default is
+the first tile in the cache. Use `--token-cache` with your own encoder output
+to ask about a new tile, following the [Encoder guide](../../egms_encoder/README.md).
 
 ## Prepare data and model
 
@@ -115,6 +161,7 @@ protocol.
 
 | module | purpose |
 |---|---|
+| [ask.py](ask.py) | one question and one generated answer for a tile |
 | `train.py` | sampling, optimization, and checkpoint selection |
 | `checkpoint.py` | configuration validation and projector loading |
 | `modeling.py` | projector, batching, and training loss |
@@ -125,6 +172,6 @@ protocol.
 ## Scope
 
 Use the released encoder's token representation and questions within the
-[EGMS-QA task definitions](../qa_construction/README.md). The
+[EGMS-QA task definitions](../qa_construction/tasks/README.md#task-groups). The
 [model card](https://huggingface.co/risenyard/egms-qa-translator#scope-and-license)
 describes application limits and model licensing.
