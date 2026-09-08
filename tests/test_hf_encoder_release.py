@@ -18,7 +18,7 @@ from safetensors.torch import load_file
 from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
 from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT, TileStore
 from egms_encoder.extract_tokens import pool_to_spatial_tokens
-from egms_encoder.install_data import install_encoder_data
+from egms_qa.release import install_release
 from egms_encoder.pretrain import apply_release_config, parse_args
 
 
@@ -457,15 +457,15 @@ def test_train_exports_inference_bundle_consumed_by_token_cli(
     assert "source_repositories" not in tokens["metadata"]
 
 
-def test_standalone_encoder_install_and_local_cli(
+def test_encoder_install_and_local_cli(
     release_dirs: tuple[Path, Path],
     tmp_path: Path,
 ) -> None:
     if not torch.cuda.is_available():
-        pytest.fail("standalone encoder integration test requires CUDA")
+        pytest.fail("encoder integration test requires CUDA")
     encoder, dataset = release_dirs
     runtime = tmp_path / "runtime"
-    install_encoder_data(dataset, runtime)
+    install_release(dataset, runtime, components=["tiles", "tokens"])
     checkpoint_dir = runtime / "data/encoder/checkpoint"
     checkpoint_dir.mkdir(parents=True)
     for filename in ("encoder.safetensors", "config.json", "normalization.json"):

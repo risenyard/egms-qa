@@ -8,7 +8,7 @@ refusal accuracy, answer-extraction coverage).
 
 Expected layout (override the root with EGMS_QA_OUTPUTS):
 
-    outputs/runs/<model>/generation_eval/test_normal_summary.json
+    outputs/evaluation/<model>/metrics.json
 
 where <model> is one of qwen, gemma, llama, mistral.
 """
@@ -22,7 +22,7 @@ from statistics import mean
 
 from egms_qa.paths import OUTPUTS_DIR, HOST_MODELS
 
-RUNS_ROOT = OUTPUTS_DIR / "runs"
+EVALUATION_ROOT = OUTPUTS_DIR / "evaluation"
 OUTPUT_ROOT = OUTPUTS_DIR / "report"
 
 # Display name -> run directory / host-model key.
@@ -59,8 +59,8 @@ def summarize(data: dict) -> dict:
 
 
 def load_run(key: str, evaluation_root: Path | None = None) -> dict:
-    path = (evaluation_root / key / 'metrics.json' if evaluation_root is not None
-            else RUNS_ROOT / key / "generation_eval" / "test_normal_summary.json")
+    root = evaluation_root if evaluation_root is not None else EVALUATION_ROOT
+    path = root / key / "metrics.json"
     if not path.is_file():
         raise FileNotFoundError(path)
     return json.loads(path.read_text(encoding="utf-8"))
@@ -68,7 +68,7 @@ def load_run(key: str, evaluation_root: Path | None = None) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--evaluation-root', type=Path,
+    parser.add_argument('--evaluation-root', type=Path, default=EVALUATION_ROOT,
                         help='Directory containing <variant>/metrics.json from the reproduction runner.')
     args = parser.parse_args()
     data = {}

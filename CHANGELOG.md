@@ -3,7 +3,7 @@
 All notable changes to EGMS-QA are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## [1.0.0] - 2026-09-04
+## 1.0.0 - 2026-09-04
 
 ### Added
 
@@ -27,5 +27,3 @@ All notable changes to EGMS-QA are documented here. The project follows
 - EGMS-QA-created data and model artifacts: CC-BY-4.0.
 - Copernicus-derived measurements: CLMS data policy with source,
   modification, and non-endorsement notices.
-
-[1.0.0]: https://github.com/risenyard/egms-qa/releases/tag/v1.0.0

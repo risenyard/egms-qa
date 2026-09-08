@@ -120,7 +120,6 @@ protocol.
 | `modeling.py` | projector, batching, and training loss |
 | `evaluate.py` | free generation and task-level scoring |
 | `answer_extractor.py` | numeric and categorical answer extraction |
-| `compute_ci.py` | per-task bootstrap confidence intervals |
 | `summarize_results.py` | four-model summary tables |
 
 ## Scope

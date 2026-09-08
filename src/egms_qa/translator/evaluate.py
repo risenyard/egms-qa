@@ -18,7 +18,7 @@ from typing import Any
 import torch
 
 from egms_qa.translator.checkpoint import load_projector, load_translator_config
-from egms_qa.translator.generation import build_prompt_q
+from egms_qa.translator.modeling import build_prompt_q
 from egms_qa.translator.answer_extractor import (
     AMBIGUOUS,
     PARSED,
@@ -115,11 +115,6 @@ def numeric_target(row: dict[str, Any], task: TaskRecord) -> float:
         return float(format_number(row.get("answer_value"), task))
     except Exception:
         return float(row.get("answer_value"))
-
-
-def score_row(row: dict[str, Any], gen: str, task: TaskRecord, task_labels: list[Any]) -> tuple[bool, Any | None]:
-    result = extract_answer(gen, task, task_labels)
-    return extraction_is_correct(row, task, result), result.value
 
 
 def balanced_rows(
