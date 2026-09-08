@@ -25,6 +25,9 @@ interval corresponds exactly to `[8,302)` on the original 304-step prepared
 axis. The epoch cadence is 6 days and the original index offset is retained in
 the data config for physical-time calculations.
 
+Threshold fitting requires at least 100 training tiles with sufficient valid
+epochs and finite D12/D13 scores.
+
 ## Algorithm steps
 
 ### Fitted Geometry
