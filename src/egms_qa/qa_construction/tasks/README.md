@@ -166,8 +166,8 @@ rebuild labels, then render questions and answers. The Dataset supplies all 27
 tables needed for that workflow. The [reference-table workflow](../README.md#reproduce-qa-construction)
 provides the label and QA commands. The
 [task recomputation workflow](../README.md#recompute-task-labels-and-regenerate-qa)
-shows how to replace B2 and its dependent C5 table in a working set, then pass
-that set to label aggregation. Both write outputs separately from installed
+shows how to pass a complete working set of task tables to label aggregation
+and QA generation. Both write outputs separately from installed
 reference files.
 
 D1 computes the published geometry scores directly from the model-ready NPZ
