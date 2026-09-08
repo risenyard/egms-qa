@@ -22,6 +22,42 @@ import pandas as pd
 RELEASE_SCHEMA = "egms-qa-release-v1"
 RELEASE_MANIFEST = Path("metadata/release_manifest.json")
 CHECKSUMS = Path("metadata/files.sha256")
+DATASET_REPO = "risenyard/egms-qa-dataset"
+DATA_GROUPS = {
+    "qa": ("data/qa/", "artifacts/labels/", "artifacts/reference_tables/"),
+    "tokens": ("artifacts/representations/",),
+    "tiles": ("artifacts/source_tiles/",),
+}
+
+
+def _data_groups(components: Iterable[str] | None) -> tuple[str, ...]:
+    if components is None:
+        return tuple(DATA_GROUPS)
+    selected = (components,) if isinstance(components, str) else tuple(components)
+    if not selected or set(selected) - set(DATA_GROUPS):
+        raise ValueError(f"components must select from {', '.join(DATA_GROUPS)}")
+    return tuple(dict.fromkeys(selected))
+
+
+def _selected_file(relative: str, groups: tuple[str, ...]) -> bool:
+    return (
+        relative.startswith("metadata/")
+        or ("/" not in relative and relative.endswith(".md"))
+        or any(relative.startswith(prefix) for group in groups for prefix in DATA_GROUPS[group])
+    )
+
+
+def download_release(components: Iterable[str] | None = None, revision: str = "main") -> Path:
+    """Fetch selected groups into the Hub's revision-specific download cache."""
+    from huggingface_hub import snapshot_download
+
+    groups = _data_groups(components)
+    patterns = ["metadata/*", "*.md"]
+    patterns.extend(prefix + "*" for group in groups for prefix in DATA_GROUPS[group])
+    return Path(snapshot_download(
+        repo_id=DATASET_REPO, repo_type="dataset", revision=revision,
+        allow_patterns=patterns,
+    ))
 
 
 def sha256_file(path: Path, chunk_size: int = 8 * 1024 * 1024) -> str:
@@ -157,7 +193,11 @@ def read_checksums(release_dir: Path) -> list[tuple[str, str]]:
     return records
 
 
-def audit_release(release_dir: Path, verify_hashes: bool = False, workers: int = 8) -> dict:
+def audit_release(
+    release_dir: Path, verify_hashes: bool = False, workers: int = 8,
+    components: Iterable[str] | None = None,
+) -> dict:
+    groups = _data_groups(components)
     release_dir = release_dir.resolve()
     manifest = json.loads((release_dir / RELEASE_MANIFEST).read_text(encoding="utf-8"))
     if manifest.get("schema_version") != RELEASE_SCHEMA:
@@ -168,6 +208,12 @@ def audit_release(release_dir: Path, verify_hashes: bool = False, workers: int =
         raise ValueError(
             f"checksum inventory count {len(checksum_records)} != manifest {expected_count}"
         )
+    if set(groups) != set(DATA_GROUPS):
+        checksum_records = [record for record in checksum_records if _selected_file(record[1], groups)]
+    for group in groups:
+        for prefix in DATA_GROUPS[group]:
+            if not any(relative.startswith(prefix) for _, relative in checksum_records):
+                raise FileNotFoundError(f"release inventory has no files for {prefix}")
     missing = [relative for _, relative in checksum_records if not (release_dir / relative).exists()]
     if missing:
         raise FileNotFoundError(f"release is missing {len(missing)} files; first: {missing[0]}")
@@ -182,7 +228,7 @@ def audit_release(release_dir: Path, verify_hashes: bool = False, workers: int =
         if mismatches:
             raise ValueError(f"checksum mismatch for {len(mismatches)} files; first: {mismatches[0]}")
     print(
-        f"release audit passed: files={len(checksum_records):,} "
+        f"release audit passed: components={','.join(groups)} files={len(checksum_records):,} "
         f"hashes={'verified' if verify_hashes else 'declared'}",
         flush=True,
     )
@@ -198,10 +244,13 @@ def _link(source: Path, target: Path) -> None:
     target.symlink_to(source.resolve(), target_is_directory=source.is_dir())
 
 
-def install_release(release_dir: Path, target_root: Path) -> None:
+def install_release(
+    release_dir: Path, target_root: Path, components: Iterable[str] | None = None,
+) -> None:
+    groups = _data_groups(components)
     release_dir = release_dir.resolve()
     target_root = target_root.resolve()
-    audit_release(release_dir, verify_hashes=False)
+    audit_release(release_dir, verify_hashes=True, components=groups)
 
     directory_links = {
         release_dir / "artifacts/source_tiles": target_root / "data/tiles",
@@ -228,11 +277,26 @@ def install_release(release_dir: Path, target_root: Path) -> None:
         release_dir / "data/qa/validation.jsonl": target_root / "outputs/qa/v1_val.jsonl",
         release_dir / "data/qa/test.jsonl": target_root / "outputs/qa/v1_test.jsonl",
     }
-    for source, target in {**directory_links, **file_links}.items():
+    links = {**directory_links, **file_links}
+    selected = {
+        source: target for source, target in links.items()
+        if any((source.relative_to(release_dir).as_posix() + "/").startswith(prefix)
+               for group in groups for prefix in DATA_GROUPS[group])
+        or source.name in {"data_config.json", "split_manifest.parquet"}
+        or (source.name == "qa_audit.json" and "qa" in groups)
+    }
+    # Check all destinations before creating links, so a later conflict cannot
+    # leave a partially installed group.
+    for source, target in selected.items():
         if not source.exists():
             raise FileNotFoundError(f"release artifact is missing: {source}")
+        if (target.exists() or target.is_symlink()) and not (
+            target.is_symlink() and target.resolve() == source.resolve()
+        ):
+            raise FileExistsError(f"installation target already exists: {target}")
+    for source, target in selected.items():
         _link(source, target)
-    print(f"installed release links into {target_root}", flush=True)
+    print(f"installed {', '.join(groups)} into {target_root}", flush=True)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -247,9 +311,14 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--release-dir", type=Path, required=True)
     audit.add_argument("--verify-hashes", action="store_true")
     audit.add_argument("--workers", type=int, default=8)
+    audit.add_argument("--components", nargs="+", choices=tuple(DATA_GROUPS))
 
     install = subparsers.add_parser("install", help="Link the release into a code checkout")
-    install.add_argument("--release-dir", type=Path, required=True)
+    source = install.add_mutually_exclusive_group(required=True)
+    source.add_argument("--release-dir", type=Path, help="Use an existing full or partial download")
+    source.add_argument("--download", action="store_true", help="Download selected groups from Hugging Face")
+    install.add_argument("--components", nargs="+", choices=tuple(DATA_GROUPS), help="Data groups (default: all)")
+    install.add_argument("--revision", default="main", help="Hub revision used with --download")
     install.add_argument("--target-root", type=Path, default=Path("."))
     return parser
 
@@ -260,9 +329,11 @@ def main(argv: Iterable[str] | None = None) -> None:
         manifest = build_manifest(args.release_dir, workers=args.workers)
         print(json.dumps(manifest["integrity"], indent=2), flush=True)
     elif args.command == "audit":
-        audit_release(args.release_dir, verify_hashes=args.verify_hashes, workers=args.workers)
+        audit_release(args.release_dir, verify_hashes=args.verify_hashes, workers=args.workers,
+                      components=args.components)
     else:
-        install_release(args.release_dir, args.target_root)
+        release_dir = download_release(args.components, args.revision) if args.download else args.release_dir
+        install_release(release_dir, args.target_root, components=args.components)
 
 
 if __name__ == "__main__":

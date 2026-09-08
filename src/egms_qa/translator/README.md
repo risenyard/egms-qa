@@ -42,18 +42,14 @@ The example uses `qwen`. Replace it in the download and runtime paths with
 corresponding host models and recipes.
 
 ```bash
-hf download risenyard/egms-qa-dataset --repo-type dataset \
-    --local-dir release/egms-qa-dataset
-python -m egms_qa.release install \
-    --release-dir release/egms-qa-dataset --target-root .
+python -m egms_qa.release install --download --components qa tokens
 hf download risenyard/egms-qa-translator \
     --include 'qwen/*' --include 'evaluation_config.json' \
     --local-dir outputs/runs
 ```
 
-This installs the full Dataset, including its precomputed tokens, QA artifacts,
-and source tiles. The translator uses the precomputed tokens, so the setup
-above is sufficient for the workflows below. Each variant's configuration
+This installs QA artifacts and precomputed tokens. Source tiles are a separate
+optional download. Each variant's configuration
 identifies the host model and revision to download when execution starts.
 
 ## Evaluate a released model

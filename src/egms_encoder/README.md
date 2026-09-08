@@ -93,10 +93,7 @@ download the Dataset and the model settings from Hugging Face, then start
 training:
 
 ```bash
-hf download risenyard/egms-qa-dataset --repo-type dataset \
-    --local-dir release/egms-qa-dataset
-python -m egms_encoder.install_data \
-    --release-dir release/egms-qa-dataset --target-root .
+python -m egms_qa.release install --download --components tiles
 hf download risenyard/egms-qa-encoder --include '*.json' \
     --local-dir data/encoder/checkpoint
 python -m egms_encoder.pretrain \

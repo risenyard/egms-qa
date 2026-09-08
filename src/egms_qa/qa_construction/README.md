@@ -37,46 +37,65 @@ linked methods.
 
 ## Use the released records
 
-After [installing the code](#installation), download and install the Dataset:
+After [installing the code](#installation), download only the data you need.
+Each command downloads and installs one group; groups can be added later.
+
+| group | includes | used for |
+|---|---|---|
+| `qa` | QA pairs, labels, task reference tables, and QA metadata | reading and rendering QA |
+| `tokens` | precomputed EGMS tokens and token metadata | translator workflows and token-based checks |
+| `tiles` | source NPZ tiles and the data configuration | encoder workflows and measurement-based task computation |
+
+QA pairs and construction files:
 
 ```bash
-hf download risenyard/egms-qa-dataset --repo-type dataset \
-    --local-dir release/egms-qa-dataset
-python -m egms_qa.release install \
-    --release-dir release/egms-qa-dataset --target-root .
+python -m egms_qa.release install --download --components qa
 ```
 
-This downloads the full release, including source tiles and encoder tokens.
-The installer checks its inventory, then links the artifacts into the runtime
-paths expected by the code. It refuses to overwrite an existing target.
+Precomputed EGMS tokens:
 
-| HF source | installed local path |
+```bash
+python -m egms_qa.release install --download --components tokens
+```
+
+Source tiles:
+
+```bash
+python -m egms_qa.release install --download --components tiles
+```
+
+Shared metadata is downloaded automatically. Installation checks the required
+files and their integrity, then links them into the working directory. It
+preserves existing files. Downloads are stored in the Hugging Face cache;
+`--target-root` selects a different working directory.
+
+Combine groups in one command when needed. For example, translator workflows
+and label rebuilding use QA data and tokens:
+
+```bash
+python -m egms_qa.release install --download --components qa tokens
+```
+
+Omit `--components` to install all three groups. For an existing download, use
+`--release-dir release/egms-qa-dataset` in place of `--download`, with the same
+component selection.
+
+| data | installed local path |
 |---|---|
-| [Source tiles](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
-| [split_manifest.parquet](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
-| [data_config.json](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/data_config.json) | `data/encoder/manifest/data_config.json` |
-| [Encoder tokens](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/representations) | `data/encoder/tokens/` |
-| [Reference tables](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/reference_tables) | `outputs/tasks/` |
-| [labels.parquet](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/labels/labels.parquet) | `outputs/qa/labels.parquet` |
-| [Labels metadata](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/labels/metadata.json) | `outputs/qa/labels_meta.json` |
-| [train.jsonl](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/data/qa/train.jsonl) | `outputs/qa/v1_train.jsonl` |
-| [validation.jsonl](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/data/qa/validation.jsonl) | `outputs/qa/v1_val.jsonl` |
-| [test.jsonl](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/data/qa/test.jsonl) | `outputs/qa/v1_test.jsonl` |
-| [QA audit](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/qa_audit.json) | `outputs/qa/qa_audit.json` |
+| QA pairs | `outputs/qa/v1_{train,val,test}.jsonl` |
+| Labels and QA metadata | `outputs/qa/` |
+| Task reference tables | `outputs/tasks/` |
+| EGMS tokens | `data/encoder/tokens/` |
+| Source tiles | `data/tiles/` |
+| Split manifest and data configuration | `data/encoder/manifest/` |
 
-To verify every file's SHA256, run:
-
-```bash
-python -m egms_qa.release audit \
-    --release-dir release/egms-qa-dataset --verify-hashes
-```
-
-Use these installed records for the published
-[Translator workflows](../translator/README.md).
+For the Dataset's schemas, file layout, and direct streaming example, see the
+[HF Dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset).
 
 ## Generate question–answer records
 
-Start with a small rendering run from the installed labels and approved phrasings:
+Install the `qa` group, then start with a small rendering run from its labels
+and approved phrasings:
 
 ```bash
 python -m egms_qa.qa_construction.generate_qa \
@@ -107,7 +126,7 @@ byte-for-byte reproduction of those files.
 | Question and answer rendering | `generate_qa.py` and `qa_lib.py` | split JSONL files and rendering metadata |
 
 The [task implementation index](tasks/README.md) links all 27 task groups and
-their dependencies. To rebuild labels from the installed reference tables and
+their dependencies. Install `qa tokens` to rebuild labels from the reference tables and
 render them into a new directory:
 
 ```bash
@@ -130,7 +149,7 @@ new build.
 
 ## Recompute D1, D4, and S3
 
-With the Dataset installed, D1 fits temporal geometry from the NPZ tiles and
+Install `qa tiles` for these commands. D1 fits temporal geometry from the NPZ tiles and
 data configuration. Its curvature and changepoint thresholds are fitted on
 the training split. S3 uses D1 curvature and changepoint strength alongside
 the other A/B/C/D monitoring indicators. D4 uses D1 trend shape to distinguish

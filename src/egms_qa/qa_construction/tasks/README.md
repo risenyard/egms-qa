@@ -9,8 +9,10 @@ meanings and the Dataset installation commands.
 
 Install the code using the [project installation](../../../../README.md#installation).
 For tasks that read measurements, representations, or upstream tables, also
-[install the Dataset](../README.md#use-the-released-records). Run all task
-commands from the cloned repository root.
+[install the required data groups](../README.md#use-the-released-records):
+`qa` supplies reference tables, `tokens` supplies encoder representations, and
+`tiles` supplies source measurements. Select groups using the input columns
+in the task table below. Run commands from the cloned repository root.
 
 ```bash
 pip install -e '.[tasks]'
