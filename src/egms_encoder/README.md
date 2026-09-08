@@ -123,6 +123,10 @@ python -m egms_encoder.pretrain \
     --output-dir outputs/my_encoder --device cuda:0
 ```
 
+Use `--resample-val-batches` to draw new validation tiles at each validation
+step. The saved recipe retains this choice on resume;
+`--no-resample-val-batches` selects fixed validation batches.
+
 To extract tokens with the trained encoder, pass its inference bundle and the
 installed data contract:
 

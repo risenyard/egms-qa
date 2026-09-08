@@ -120,7 +120,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--val-batches", type=int, default=None)
     p.add_argument(
         "--resample-val-batches",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=None,
         help="Draw a new, reproducible set of non-overlapping validation batches at each validation step.",
     )
     p.add_argument("--val-every-steps", type=int, default=None)
@@ -184,6 +185,7 @@ def apply_release_config(
         "precision": optimization["precision"],
         "seed": optimization["seed"],
         "val_batches": validation["batches"],
+        "resample_val_batches": validation.get("resample_each_validation", False),
         "val_every_steps": validation["interval_steps"],
         "val_seed": validation["seed"],
         "checkpoint_every_steps": checkpointing.get("interval_steps", 5_000),
@@ -289,6 +291,7 @@ def resolved_training_recipe(training_args: dict, args: argparse.Namespace) -> d
     resolved["validation"].update(
         {
             "batches": int(args.val_batches),
+            "resample_each_validation": bool(args.resample_val_batches),
             "interval_steps": int(args.val_every_steps),
             "seed": int(args.val_seed),
         }

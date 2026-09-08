@@ -102,3 +102,14 @@ def test_pretrain_defaults_match_public_encoder_recipe() -> None:
     assert output_recipe["optimization"]["maximum_steps"] == args.max_steps
     assert output_recipe["data"]["maximum_points_per_tile"] == args.max_tile_points
     assert output_recipe["masking"]["strategy"] == "synchronized_block"
+
+    custom = apply_release_config(
+        parse_args(["--resample-val-batches"]), model_config, training_args
+    )
+    saved = resolved_training_recipe(training_args, custom)
+    resumed = apply_release_config(parse_args([]), model_config, saved)
+    assert resumed.resample_val_batches is True
+    overridden = apply_release_config(
+        parse_args(["--no-resample-val-batches"]), model_config, saved
+    )
+    assert overridden.resample_val_batches is False
