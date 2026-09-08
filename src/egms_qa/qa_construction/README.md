@@ -100,9 +100,34 @@ python -m egms_qa.qa_construction.generate_qa \
 
 ## Construct QA for new tiles
 
-Complete the [task-system setup](tasks/README.md#setup), then follow the
-[new-tile task computation instructions](tasks/README.md#new-tiles). That example
-writes the task tables to `outputs/tasks-new/`.
+Complete the [task-system setup](tasks/README.md#setup).
+Prepare NPZ tiles following the [tile contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#source-tile-contract)
+and a manifest with `tile_id`, `split`, and `path`. Each tile needs displacement
+histories, coordinates, and the static fields required by the
+[tile reader](../../egms_encoder/data/tile_store.py). Missing point counts
+and centroids are computed automatically.
+
+```bash
+python -m egms_qa.qa_construction.run_tasks \
+    --mode new-tiles --manifest my_data/split.parquet \
+    --out-dir outputs/tasks-new
+```
+
+The task tables are written to `outputs/tasks-new/<group>/<group>_final_table.csv`.
+
+Tokens are extracted automatically with the released encoder. To reuse an
+existing cache, pass `--token-cache`. The cache must match the manifest,
+encoder, normalization, and data configuration.
+
+Use `--source-tiles-root` to change the tile directory or `--data-config` to
+supply a data configuration. Tiles must still contain 294 steps of vertical
+displacement.
+
+New tiles use the release's training reference for classification and
+representation scores. These settings stay fixed. A train split is not
+required, and the collection can have a different number of tiles.
+Reference settings are saved in `reference_state.joblib`, with input hashes
+and run details in `run.json`.
 
 Assemble the computed targets into `my_data/labels.parquet` following the
 [Dataset label contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#labels-and-task-metadata).

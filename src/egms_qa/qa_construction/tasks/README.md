@@ -97,35 +97,8 @@ with the [QA generation workflow](../README.md#reproduce-qa-generation).
 
 ### New tiles
 
-Prepare NPZ tiles following the [tile contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#source-tile-contract)
-and a manifest with `tile_id`, `split`, and `path`. Each tile needs displacement
-histories, coordinates, and the static fields required by the
-[tile reader](../../../egms_encoder/data/tile_store.py). Missing point counts
-and centroids are computed automatically.
-
-```bash
-python -m egms_qa.qa_construction.run_tasks \
-    --mode new-tiles --manifest my_data/split.parquet \
-    --out-dir outputs/tasks-new
-```
-
-Tokens are extracted automatically with the released encoder. To reuse an
-existing cache, pass `--token-cache`. The cache must match the manifest,
-encoder, normalization, and data configuration.
-
-Use `--source-tiles-root` to change the tile directory or `--data-config` to
-supply a data configuration. Tiles must still contain 294 steps of vertical
-displacement.
-
-New tiles use the release's training reference for classification and
-representation scores. These settings stay fixed. A train split is not
-required, and the collection can have a different number of tiles.
-Reference settings are saved in `reference_state.joblib`, with input hashes
-and run details in `run.json`.
-
-The task tables are written to `outputs/tasks-new/<group>/<group>_final_table.csv`.
-Continue with [label assembly and QA generation](../README.md#construct-qa-for-new-tiles)
-in the QA construction guide.
+Use [Construct QA for new tiles](../README.md#construct-qa-for-new-tiles) to
+prepare new inputs, compute task results, and generate QA.
 
 ### Task reference
 
