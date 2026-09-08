@@ -126,7 +126,7 @@ def build_manifest(release_dir: Path, workers: int = 8) -> dict:
             "artifacts/source_tiles": "10,000 model-ready 294-step EGMS tiles (NPZ)",
             "artifacts/representations": "frozen encoder token cache",
             "artifacts/labels": "canonical task labels",
-            "artifacts/reference_tables": "deterministic per-family task tables",
+            "artifacts/reference_tables": "per-group reference tables and supporting scientific inputs",
             "metadata": "current data contract, split, audit, and integrity records",
         },
         "components": component_stats,

@@ -127,6 +127,6 @@ Candidate rules compared:
 | `q90_q975_q99` | 0.2306 / 0.2913 / 0.3286 | 8997 / 741 / 156 / 106 |
 | `tukey_q75_1p5iqr_3iqr` | 0.1768 / 0.2965 / 0.4162 | 7480 / 2285 / 222 / 13 |
 
-Official S22 rule: `q75_q95_q99`.
+Released S22 rule: `q75_q95_q99`.
 
 Reason: it directly matches the rarity story: common core, unusual upper quartile, rare top 5%, and extreme top 1%. The thresholds are train-only and corpus-relative.
