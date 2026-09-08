@@ -2,14 +2,14 @@
 
 The 78 leaf tasks are organized into 27 task groups under six families
 (A/B/C/D/S/X). A directory such as `a1/` implements A11 and A12; it is not a
-separate top-level family. See the [QA guide](../README.md) for all leaf-task
-meanings and the Dataset installation commands.
+separate top-level family. Each linked task page describes all of its leaf tasks. See the
+[QA guide](../README.md) for downloading data and generating QA.
 
 ## Setup
 
 Install the code using the [project installation](../../../../README.md#installation).
 For tasks that read measurements, representations, or upstream tables, also
-[install the required data groups](../README.md#use-the-released-records):
+[install the required data groups](../README.md#download-and-try):
 `qa` supplies reference tables, `tokens` supplies encoder representations, and
 `tiles` supplies source measurements. Select groups using the input columns
 in the task table below. Run commands from the cloned repository root.
