@@ -69,39 +69,39 @@ for these steps; the remaining calculations run on CPU.
 
 ## Run the task system
 
-Run all 27 groups in dependency order:
+After [setup](#setup), run all 27 task groups on the released data:
 
 ```bash
 python -m egms_qa.qa_construction.run_tasks \
     --out-dir outputs/tasks-rebuilt
 ```
 
-The runner handles A1/A2 computation and aggregation and passes every new
-upstream table to its dependent tasks. It uses C4's released cutoff and keeps
-each method's existing parameters. It writes
-`outputs/tasks-rebuilt/<group>/<group>_final_table.csv`, plus per-group diagnostics,
-`logs/`, and `run.json`. Labels and QA are separate steps in the
+Tasks run in dependency order. Each task uses the new results from the tasks
+it depends on. Results are saved to
+`outputs/tasks-rebuilt/<group>/<group>_final_table.csv`.
+The output directory also contains task diagnostics, `logs/`, and `run.json`.
+To build labels and QA from these tables, follow the
 [QA construction guide](../README.md#reproduce-task-computation).
 
-Add `--dry-run` to inspect the plan without writing files. `--device cpu` or
-`--device cuda:0` selects the execution device; `--workers` controls CPU workers.
-Use a new output directory, or add `--resume` to continue an interrupted run.
-Resume verifies inputs, parameters, code, dependency versions, and completed artifacts before
-skipping any group. A failed group stops downstream execution.
+Add `--dry-run` to preview the commands. Use `--device cpu` or
+`--device cuda:0` to select the device, and `--workers` to set the CPU worker
+count.
 
-The Dataset tables are fixed reference results. Re-execution can differ in
-encoder-dependent values, labels near cutoffs, and percentile ranks when
-scores are tied. For exact released targets, use the
-[published reference tables](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/reference_tables)
+To continue an interrupted run, repeat the command with `--resume`. The runner
+checks that inputs, settings, code, and completed results are unchanged before
+skipping completed tasks. Otherwise, choose a new output directory.
+
+Recomputed values can differ from the fixed Dataset tables. For exact
+published targets, use the [released reference tables](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/reference_tables)
 with the [QA generation workflow](../README.md#reproduce-qa-generation).
 
 ### New tiles
 
-Provide a manifest with `tile_id`, `split`, and `path`, and NPZ files matching
-the [tile contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#source-tile-contract).
-The complete task system requires displacement histories, coordinates, and the
-eight static fields listed in the [tile reader](../../../egms_encoder/data/tile_store.py).
-The runner derives point counts and centroids if the manifest omits them.
+Prepare NPZ tiles following the [tile contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#source-tile-contract)
+and a manifest with `tile_id`, `split`, and `path`. Each tile needs displacement
+histories, coordinates, and the static fields required by the
+[tile reader](../../../egms_encoder/data/tile_store.py). Missing point counts
+and centroids are computed automatically.
 
 ```bash
 python -m egms_qa.qa_construction.run_tasks \
@@ -109,21 +109,22 @@ python -m egms_qa.qa_construction.run_tasks \
     --out-dir outputs/tasks-new
 ```
 
-Tokens are extracted with the released encoder when `--token-cache` is omitted.
-A supplied cache must match the tile IDs, splits, encoder, normalization, and
-data configuration. Use `--source-tiles-root` or `--data-config` to specify
-local inputs; the stored 294-step vertical-displacement contract still applies.
+Tokens are extracted automatically with the released encoder. To reuse an
+existing cache, pass `--token-cache`. The cache must match the manifest,
+encoder, normalization, and data configuration.
 
-New tiles use the published training population for thresholds, percentile
-ranks, representation transforms, and S1 profiles. No new-tile rows enter the
-fit, even when their split is `train`. The resulting reference state is saved
-locally as `reference_state.joblib`; its source files and hashes are recorded
-in `run.json`. New collections need not contain 10,000 tiles or a train split.
+Use `--source-tiles-root` to change the tile directory or `--data-config` to
+supply a data configuration. Tiles must still contain 294 steps of vertical
+displacement.
+
+New tiles use the release's training reference for classification and
+representation scores. These settings stay fixed. A train split is not
+required, and the collection can have a different number of tiles.
+Reference settings are saved in `reference_state.joblib`, with input hashes
+and run details in `run.json`.
 
 ### Task reference
 
-Individual implementations remain callable through their linked modules;
-use `--help` for task-specific options. Corpus-relative labels retain the
-reference population specified by each method. Re-estimating European
-candidate-pool cutoffs requires the separate reference data described by that
-method and is outside this runner.
+For a single task group, use its linked implementation and `--help` to see the
+available options. Changing European reference cutoffs requires the separate
+reference data described in that task's method.
