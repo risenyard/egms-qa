@@ -18,7 +18,7 @@ motion, spatial organization, temporal dynamics, and representation properties.
 The 14 X tasks define refusal boundaries and are stored as task catalogs rather
 than tile-dependent label columns.
 
-For example, [B21](tasks/b2/b2_algorithm.md) takes the mean of a tile's point
+>For example, [B21](tasks/b2/b2_algorithm.md) takes the mean of a tile's point
 velocities. Its reference-table column, `B21_mean_velocity_mm_yr`, becomes the
 label column `B21`. One question phrasing is “What is the average vertical
 ground velocity?” An illustrative value of `-1.6` yields the reference answer
