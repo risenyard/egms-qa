@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 from egms_qa.paths import (
-    QA_DIR as DEFAULT_OUT,
+    OUTPUTS_DIR,
     TASKS_DIR as DEFAULT_TASKS_DIR,
     ENCODER_TOKENS as DEFAULT_ENCODER_CACHE,
 )
@@ -25,11 +25,26 @@ from egms_qa.paths import (
 from egms_qa.qa_construction.task_specs import TASK_SPECS
 from egms_qa.qa_construction.tables import align_family_to_base, read_family
 
+DEFAULT_OUT = OUTPUTS_DIR / "labels-generated"
+
+
+def check_output_paths(out: Path) -> None:
+    """Reject existing outputs, including dangling links to release files."""
+    for name in ("labels.parquet", "labels_meta.json"):
+        path = out / name
+        if path.exists() or path.is_symlink():
+            raise FileExistsError(
+                f"Refusing to overwrite {path}; choose a different --out-dir."
+            )
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--tasks-root", default=str(DEFAULT_TASKS_DIR))
-    p.add_argument("--out-dir", default=str(DEFAULT_OUT))
+    p.add_argument(
+        "--out-dir", default=str(DEFAULT_OUT),
+        help="Output directory (default: %(default)s); existing output files are never overwritten.",
+    )
     p.add_argument("--encoder-cache", default=str(DEFAULT_ENCODER_CACHE))
     p.add_argument("--skip-cache-validation", action="store_true")
     return p.parse_args()
@@ -114,7 +129,7 @@ def main() -> None:
     args = parse_args()
     root = Path(args.tasks_root)
     out = Path(args.out_dir)
-    out.mkdir(parents=True, exist_ok=True)
+    check_output_paths(out)
 
     families = sorted({spec["source_family"] for spec in TASK_SPECS})
     tables = {family: read_family(root, family) for family in families}
@@ -200,7 +215,6 @@ def main() -> None:
         raise ValueError(f"unexpected split counts: {split_counts(labels)}")
 
     parquet_path = out / "labels.parquet"
-    labels.to_parquet(parquet_path, index=False)
     meta = {
         "version": "EGMS-QA",
         "description": "Canonical delivered EGMS-QA A-X task labels for encoder-token probing",
@@ -229,7 +243,11 @@ def main() -> None:
         },
     }
     meta_path = out / "labels_meta.json"
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    out.mkdir(parents=True, exist_ok=True)
+    check_output_paths(out)
+    with parquet_path.open("xb") as label_file, meta_path.open("x", encoding="utf-8") as meta_file:
+        labels.to_parquet(label_file, index=False)
+        meta_file.write(json.dumps(meta, indent=2))
 
     print(f"wrote {parquet_path}")
     print(f"wrote {meta_path}")

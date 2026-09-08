@@ -124,6 +124,10 @@ encoder token cache, then aligns label rows to its tile order. The released
 label file supplies the targets for the published QA records. The
 optional [temporal summary](temporal_summary.md) combines D1–D4 tables for analysis.
 
+Label building defaults to `outputs/labels-generated/`. It refuses to replace
+existing output files or symbolic links; choose a different `--out-dir` for a
+new build.
+
 ## Recompute D1, D4, and S3
 
 With the Dataset installed, D1 fits temporal geometry from the NPZ tiles and
