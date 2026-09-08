@@ -51,7 +51,7 @@ the released reference tables and pass them to the QA generator:
 
 ```bash
 python -m egms_qa.qa_construction.build_labels \
-    --skip-cache-validation --out-dir outputs/labels-reproduced
+    --validate-release --out-dir outputs/labels-reproduced
 python -m egms_qa.qa_construction.generate_qa \
     --labels outputs/labels-reproduced/labels.parquet \
     --meta outputs/labels-reproduced/labels_meta.json \
@@ -59,8 +59,8 @@ python -m egms_qa.qa_construction.generate_qa \
 ```
 
 The label builder writes `labels.parquet` and `labels_meta.json`.
-`--skip-cache-validation` omits the optional alignment check against encoder
-tokens; reference-table validation still runs.
+`--validate-release` checks the fixed 8,000/1,000/1,000 tile split. To also
+check token alignment, supply `--encoder-cache` with a token-cache path.
 
 QA files appear under `outputs/qa-reproduced/qa/`: two different question phrasings for training dataset
 (`v1_train_e00.jsonl` and `v1_train_e01.jsonl`), plus `v1_val.jsonl` and
@@ -90,7 +90,7 @@ and output checks. To turn these results into labels and QA:
 ```bash
 python -m egms_qa.qa_construction.build_labels \
     --tasks-root outputs/tasks-rebuilt \
-    --skip-cache-validation --out-dir outputs/labels-recomputed
+    --validate-release --out-dir outputs/labels-recomputed
 python -m egms_qa.qa_construction.generate_qa \
     --labels outputs/labels-recomputed/labels.parquet \
     --meta outputs/labels-recomputed/labels_meta.json \
@@ -129,20 +129,26 @@ required, and the collection can have a different number of tiles.
 Reference settings are saved in `reference_state.joblib`, with input hashes
 and run details in `run.json`.
 
-Assemble the computed targets into `my_data/labels.parquet` following the
-[Dataset label contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#labels-and-task-metadata).
-The release label builder retains its fixed 10,000-tile requirement; other
-collections need their own label-table assembly.
+Merge the task tables into labels, then generate QA:
 
 ```bash
+python -m egms_qa.qa_construction.build_labels \
+    --tasks-root outputs/tasks-new \
+    --out-dir outputs/labels-new
 python -m egms_qa.qa_construction.generate_qa \
-    --labels my_data/labels.parquet \
+    --labels outputs/labels-new/labels.parquet \
+    --meta outputs/labels-new/labels_meta.json \
     --tasks-root outputs/tasks-new \
     --out-dir outputs/qa-custom
 ```
 
-QA appears under `outputs/qa-custom/qa/`. The generator uses the installed task
-metadata and approved phrasings. Missing targets receive missing-data answers.
+The builder aligns all task tables by `tile_id` and `split` and supports any
+number of tiles. It writes `labels.parquet` and `labels_meta.json`; the
+[Dataset label contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#labels-and-task-metadata)
+describes their fields.
+
+QA appears under `outputs/qa-custom/qa/`. The generator uses the new label
+metadata and the published approved phrasings. Missing targets receive missing-data answers.
 
 ## Code reference
 

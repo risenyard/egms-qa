@@ -40,9 +40,16 @@ def read_family(root: Path, family: str, expected_rows: int | None = 10000) -> p
     path = root / family / f"{family}_final_table.csv"
     if not path.exists():
         raise FileNotFoundError(path)
-    df = pd.read_csv(path)
+    df = pd.read_csv(path, dtype={"tile_id": str, "split": str})
     if "tile_id" not in df.columns or "split" not in df.columns:
         raise ValueError(f"{path} must contain tile_id and split")
+    if df.empty or df[["tile_id", "split"]].isna().any().any():
+        raise ValueError(f"{path} has empty data or missing tile_id/split keys")
+    if df["tile_id"].str.strip().eq("").any():
+        raise ValueError(f"{path} has empty tile IDs")
+    invalid = sorted(set(df["split"]) - {"train", "val", "test"})
+    if invalid:
+        raise ValueError(f"{path} has invalid split values: {invalid}")
     if df["tile_id"].duplicated().any():
         dupes = df.loc[df["tile_id"].duplicated(), "tile_id"].head().tolist()
         raise ValueError(f"{path} has duplicate tile_id values: {dupes}")

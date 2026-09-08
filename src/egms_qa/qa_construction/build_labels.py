@@ -1,9 +1,7 @@
-"""Build EGMS-QA delivered-task labels for token probing.
+"""Assemble task result tables into EGMS-QA labels and metadata.
 
-This builder treats the delivered family final tables as the source of truth.
-It materializes one canonical probe target per leaf task and keeps X refusal
-tasks in metadata only because they are static boundary policies, not
-token-dependent targets.
+Tile-dependent targets are aligned by tile ID and split. X refusal tasks stay
+in metadata. The fixed release size is checked only with --validate-release.
 """
 from __future__ import annotations
 
@@ -19,7 +17,6 @@ import pandas as pd
 from egms_qa.paths import (
     OUTPUTS_DIR,
     TASKS_DIR as DEFAULT_TASKS_DIR,
-    ENCODER_TOKENS as DEFAULT_ENCODER_CACHE,
 )
 
 from egms_qa.qa_construction.task_specs import TASK_SPECS
@@ -45,8 +42,9 @@ def parse_args() -> argparse.Namespace:
         "--out-dir", default=str(DEFAULT_OUT),
         help="Output directory (default: %(default)s); existing output files are never overwritten.",
     )
-    p.add_argument("--encoder-cache", default=str(DEFAULT_ENCODER_CACHE))
-    p.add_argument("--skip-cache-validation", action="store_true")
+    p.add_argument("--encoder-cache", help="Optionally validate and order labels against this token cache.")
+    p.add_argument("--skip-cache-validation", action="store_true", help="Omit token-cache validation, even if a cache is supplied.")
+    p.add_argument("--validate-release", action="store_true", help="Require the released 8,000/1,000/1,000 tile split.")
     return p.parse_args()
 
 
@@ -64,6 +62,10 @@ def load_cache_ids(path: Path) -> tuple[list[str], list[str]]:
     cache = torch.load(path, map_location="cpu", weights_only=True)
     ids = [str(t) for t in cache["tile_ids"]]
     splits = [str(s) for s in cache.get("splits", [""] * len(ids))]
+    if len(ids) != len(set(ids)):
+        raise ValueError("encoder_cache contains duplicate tile IDs")
+    if len(splits) != len(ids):
+        raise ValueError("encoder_cache tile_id/split length mismatch")
     return ids, splits
 
 
@@ -108,7 +110,7 @@ def label_stats(df: pd.DataFrame, task_id: str, label_type: str) -> dict[str, An
         v = pd.to_numeric(s, errors="coerce")
         return {
             "label_n": int(v.notna().sum()),
-            "label_std": float(np.nanstd(v.to_numpy(dtype=float))),
+            "label_std": float(np.std(v.dropna().to_numpy(dtype=float))) if v.notna().any() else None,
             "class_count": None,
             "min_class_frac": None,
             "majority_class_frac": None,
@@ -132,7 +134,8 @@ def main() -> None:
     check_output_paths(out)
 
     families = sorted({spec["source_family"] for spec in TASK_SPECS})
-    tables = {family: read_family(root, family) for family in families}
+    tables = {family: read_family(root, family, expected_rows=10000 if args.validate_release else None)
+              for family in families}
 
     first = tables[families[0]][["tile_id", "split"]].copy()
     first["tile_id"] = first["tile_id"].astype(str)
@@ -180,7 +183,7 @@ def main() -> None:
     tasks.extend(x_tasks)
 
     cache_checks: dict[str, Any] = {}
-    if not args.skip_cache_validation:
+    if args.encoder_cache is not None and not args.skip_cache_validation:
         encoder_path = Path(args.encoder_cache)
         encoder_ids, encoder_splits = load_cache_ids(encoder_path)
         label_ids = labels["tile_id"].astype(str).tolist()
@@ -211,13 +214,13 @@ def main() -> None:
         }
 
 
-    if split_counts(labels) != {"test": 1000, "train": 8000, "val": 1000}:
+    if args.validate_release and split_counts(labels) != {"test": 1000, "train": 8000, "val": 1000}:
         raise ValueError(f"unexpected split counts: {split_counts(labels)}")
 
     parquet_path = out / "labels.parquet"
     meta = {
         "version": "EGMS-QA",
-        "description": "Canonical delivered EGMS-QA A-X task labels for encoder-token probing",
+        "description": "EGMS-QA task labels assembled from task result tables",
         "labels": str(parquet_path.resolve()),
         "tasks": tasks,
         "probe_policy": {
@@ -229,10 +232,11 @@ def main() -> None:
         },
         "sources": {
             "tasks_root": str(root.resolve()),
-            "encoder_cache": str(Path(args.encoder_cache).resolve()),
+            "encoder_cache": str(Path(args.encoder_cache).resolve()) if cache_checks else None,
         },
         "verification": {
             "rows": int(len(labels)),
+            "release_contract_checked": args.validate_release,
             "columns": list(labels.columns),
             "split_counts": split_counts(labels),
             "duplicate_tile_id": int(labels["tile_id"].duplicated().sum()),
