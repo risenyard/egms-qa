@@ -102,6 +102,10 @@ python -m egms_encoder.pretrain \
     --output-dir outputs/my_encoder --device cuda:0
 ```
 
+Training memory depends on the number of tiles and points per batch. Use
+`--tiles-per-batch` to reduce the batch on smaller GPUs, and retain that override
+when reporting the training settings.
+
 Training reads the architecture, recipe, and normalization from
 `data/encoder/checkpoint/`. It starts from scratch with the released
 train-fitted normalization. Command-line overrides support custom experiments.

@@ -144,7 +144,12 @@ class SpatialBlock(nn.Module):
 
     def forward(self, hidden: torch.Tensor, key_padding_mask: torch.Tensor | None = None) -> torch.Tensor:
         normed = self.attention_norm(hidden)
-        attn_out, _ = self.attention(normed, normed, normed, key_padding_mask=key_padding_mask)
+        # Training does not consume attention weights. Avoid their quadratic
+        # storage while retaining the released inference execution path.
+        attn_out, _ = self.attention(
+            normed, normed, normed, key_padding_mask=key_padding_mask,
+            need_weights=not self.training,
+        )
         hidden = hidden + self.dropout(attn_out)
         hidden = hidden + self.dropout(self.ffn(self.ffn_norm(hidden)))
         return hidden

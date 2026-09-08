@@ -103,7 +103,9 @@ def main() -> None:
             metric = "R2" if metric_type == "numeric" else "balanced_accuracy"
             writer.writerow([
                 task, metric,
-                *(task_score(data[name]["raw"]["per_task"][task]) for name in MODELS),
+                *(float(data[name]["raw"]["per_task"][task][
+                    "r2" if metric_type == "numeric" else "balanced_acc"
+                ]) for name in MODELS),
             ])
 
     lines = [
