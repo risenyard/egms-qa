@@ -1,17 +1,27 @@
-# C41/C42 Fast-Tail Spatial Extent
+# C4: Fast-tail spatial extent
 
-## Task Question
+## Task overview
+
+| task | description |
+|---|---|
+| **C4 group** | Measure whether high-velocity tail cells occupy a substantial spatial area. |
+| C41 | Fraction of valid cells whose absolute-velocity tail statistic exceeds the fixed reference threshold. |
+| C42 | Extent class combining the number of high-tail cells and their fraction of valid cells. |
+
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv) · [Implementation](c4_compute.py)
+
+## Key concepts
 
 Do high-velocity tail bins occupy a spatial area, or are they confined to a very small part of the tile?
 
-## Inputs
+### Inputs
 
 - `coords`: point coordinates.
 - `mean_velocity`: point-level mean velocity in mm/yr.
 
 The 10k final table uses:
 
-`./data/encoder/manifest/split.parquet`
+[HF split.parquet](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) (installed at `data/encoder/manifest/split.parquet`)
 
 The fast-motion threshold `T_fast` is **corpus-relative**: it is the p95 of the
 per-bin abs-velocity p90 over the full European candidate pool (83,323 tiles).
@@ -21,20 +31,18 @@ optional `reference` subcommand requires the full candidate pool, which is
 not included in the Dataset. That subcommand generates a reference JSON that
 can be supplied to `final` through `--reference-json`.
 
-Derived reference distribution over the pool (for provenance):
 
-| statistic | value (mm/yr) |
-|---|---|
-| p50 | 1.80 |
-| p90 | 3.72 |
-| **p95 (= `T_fast`)** | **4.80** |
-| p99 | 8.20 |
-| p99.9 | 18.60 |
 
-(log-bulk fit: mu=0.594, sigma=0.536, over log values trimmed to [p1, p99];
-n_tiles=83,323, n_valid_bins=3,351,762.)
+### Intentional Exclusions
 
-## Reference Distribution
+- C4 does not measure the strongest velocity itself; B33/B36 handle velocity-tail magnitude.
+- C4 does not measure all meaningful motion; C11 handles noise-aware moving-point fraction.
+- C4 does not measure global concentration; C21/C22 handle spatial concentration over all motion.
+- C4 does not measure a deformation front; C31/C33 handle adjacent-bin jumps.
+
+## Algorithm steps
+
+### Reference Distribution
 
 For every European candidate tile:
 
@@ -70,7 +78,7 @@ T_fast = full-Europe bin-level p95 = 4.800000 mm/yr
 For reference, the trimmed log-bulk fit gives `z2 = 5.287757 mm/yr`, close to p95,
 which supports p95 as a stable high-tail threshold rather than an arbitrary cut.
 
-## Final Formula
+### Final Formula
 
 For each 10k VQA tile:
 
@@ -94,42 +102,69 @@ The `sparse` class uses absolute bin count because one or two high-tail bins are
 not enough to claim a spatial area. The `extensive` class uses a quarter of valid
 bins as an interpretable area-coverage threshold.
 
-## Final Distribution
+## Run and files
 
-All 10k EGMS encoder tiles:
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-| statistic | C41_fast_tail_bin_fraction |
-|---|---:|
-| p50 | 0.000000 |
-| p75 | 0.035714 |
-| p90 | 0.125000 |
-| p95 | 0.230769 |
-| p99 | 0.577806 |
+```bash
+python -m egms_qa.qa_construction.tasks.c4.c4_compute final \
+    --out-dir outputs/tasks-rebuilt/c4
+```
 
-C42 class counts:
+The new table is written to `outputs/tasks-rebuilt/c4/c4_final_table.csv`.
+The installed reference remains at `outputs/tasks/c4/c4_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
 
-| class | count | fraction |
+| required input | published source | installed path |
+|---|---|---|
+| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
+| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
+
+The `final` subcommand uses the published fixed threshold. The optional
+`reference` subcommand needs a separate full candidate-pool manifest, which is
+not distributed with this Dataset. Its threshold JSON and diagnostics are
+generated locally; they are not downloadable release files.
+
+The computation may also write local summaries or diagnostics next to its
+new table. Their filenames and options are defined in the linked script;
+they are not part of the published reference-table inventory unless linked
+explicitly above.
+
+## Results
+
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
+
+### Numeric targets
+
+| task | defined | missing | p05 | median | p95 |
+|---|---:|---:|---:|---:|---:|
+| C41 | 10,000 | 0 | 0 | 0 | 0.230769 |
+
+### C42 label distribution
+
+| label | count | share |
 |---|---:|---:|
-| `none` | 5740 | 0.5740 |
-| `sparse` | 2321 | 0.2321 |
-| `localized` | 1482 | 0.1482 |
-| `extensive` | 457 | 0.0457 |
+| `none` | 5,740 | 57.40% |
+| `sparse` | 2,321 | 23.21% |
+| `localized` | 1,482 | 14.82% |
+| `extensive` | 457 | 4.57% |
 
-## Intentional Exclusions
+### Reference and selection evidence
 
-- C4 does not measure the strongest velocity itself; B33/B36 handle velocity-tail magnitude.
-- C4 does not measure all meaningful motion; C11 handles noise-aware moving-point fraction.
-- C4 does not measure global concentration; C21/C22 handle spatial concentration over all motion.
-- C4 does not measure a deformation front; C31/C33 handle adjacent-bin jumps.
+#### Reference calibration
 
-## File Inventory
+Derived reference distribution over the pool (for provenance):
 
-GitHub provides `c4_compute.py` and this algorithm note. The Dataset publishes
-`artifacts/reference_tables/c4/c4_final_table.csv`, which the release installer
-exposes at `outputs/tasks/c4/c4_final_table.csv`.
+| statistic | value (mm/yr) |
+|---|---|
+| p50 | 1.80 |
+| p90 | 3.72 |
+| **p95 (= `T_fast`)** | **4.80** |
+| p99 | 8.20 |
+| p99.9 | 18.60 |
 
-The `final` subcommand writes `c4_final_table.csv` and `c4_final_summary.json`
-to its `--out-dir`. The optional `reference` subcommand writes
-`c4_bin_level_reference_thresholds.json`, diagnostic CSV tables, a sampled NPZ,
-and `c4_bin_level_reference_distribution.png`. These reference-run outputs are
-generated locally and are not included in the Dataset.
+(log-bulk fit: mu=0.594, sigma=0.536, over log values trimmed to [p1, p99];
+n_tiles=83,323, n_valid_bins=3,351,762.)

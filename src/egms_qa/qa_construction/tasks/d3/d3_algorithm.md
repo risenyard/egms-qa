@@ -1,6 +1,19 @@
-# D3 Acceleration Algorithm
+# D3: Motion intensification
 
-## Current Scope
+## Task overview
+
+| task | description |
+|---|---|
+| **D3 group** | Describe whether motion is intensifying, how widely that change is supported, and where it concentrates. |
+| D31 | Signed motion-intensification summary distinguishing intensification from weakening. |
+| D32 | Fraction of observations supporting the acceleration criterion. |
+| D33 | Spread of the point-level motion-intensification values. |
+| D34 | Strength of the spatial intensification hotspot. |
+| D35 | Location of the identified intensification hotspot. |
+
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv) · [Implementation](d3_compute.py)
+
+## Key concepts
 
 This folder is the D3 acceleration family. The implemented targets are:
 
@@ -16,7 +29,9 @@ spatially supported, how spread out the direction-aware acceleration field is,
 and where the strongest local hotspot sits in an 8x8 tile grid. It does not use
 a tile-level direction such as B34 to flip point-level acceleration.
 
-## Point-Level Definition
+## Algorithm steps
+
+### Point-Level Definition
 
 For each point, read:
 
@@ -58,7 +73,7 @@ This gives:
 | positive | positive | positive | uplift intensifying |
 | positive | negative | negative | uplift weakening |
 
-## D31 Formula
+### D31 Formula
 
 ```text
 D31_motion_intensification_mm_yr2 =
@@ -73,7 +88,7 @@ Interpretation:
 - negative: dominant moving points are weakening
 - near zero: central acceleration change is weak or balanced
 
-## D32 Formula
+### D32 Formula
 
 If D31 has a nonzero direction:
 
@@ -93,7 +108,7 @@ Interpretation:
 Because D31 is a median, D32 is expected to be at least about 0.5 whenever it is
 defined.
 
-## D33 Formula
+### D33 Formula
 
 D33 reuses the same `point_intensification_i` and the same valid moving point
 gate as D31/D32:
@@ -115,7 +130,7 @@ D33 is not raw acceleration strength. Raw absolute acceleration strength remains
 the B41/B42 story. D33 only measures the distribution width of the D31
 direction-aware acceleration field.
 
-## D34/D35 Formula
+### D34/D35 Formula
 
 D34 and D35 reuse the same `point_intensification_i` and the same valid moving
 point gate as D31-D33. Split the tile into the same 8x8 local grid style used by
@@ -145,7 +160,7 @@ Interpretation:
 D34 is not raw acceleration strength. It is the strongest local bin of the D31
 direction-aware acceleration field.
 
-## Relationship To B41
+### Relationship To B41
 
 | task | formula | meaning |
 |---|---|---|
@@ -159,7 +174,7 @@ direction-aware acceleration field.
 D31, D32, D33 and D34 remain scalar-only. D35 is location-only. They have no
 hard acceleration class thresholds.
 
-## Exclusions
+### Exclusions
 
 - D3 does not include changepoint slope jump. That belongs to the D1 trend/regime
   story, because it depends on D13/D14 and tile-level trend timing rather than
@@ -169,105 +184,116 @@ hard acceleration class thresholds.
   magnitude, while D31-D35 measure direction-aware intensification, support,
   spread, hotspot strength, and hotspot location.
 
-## Files
+## Run and files
 
-- `d3_final_table.csv`: canonical D31-D35 target table plus validity reason.
-- `d3_final_diagnostics.csv`: final and raw D31-D35, point-intensification summaries, raw acceleration diagnostics, valid motion counts, and support reasons.
-- `d3_compute.py`: recomputes D31-D35.
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-## Current All-10k Result
+```bash
+python -m egms_qa.qa_construction.tasks.d3.d3_compute \
+    --out-dir outputs/tasks-rebuilt/d3
+```
 
-`D31_motion_intensification_mm_yr2`:
+The new table is written to `outputs/tasks-rebuilt/d3/d3_final_table.csv`.
+The installed reference remains at `outputs/tasks/d3/d3_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
 
-| statistic | value |
-|---|---:|
-| count defined | 8508 |
-| mean | 0.025996 |
-| p01 | -0.520000 |
-| p05 | -0.220000 |
-| p10 | -0.110000 |
-| p25 | -0.030000 |
-| p50 | 0.010000 |
-| p75 | 0.070000 |
-| p90 | 0.210000 |
-| p95 | 0.330000 |
-| p99 | 0.783950 |
+| required input | published source | installed path |
+|---|---|---|
+| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
+| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
 
-`D32_acceleration_support_fraction`:
+The computation may also write local summaries or diagnostics next to its
+new table. Their filenames and options are defined in the linked script;
+they are not part of the published reference-table inventory unless linked
+explicitly above.
 
-| statistic | value |
-|---|---:|
-| count defined | 7967 |
-| mean | 0.624230 |
-| p25 | 0.535377 |
-| p50 | 0.583893 |
-| p75 | 0.677198 |
-| p90 | 0.810806 |
-| p95 | 0.883951 |
-| p99 | 0.975410 |
+## Results
 
-`D33_intensification_spread_mm_yr2`:
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
 
-| statistic | value |
-|---|---:|
-| count defined | 8508 |
-| mean | 0.874792 |
-| p01 | 0.300000 |
-| p05 | 0.352000 |
-| p10 | 0.400000 |
-| p25 | 0.520000 |
-| p50 | 0.750000 |
-| p75 | 1.078000 |
-| p90 | 1.484000 |
-| p95 | 1.772000 |
-| p99 | 2.518880 |
+### Numeric targets
 
-`D34_intensification_hotspot_strength_mm_yr2`:
+| task | defined | missing | p05 | median | p95 |
+|---|---:|---:|---:|---:|---:|
+| D31 | 8,508 | 1,492 | -0.22 | 0.01 | 0.33 |
+| D32 | 7,967 | 2,033 | 0.50643 | 0.583893 | 0.883951 |
+| D33 | 8,508 | 1,492 | 0.352 | 0.75 | 1.772 |
+| D34 | 8,508 | 1,492 | 0.295 | 0.648278 | 1.72036 |
 
-| statistic | value |
-|---|---:|
-| count defined | 8508 |
-| mean | 0.793356 |
-| p01 | 0.217861 |
-| p05 | 0.295000 |
-| p10 | 0.345714 |
-| p25 | 0.458000 |
-| p50 | 0.648278 |
-| p75 | 0.927143 |
-| p90 | 1.341129 |
-| p95 | 1.720361 |
-| p99 | 3.007306 |
+### D35 label distribution
 
-`D35_intensification_hotspot_location` top locations:
+<details>
+<summary>All 65 released labels</summary>
 
-| location | count |
-|---|---:|
-| `none` | 1492 |
-| `r7c7` | 161 |
-| `r0c0` | 158 |
-| `r3c0` | 157 |
-| `r2c0` | 157 |
-| `r7c0` | 155 |
-| `r6c0` | 154 |
-| `r2c3` | 154 |
-| `r0c5` | 153 |
-| `r7c5` | 153 |
+| label | count | share |
+|---|---:|---:|
+| `none` | 1,492 | 14.92% |
+| `r7c7` | 161 | 1.61% |
+| `r0c0` | 158 | 1.58% |
+| `r3c0` | 157 | 1.57% |
+| `r2c0` | 157 | 1.57% |
+| `r7c0` | 155 | 1.55% |
+| `r6c0` | 154 | 1.54% |
+| `r2c3` | 154 | 1.54% |
+| `r0c5` | 153 | 1.53% |
+| `r7c5` | 153 | 1.53% |
+| `r6c7` | 153 | 1.53% |
+| `r4c0` | 151 | 1.51% |
+| `r0c7` | 150 | 1.50% |
+| `r7c1` | 150 | 1.50% |
+| `r5c7` | 148 | 1.48% |
+| `r0c4` | 144 | 1.44% |
+| `r3c5` | 143 | 1.43% |
+| `r7c4` | 142 | 1.42% |
+| `r5c0` | 142 | 1.42% |
+| `r7c3` | 141 | 1.41% |
+| `r0c1` | 141 | 1.41% |
+| `r1c3` | 140 | 1.40% |
+| `r4c2` | 139 | 1.39% |
+| `r7c6` | 137 | 1.37% |
+| `r0c3` | 136 | 1.36% |
+| `r5c1` | 136 | 1.36% |
+| `r5c4` | 136 | 1.36% |
+| `r6c5` | 134 | 1.34% |
+| `r0c6` | 133 | 1.33% |
+| `r3c1` | 133 | 1.33% |
+| `r3c2` | 133 | 1.33% |
+| `r4c7` | 132 | 1.32% |
+| `r1c1` | 132 | 1.32% |
+| `r1c7` | 132 | 1.32% |
+| `r1c0` | 131 | 1.31% |
+| `r2c6` | 130 | 1.30% |
+| `r2c5` | 128 | 1.28% |
+| `r0c2` | 128 | 1.28% |
+| `r2c7` | 128 | 1.28% |
+| `r3c3` | 127 | 1.27% |
+| `r5c3` | 127 | 1.27% |
+| `r2c4` | 126 | 1.26% |
+| `r4c5` | 126 | 1.26% |
+| `r6c1` | 125 | 1.25% |
+| `r7c2` | 125 | 1.25% |
+| `r3c7` | 125 | 1.25% |
+| `r1c2` | 125 | 1.25% |
+| `r6c2` | 123 | 1.23% |
+| `r4c4` | 123 | 1.23% |
+| `r6c4` | 122 | 1.22% |
+| `r4c6` | 122 | 1.22% |
+| `r5c6` | 121 | 1.21% |
+| `r4c1` | 120 | 1.20% |
+| `r6c3` | 120 | 1.20% |
+| `r1c6` | 120 | 1.20% |
+| `r5c2` | 119 | 1.19% |
+| `r2c1` | 118 | 1.18% |
+| `r3c4` | 117 | 1.17% |
+| `r5c5` | 114 | 1.14% |
+| `r6c6` | 114 | 1.14% |
+| `r1c4` | 113 | 1.13% |
+| `r3c6` | 113 | 1.13% |
+| `r1c5` | 112 | 1.12% |
+| `r4c3` | 109 | 1.09% |
+| `r2c2` | 97 | 0.97% |
 
-D31/D32 validity reason counts:
-
-| reason | count |
-|---|---:|
-| `valid` | 7967 |
-| `insufficient_valid_motion_points` | 1492 |
-| `zero_or_undefined_d31_direction` | 541 |
-
-`D31`, `D33`, and `D34` are defined for all 8508 gate-passed tiles. `D35` is
-`none` for the 1492 gate-failed tiles. `D32` is defined only for the 7967
-gate-passed tiles where D31 has a nonzero direction.
-
-Raw pre-gate diagnostics are retained in `d3_final_diagnostics.csv` as
-`D31_raw_motion_intensification_mm_yr2` and
-`D32_raw_acceleration_support_fraction`. D33 raw pre-gate spread is retained as
-`D33_raw_intensification_spread_mm_yr2`. D34/D35 raw pre-gate hotspot outputs
-are retained as `D34_raw_intensification_hotspot_strength_mm_yr2` and
-`D35_raw_intensification_hotspot_location`.
+</details>

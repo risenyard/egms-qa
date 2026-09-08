@@ -1,6 +1,18 @@
-# D2 Seasonal Phase Algorithm
+# D2: Seasonal phase
 
-## Current Scope
+## Task overview
+
+| task | description |
+|---|---|
+| **D2 group** | Describe annual phase, phase agreement, and changes in seasonal amplitude. |
+| D21 | Dominant seasonal peak category when amplitude and phase-support conditions permit interpretation. |
+| D22 | Concentration of the annual phase estimates, describing seasonal coherence. |
+| D23 | Circular phase dispersion expressed in days. |
+| D24 | Change in annual amplitude between the specified early and late windows. |
+
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d2/d2_final_table.csv) · [Implementation](d2_compute.py)
+
+## Key concepts
 
 This folder is the D2 seasonal-phase family. The current computed target is:
 
@@ -22,14 +34,22 @@ D24 is delivered as a continuous scalar only. It asks whether the annual
 seasonal amplitude became stronger or weaker between the first and second half
 of the observation window.
 
-## Input
+### Input
 
 For each tile, read the stored model-ready displacement
 `time_series[:, 0:294]`. The data config records that this is identical to
 `[8,302)` on the original 304-step prepared axis. D2 uses the stored window but
 adds the original index offset when constructing the physical time axis.
 
-## D21 Formula
+### Validity
+
+- valid point: at least 50 valid epochs
+- valid D24 point: at least 50 valid epochs in both early and late windows
+- valid tile: at least 30 valid points
+
+## Algorithm steps
+
+### D21 Formula
 
 D21 uses the same detrended annual point phasors as D22/D23:
 
@@ -70,7 +90,7 @@ The threshold is corpus-relative for the current EGMS encoder all-10k delivery. 
 formalizes D21 as a tile-wide coherent seasonal peak, not merely an average
 seasonal phase.
 
-## D22 Formula
+### D22 Formula
 
 For each point, fit and remove a linear trend from its displacement time series:
 
@@ -97,7 +117,7 @@ Interpretation:
 - near 1: point seasonal phases are aligned
 - near 0: point seasonal phases cancel or are scattered
 
-## D23 Formula
+### D23 Formula
 
 D23 converts the same point-level annual phasors into circular phase dispersion
 in calendar days.
@@ -123,7 +143,7 @@ Interpretation:
 - smaller values: seasonal peaks are concentrated within fewer calendar days
 - larger values: seasonal peaks are spread across a wider part of the year
 
-## D24 Formula
+### D24 Formula
 
 D24 compares annual seasonal amplitude between the early and late halves of the
 same time window.
@@ -160,98 +180,52 @@ Interpretation:
 D24 is scalar-only. It has no `shrinking / stable / growing` class in the formal
 target because the all-10k distribution is strongly concentrated near zero.
 
-## Validity
+## Run and files
 
-- valid point: at least 50 valid epochs
-- valid D24 point: at least 50 valid epochs in both early and late windows
-- valid tile: at least 30 valid points
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-## Files
+```bash
+python -m egms_qa.qa_construction.tasks.d2.d2_compute \
+    --out-dir outputs/tasks-rebuilt/d2
+```
 
-- `d2_final_table.csv`: formal D21/D22/D23/D24 target table.
-- `d2_final_diagnostics.csv`: support diagnostics for seasonal-phase threshold analysis.
-- `d2_compute.py`: recomputes D21, D22, D23, and D24.
+The new table is written to `outputs/tasks-rebuilt/d2/d2_final_table.csv`.
+The installed reference remains at `outputs/tasks/d2/d2_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
 
-## Current All-10k Result
+| required input | published source | installed path |
+|---|---|---|
+| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
+| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
+| Data configuration | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/data_config.json) | `data/encoder/manifest/data_config.json` |
+| B5 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b5/b5_final_table.csv) | `outputs/tasks/b5/b5_final_table.csv` |
 
-`D21_dominant_seasonal_peak`:
+The computation may also write local summaries or diagnostics next to its
+new table. Their filenames and options are defined in the linked script;
+they are not part of the published reference-table inventory unless linked
+explicitly above.
 
-| class | count |
-|---|---:|
-| `no_clear_seasonal_peak` | 3472 |
-| `summer_peak` | 2405 |
-| `winter_peak` | 1783 |
-| `spring_peak` | 1698 |
-| `autumn_peak` | 642 |
+## Results
 
-D21 gate reasons:
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d2/d2_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
 
-| reason | count |
-|---|---:|
-| `clear` | 6528 |
-| `low_phase_coherence` | 2683 |
-| `weak_seasonality` | 564 |
-| `weak_seasonality_and_low_coherence` | 225 |
+### Numeric targets
 
-Raw peak-season counts before D21 gating:
+| task | defined | missing | p05 | median | p95 |
+|---|---:|---:|---:|---:|---:|
+| D22 | 10,000 | 0 | 0.0746656 | 0.298174 | 0.784234 |
+| D23 | 10,000 | 0 | 39.4858 | 89.8984 | 132.048 |
+| D24 | 10,000 | 0 | -0.104846 | 0.0159081 | 0.113439 |
 
-| class | count |
-|---|---:|
-| `summer_peak` | 3324 |
-| `spring_peak` | 2860 |
-| `winter_peak` | 2666 |
-| `autumn_peak` | 1150 |
+### D21 label distribution
 
-`D22_phase_coherence`:
-
-| statistic | value |
-|---|---:|
-| mean | 0.345591 |
-| p10 | 0.107155 |
-| p25 | 0.183483 |
-| p50 | 0.298174 |
-| p75 | 0.468239 |
-| p90 | 0.666640 |
-| p95 | 0.784234 |
-
-`D23_phase_dispersion_days`:
-
-| statistic | value |
-|---|---:|
-| mean | 88.466987 |
-| p10 | 51.545815 |
-| p25 | 71.035680 |
-| p50 | 89.898365 |
-| p75 | 106.584310 |
-| p90 | 122.568380 |
-| p95 | 132.047655 |
-
-`D24_seasonal_amplitude_change_mm`:
-
-| statistic | value |
-|---|---:|
-| mean | 0.007545 |
-| p01 | -0.233549 |
-| p05 | -0.104846 |
-| p10 | -0.064743 |
-| p25 | -0.020479 |
-| p50 | 0.015908 |
-| p75 | 0.048531 |
-| p90 | 0.083171 |
-| p95 | 0.113439 |
-| p99 | 0.207153 |
-
-Candidate low-coherence rates, used to select the D21 coherence gate:
-
-| threshold | fraction below |
-|---|---:|
-| 0.10 | 8.97% |
-| 0.15 | 18.13% |
-| 0.20 | 29.08% |
-| 0.25 | 39.92% |
-| 0.30 | 50.39% |
-
-D22 and D23 remain continuous scalars. The D22=0.20 threshold is used only as
-D21's coherence gate.
-
-D24 remains a continuous scalar. No D24 class threshold is used.
+| label | count | share |
+|---|---:|---:|
+| `no_clear_seasonal_peak` | 3,472 | 34.72% |
+| `summer_peak` | 2,405 | 24.05% |
+| `winter_peak` | 1,783 | 17.83% |
+| `spring_peak` | 1,698 | 16.98% |
+| `autumn_peak` | 642 | 6.42% |

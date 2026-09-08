@@ -1,28 +1,29 @@
-# S1 Global Representation Anchor
+# S1: Representation anchors
 
-## Task Scope
+## Task overview
+
+| task | description |
+|---|---|
+| **S1 group** | Describe a tile's position relative to reference anchors in the encoder representation space. |
+| S11 | Assigned reference-anchor profile. |
+| S12 | Distance to the nearest reference anchor. |
+| S13 | Assignment margin between the nearest competing anchors. |
+| S14 | Assignment status describing how the representation is supported by the reference profiles. |
+| S15 | Descriptive category for the assigned reference-anchor profile. |
+
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s1/s1_final_table.csv) · [Implementation](s1_compute.py)
+
+## Key concepts
 
 S1 describes where each tile sits relative to train-defined encoder summary-token reference anchors. It is a representation construct, not an external geophysical class.
 
-Official leaf tasks:
+## Algorithm steps
 
-| ID | Field | Meaning |
-|---|---|---|
-| S11 | `S11_reference_anchor_profile` | readable profile of the nearest reference anchor |
-| S12 | `S12_reference_anchor_distance` | cosine distance from the tile to the nearest train-defined anchor |
-| S13 | `S13_reference_anchor_margin` | distance gap between the nearest and second-nearest anchors |
-| S14 | `S14_reference_assignment_status` | distribution-driven assignment status |
-| S15 | `S15_reference_anchor_profile_description` | concise explanation of the nearest anchor profile |
-
-`reference_anchor_id` is an auxiliary technical identifier for reproducibility. It is not a separate task.
-
-## Algorithm
+### Algorithm
 
 Input token cache:
 
-```text
-data/encoder/tokens/egms_tokens_10k.pt
-```
+[HF input](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/representations/egms_tokens_10k.pt) · installed path: `data/encoder/tokens/egms_tokens_10k.pt`
 
 Steps:
 
@@ -40,7 +41,7 @@ Steps:
     - `transition_or_weakly_anchored`
     - `far_or_ambiguous_from_reference_anchors`
 
-## Anchor Profiles
+### Anchor Profiles
 
 | anchor | S11 profile | S15 description |
 |---:|---|---|
@@ -51,34 +52,68 @@ Steps:
 | 4 | `stable_low_activity_background_reference` | large low-activity stable background reference with low velocity and acceleration |
 | 5 | `summer_trend_seasonal_mixed_reference` | summer-associated trend-seasonal mixed reference with relatively diffuse spatial structure |
 
-## Result Counts
+## Run and files
 
-S14:
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-| label | count | fraction |
-|---|---:|---:|
-| `transition_or_weakly_anchored` | 7576 | 0.7576 |
-| `far_or_ambiguous_from_reference_anchors` | 1242 | 0.1242 |
-| `strongly_anchored` | 1182 | 0.1182 |
-
-Nearest anchor:
-
-| anchor | count | fraction |
-|---:|---:|---:|
-| 0 | 2574 | 0.2574 |
-| 1 | 1789 | 0.1789 |
-| 2 | 853 | 0.0853 |
-| 3 | 1134 | 0.1134 |
-| 4 | 2687 | 0.2687 |
-| 5 | 963 | 0.0963 |
-
-## File Inventory
-
-```text
-src/egms_qa/qa_construction/tasks/s1/s1_compute.py   # this script
-src/egms_qa/qa_construction/tasks/s1/s1_algorithm.md # this document
-outputs/tasks/s1/s1_final_table.csv     # generated canonical table (data release)
+```bash
+python -m egms_qa.qa_construction.tasks.s1.s1_compute \
+    --out-dir outputs/tasks-rebuilt/s1
 ```
 
-Running `s1_compute.py` also writes auxiliary diagnostics (anchor counts,
-GMM components, distribution plot, summary) next to the final table.
+The new table is written to `outputs/tasks-rebuilt/s1/s1_final_table.csv`.
+The installed reference remains at `outputs/tasks/s1/s1_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
+
+| required input | published source | installed path |
+|---|---|---|
+| Encoder token cache | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/representations/egms_tokens_10k.pt) | `data/encoder/tokens/egms_tokens_10k.pt` |
+
+The computation may also write local summaries or diagnostics next to its
+new table. Their filenames and options are defined in the linked script;
+they are not part of the published reference-table inventory unless linked
+explicitly above.
+
+## Results
+
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s1/s1_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
+
+### Numeric targets
+
+| task | defined | missing | p05 | median | p95 |
+|---|---:|---:|---:|---:|---:|
+| S12 | 10,000 | 0 | 0.095143 | 0.414417 | 0.807097 |
+| S13 | 10,000 | 0 | 0.0356778 | 0.467927 | 0.902359 |
+
+### S11 label distribution
+
+| label | count | share |
+|---|---:|---:|
+| `stable_low_activity_background_reference` | 2,687 | 26.87% |
+| `mixed_acceleration_complex_trend_reference` | 2,574 | 25.74% |
+| `spring_trend_acceleration_reference` | 1,789 | 17.89% |
+| `extreme_localized_deformation_front_reference` | 1,134 | 11.34% |
+| `summer_trend_seasonal_mixed_reference` | 963 | 9.63% |
+| `coherent_autumn_seasonal_reference` | 853 | 8.53% |
+
+### S14 label distribution
+
+| label | count | share |
+|---|---:|---:|
+| `transition_or_weakly_anchored` | 7,576 | 75.76% |
+| `far_or_ambiguous_from_reference_anchors` | 1,242 | 12.42% |
+| `strongly_anchored` | 1,182 | 11.82% |
+
+### S15 label distribution
+
+| label | count | share |
+|---|---:|---:|
+| `large low-activity stable background reference with low velocity and acceleration` | 2,687 | 26.87% |
+| `large mixed dynamic reference with elevated acceleration and complex trend behavior` | 2,574 | 25.74% |
+| `spring-associated trend and acceleration mixed reference` | 1,789 | 17.89% |
+| `small extreme reference with strong localized deformation, front strength, and fast-tail extent` | 1,134 | 11.34% |
+| `summer-associated trend-seasonal mixed reference with relatively diffuse spatial structure` | 963 | 9.63% |
+| `compact autumn-seasonal reference with high phase coherence` | 853 | 8.53% |

@@ -1,10 +1,26 @@
-# B21/B22 Mean Velocity Family
+# B2: Mean motion
 
-## Task Question
+## Task overview
+
+| task | description |
+|---|---|
+| **B2 group** | Describe mean vertical motion and its subsidence intensity while preserving uplift cases. |
+| B21 | Mean of the valid point velocities in the tile, in millimeters per year. |
+| B22 | Mean-subsidence intensity band with an uplift-protected direction rule. |
+
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b2/b2_final_table.csv) · [Implementation](b2_compute.py)
+
+## Key concepts
 
 What is the tile's average velocity, and which European relative subsidence intensity band does it fall into?
 
-## Targets
+### Interpretation
+
+B22 is a corpus-relative European intensity band. It is not a legal, physical, or causal severity class. Uplift is kept as a separate direction override.
+
+## Algorithm steps
+
+### Targets
 
 ```text
 B21_mean_velocity_mm_yr = mean(point mean_velocity)
@@ -38,24 +54,44 @@ B34_uplift_protected_direction = uplift
     else non_uplift
 ```
 
-## Interpretation
+## Run and files
 
-B22 is a corpus-relative European intensity band. It is not a legal, physical, or causal severity class. Uplift is kept as a separate direction override.
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-## Final Counts
+```bash
+python -m egms_qa.qa_construction.tasks.b2.b2_compute \
+    --out-dir outputs/tasks-rebuilt/b2
+```
 
-All 10k EGMS encoder tiles:
+The new table is written to `outputs/tasks-rebuilt/b2/b2_final_table.csv`.
+The installed reference remains at `outputs/tasks/b2/b2_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
 
-| class | count | fraction |
+| required input | published source | installed path |
+|---|---|---|
+| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
+| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
+
+## Results
+
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b2/b2_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
+
+### Numeric targets
+
+| task | defined | missing | p05 | median | p95 |
+|---|---:|---:|---:|---:|---:|
+| B21 | 10,000 | 0 | -2.07322 | -1.09149 | -0.095449 |
+
+### B22 label distribution
+
+| label | count | share |
 |---|---:|---:|
-| `high` | 2013 | 0.2013 |
-| `high_mid` | 1952 | 0.1952 |
-| `mid` | 1906 | 0.1906 |
-| `low_mid` | 1879 | 0.1879 |
-| `low` | 1914 | 0.1914 |
-| `uplift` | 336 | 0.0336 |
-
-## File Inventory
-
-- `b2_final_table.csv`: canonical family table with B21, upstream B34 direction, and B22.
-- `b2_compute.py`: reproducible computation script.
+| `high` | 2,013 | 20.13% |
+| `high_mid` | 1,952 | 19.52% |
+| `low` | 1,914 | 19.14% |
+| `mid` | 1,906 | 19.06% |
+| `low_mid` | 1,879 | 18.79% |
+| `uplift` | 336 | 3.36% |

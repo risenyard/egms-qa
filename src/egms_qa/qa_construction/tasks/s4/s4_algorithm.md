@@ -1,22 +1,19 @@
-# S4 Algorithm: Encoder-Perceived Local Spatial Structure
+# S4: Local representation structure
 
-## Delivered Tasks
+## Task overview
 
-`S41_encoder_perceived_local_structure_strength`
+| task | description |
+|---|---|
+| **S4 group** | Describe variation and concentration among the valid spatial-cell representations inside a tile. |
+| S41 | RMS deviation from the cell-token centroid divided by the RMS magnitude of the cell tokens. |
+| S42 | Local-structure class derived from train-reference thresholds on S41. |
+| S43 | Gini concentration of the cell-token residual magnitudes around their centroid. |
 
-S41 asks whether the encoder sees a tile as spatially coherent, or whether the
-valid 8x8 patch tokens contain stronger local spatial structure.
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s4/s4_final_table.csv) · [Implementation](s4_compute.py)
 
-`S42_encoder_perceived_local_structure_class`
+## Key concepts
 
-S42 is the question-friendly class derived from S41.
-
-`S43_encoder_perceived_local_structure_concentration`
-
-S43 asks whether the encoder-perceived local structure is broadly distributed
-across valid patch positions or concentrated in fewer local patches.
-
-## Inputs
+### Inputs
 
 Current tile tokens only:
 
@@ -26,7 +23,7 @@ Current tile tokens only:
 S4 does not use the tile-summary token, geographic neighbors, A/B/C/D labels, S11 anchors, or
 reference libraries.
 
-## Interpretation Boundary
+### Interpretation Boundary
 
 S4 is not a direct physical ground-truth label. It describes
 encoder-perceived local spatial structure inside a tile. Because the 64 patch
@@ -37,7 +34,9 @@ meaning, but the claim remains representation-level:
 Does the encoder see local spatial structure inside this tile?
 ```
 
-## Formula
+## Algorithm steps
+
+### Formula
 
 For a tile with valid patch tokens `p_i`:
 
@@ -64,7 +63,7 @@ fewer valid patches. S43 is delivered as a continuous scalar and is not
 classified because its empirical distribution is continuous without a clear
 natural breakpoint.
 
-## S42 Class Rule
+### S42 Class Rule
 
 S41 is right-skewed with a high local-structure tail, so S42 uses train-only
 tail-aware thresholds:
@@ -86,53 +85,47 @@ S41 > train p95
 These thresholds are corpus-relative train-distribution labels, not physical
 thresholds.
 
-## Current All10k Result
+## Run and files
 
-`S41_encoder_perceived_local_structure_strength`:
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-```text
-mean = 0.128880
-std  = 0.034542
-p05  = 0.088459
-p25  = 0.108963
-p50  = 0.124018
-p75  = 0.141626
-p95  = 0.180914
-p99  = 0.249896
+```bash
+python -m egms_qa.qa_construction.tasks.s4.s4_compute \
+    --out-dir outputs/tasks-rebuilt/s4
 ```
 
-`S42_encoder_perceived_local_structure_class` all10k counts:
+The new table is written to `outputs/tasks-rebuilt/s4/s4_final_table.csv`.
+The installed reference remains at `outputs/tasks/s4/s4_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
 
-```text
-spatially_coherent       5000
-weak_local_structure     4016
-clear_local_structure     491
-strong_local_structure    493
-```
+| required input | published source | installed path |
+|---|---|---|
+| Encoder token cache | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/representations/egms_tokens_10k.pt) | `data/encoder/tokens/egms_tokens_10k.pt` |
 
-`S43_encoder_perceived_local_structure_concentration`:
+The computation may also write local summaries or diagnostics next to its
+new table. Their filenames and options are defined in the linked script;
+they are not part of the published reference-table inventory unless linked
+explicitly above.
 
-```text
-mean = 0.192186
-std  = 0.033269
-p05  = 0.144162
-p25  = 0.168749
-p50  = 0.189268
-p75  = 0.211706
-p95  = 0.250342
-p99  = 0.288332
-```
+## Results
 
-Diagnostic correlations:
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s4/s4_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
 
-```text
-Spearman(S43, S41) = 0.391856
-Spearman(S43, valid_patch_count) = -0.406812
-```
+### Numeric targets
 
-## File Inventory
+| task | defined | missing | p05 | median | p95 |
+|---|---:|---:|---:|---:|---:|
+| S41 | 10,000 | 0 | 0.0884594 | 0.124018 | 0.180914 |
+| S43 | 10,000 | 0 | 0.144162 | 0.189268 | 0.250342 |
 
-- `s4_final_table.csv`: final task table with `tile_id`, `split`, S41, S42, and S43.
-- `s4_compute.py`: reproducible computation script.
-- `s4_summary.json`: distribution and reproducibility summary.
-- `s4_distribution.png`: final distribution diagnostic.
+### S42 label distribution
+
+| label | count | share |
+|---|---:|---:|
+| `spatially_coherent` | 5,000 | 50.00% |
+| `weak_local_structure` | 4,016 | 40.16% |
+| `strong_local_structure` | 493 | 4.93% |
+| `clear_local_structure` | 491 | 4.91% |

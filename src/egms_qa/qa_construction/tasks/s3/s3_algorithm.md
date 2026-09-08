@@ -1,30 +1,23 @@
-# S3 Algorithm: Representation-Monitoring Consistency
+# S3: Representation–monitoring consistency
 
-## Delivered Tasks
+## Task overview
 
-`S31_representation_monitoring_rarity_gap_p`
+| task | description |
+|---|---|
+| **S3 group** | Compare representation rarity with rarity in the scalar monitoring indicators. |
+| S31 | Difference between the training-reference percentile ranks of representation rarity and monitoring rarity. |
+| S32 | Relation class derived from the S31 gap using train-fitted standardized thresholds. |
+| S33 | Monitoring dimension with the largest axis-level reference score: quality, motion, spatial, or temporal. |
 
-S31 asks whether the encoder representation considers a tile more or less unusual
-than the A/B/C/D monitoring scalar system does.
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv) · [Implementation](s3_compute.py)
 
-```text
-S31 = encoder representation rarity p - A/B/C/D monitoring rarity p
-```
+## Key concepts
 
-The unit is percentile points on a train-defined `p0-p99` scale.
+S31 is a difference of percentile ranks on a train-defined `p0-p99` scale.
+S32 classifies this difference. S33 identifies the most distinctive monitoring
+dimension.
 
-`S32_representation_monitoring_rarity_relation`
-
-S32 is the five-class, question-friendly relation derived from S31. Because the
-S31 gap is approximately symmetric and bell-shaped, S32 uses train z-score
-thresholds instead of percentile quotas.
-
-`S33_monitoring_distinctive_dimension`
-
-S33 explains which A/B/C/D monitoring axis contributes the most distinctive
-scalar-side signal: `quality`, `motion`, `spatial`, or `temporal`.
-
-## Inputs
+### Inputs
 
 Encoder-side input:
 
@@ -41,8 +34,8 @@ A/B/C/D monitoring sentinel scalars:
 
 The two S3-specific inputs are frozen posterior estimates from
 [BEAST](https://github.com/zhaokg/Rbeast), published in
-`artifacts/reference_tables/s3/s3_temporal_inputs.csv` with
-`s3_temporal_inputs_metadata.json`. The first is mean posterior polynomial
+[s3_temporal_inputs.csv](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_temporal_inputs.csv) with
+[s3_temporal_inputs_metadata.json](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_temporal_inputs_metadata.json). The first is mean posterior polynomial
 trend order over the observation window. The second is the largest posterior
 probability among candidate trend changepoints. Undefined posterior estimates
 are omitted when taking the temporal-axis maximum.
@@ -57,7 +50,9 @@ little-endian integer from a four-byte BLAKE2s digest of its tile ID, modulo
 These sentinels are oriented so larger values mean stronger monitoring signal,
 stronger structure, or worse observation quality.
 
-## Formula
+## Algorithm steps
+
+### Formula
 
 1. Use train tiles only as the reference population.
 2. Convert `S21_local_isolation_score` to `embedding_rarity_p`.
@@ -78,7 +73,7 @@ Positive values mean the encoder representation is rarer than expected from the
 A/B/C/D monitoring scalar system. Negative values mean the scalar monitoring
 system is rarer than the encoder representation.
 
-## S32 Class Rule
+### S32 Class Rule
 
 Use only train tiles to estimate the S31 gap mean and standard deviation:
 
@@ -106,7 +101,7 @@ The thresholds are corpus-relative train z-score thresholds, not physical
 thresholds. The strong classes correspond to an approximate two-sided 95%
 normal-style deviation.
 
-## S33 Dimension Rule
+### S33 Dimension Rule
 
 S33 reuses the same monitoring axes used by S31:
 
@@ -125,58 +120,37 @@ dimension is most distinctive, not why the encoder embedding itself is rare.
 Exact ties are resolved deterministically by axis order:
 `quality -> motion -> spatial -> temporal`.
 
-## Current All10k Result
+## Run and files
 
-`S31_representation_monitoring_rarity_gap_p`:
-
-```text
-mean = 0.103
-std  = 35.081
-p05  = -58.324
-p25  = -23.407
-p50  = -0.130
-p75  =  23.825
-p95  =  59.834
-```
-
-The distribution is approximately symmetric and bell-shaped, but it is not used
-as a normal-distribution assumption. S31 is delivered as a continuous construct
-scalar. S32 is the derived five-class relation.
-
-`S32_representation_monitoring_rarity_relation` all10k counts:
-
-```text
-strong_monitoring_excess       255
-moderate_monitoring_excess    1348
-aligned                       6706
-moderate_encoder_excess       1435
-strong_encoder_excess          256
-```
-
-`S33_monitoring_distinctive_dimension` all10k counts:
-
-```text
-quality       956
-motion       1545
-spatial      3262
-temporal     4237
-```
-
-## Run
-
-After installing the Dataset using the [QA guide](../../README.md), reproduce
-the published targets from the released inputs:
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
 ```bash
-pip install -e '.[tasks]'
 python -m egms_qa.qa_construction.tasks.s3.s3_compute \
     --out-dir outputs/tasks-rebuilt/s3
 ```
 
-The command reads reference tables from `outputs/tasks/`, including the frozen
-S3 posterior input table, and validates their tile IDs and splits before
-joining. Override `--tasks-root` to use another table directory. The three
-published target columns are written alongside `tile_id` and `split`.
+The new table is written to `outputs/tasks-rebuilt/s3/s3_final_table.csv`.
+The installed reference remains at `outputs/tasks/s3/s3_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
+
+| required input | published source | installed path |
+|---|---|---|
+| A4 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a4/a4_final_table.csv) | `outputs/tasks/a4/a4_final_table.csv` |
+| B3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) | `outputs/tasks/b3/b3_final_table.csv` |
+| B4 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b4/b4_final_table.csv) | `outputs/tasks/b4/b4_final_table.csv` |
+| B5 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b5/b5_final_table.csv) | `outputs/tasks/b5/b5_final_table.csv` |
+| C1 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c1/c1_final_table.csv) | `outputs/tasks/c1/c1_final_table.csv` |
+| C2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c2/c2_final_table.csv) | `outputs/tasks/c2/c2_final_table.csv` |
+| C3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) | `outputs/tasks/c3/c3_final_table.csv` |
+| C4 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv) | `outputs/tasks/c4/c4_final_table.csv` |
+| D2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d2/d2_final_table.csv) | `outputs/tasks/d2/d2_final_table.csv` |
+| D3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv) | `outputs/tasks/d3/d3_final_table.csv` |
+| S2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s2/s2_final_table.csv) | `outputs/tasks/s2/s2_final_table.csv` |
+| Frozen temporal input | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_temporal_inputs.csv) | `outputs/tasks/s3/s3_temporal_inputs.csv` |
+| Temporal-input metadata | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_temporal_inputs_metadata.json) | `outputs/tasks/s3/s3_temporal_inputs_metadata.json` |
+
+### Optional temporal refit
 
 To refit the Bayesian inputs as a separate experiment:
 
@@ -193,12 +167,38 @@ hash. The estimator build used for the frozen inputs was not recorded. Fresh
 MCMC fits can differ across builds and hardware, including under fixed seeds.
 Exact reproduction of the released S3 corpus uses the frozen input table.
 
-## File Inventory
+The computation may also write local summaries or diagnostics next to its
+new table. Their filenames and options are defined in the linked script;
+they are not part of the published reference-table inventory unless linked
+explicitly above.
 
-- `s3_final_table.csv`: final task table with `tile_id`, `split`, S31, S32, and S33.
-- `s3_compute.py`: reproducible computation script.
-- `s3_temporal_compute.py`: optional Bayesian temporal-input refit.
-- `s3_temporal_inputs.csv` and `s3_temporal_inputs_metadata.json`: frozen
-  scientific inputs distributed in the Dataset's S3 reference-table directory.
-- `s3_summary.json`: distribution and reproducibility summary.
-- `s3_distribution.png`: optional diagnostic written with `--plot`.
+## Results
+
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
+
+### Numeric targets
+
+| task | defined | missing | p05 | median | p95 |
+|---|---:|---:|---:|---:|---:|
+| S31 | 10,000 | 0 | -58.324 | -0.129937 | 59.8337 |
+
+### S32 label distribution
+
+| label | count | share |
+|---|---:|---:|
+| `aligned` | 6,706 | 67.06% |
+| `moderate_encoder_excess` | 1,435 | 14.35% |
+| `moderate_monitoring_excess` | 1,348 | 13.48% |
+| `strong_encoder_excess` | 256 | 2.56% |
+| `strong_monitoring_excess` | 255 | 2.55% |
+
+### S33 label distribution
+
+| label | count | share |
+|---|---:|---:|
+| `temporal` | 4,237 | 42.37% |
+| `spatial` | 3,262 | 32.62% |
+| `motion` | 1,545 | 15.45% |
+| `quality` | 956 | 9.56% |

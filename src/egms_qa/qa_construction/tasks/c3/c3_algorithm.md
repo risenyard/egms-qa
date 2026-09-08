@@ -1,19 +1,38 @@
-# C31/C32/C33 Deformation Front
+# C3: Deformation fronts
 
-## Task Question
+## Task overview
+
+| task | description |
+|---|---|
+| **C3 group** | Describe velocity contrasts between neighboring spatial cells. |
+| C31 | Deformation-front strength computed from adjacent-cell velocity contrasts. |
+| C32 | Grid location of the identified deformation front. |
+| C33 | Front-strength class derived from the contrast score. |
+
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) · [Implementation](c3_compute.py)
+
+## Key concepts
 
 Does this tile contain a strong spatial velocity jump, where is the strongest jump located, and how sharp is the front relative to the 10k corpus?
 
-## Inputs
+### Inputs
 
 - `coords`: point coordinates.
 - `mean_velocity`: point-level mean velocity in mm/yr.
 
 Arrays are read from the EGMS encoder 10k tile manifest:
 
-`./data/encoder/manifest/split.parquet`
+[HF split.parquet](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) (installed at `data/encoder/manifest/split.parquet`)
 
-## Formula
+### Intentional Exclusions
+
+- C31/C32/C33 do not use RMSE; A41 and C11 handle noise-aware reliability.
+- C33 is the only sharp-front class kept in EGMS-QA. There is no separate sharp-differential score/flag; downstream monitoring context should use `C33=very_sharp` when it needs a sharp-front predicate.
+- C31 uses p90 neighbor difference as the stable main scalar and uses max neighbor difference only for location.
+
+## Algorithm steps
+
+### Formula
 
 For each tile:
 
@@ -37,7 +56,7 @@ r{row_a}c{col_a}-r{row_b}c{col_b}
 
 Example: `r4c2-r4c3`.
 
-## Distribution Class
+### Distribution Class
 
 C33 is derived from the observed C31 train-split distribution. The distribution
 is strongly right-skewed with a long high-front tail, so C33 uses train
@@ -51,36 +70,164 @@ class:
 | `strong` | 0.653784 < C31 <= 1.583580 |
 | `very_sharp` | C31 > 1.583580 |
 
-## Intentional Exclusions
+## Run and files
 
-- C31/C32/C33 do not use RMSE; A41 and C11 handle noise-aware reliability.
-- C33 is the only sharp-front class kept in EGMS-QA. There is no separate sharp-differential score/flag; downstream monitoring context should use `C33=very_sharp` when it needs a sharp-front predicate.
-- C31 uses p90 neighbor difference as the stable main scalar and uses max neighbor difference only for location.
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-## Final Distribution
+```bash
+python -m egms_qa.qa_construction.tasks.c3.c3_compute \
+    --out-dir outputs/tasks-rebuilt/c3
+```
 
-All 10k EGMS encoder tiles:
+The new table is written to `outputs/tasks-rebuilt/c3/c3_final_table.csv`.
+The installed reference remains at `outputs/tasks/c3/c3_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
 
-| statistic | value |
-|---|---:|
-| p01 | 0.2117 |
-| p05 | 0.2955 |
-| p25 | 0.4735 |
-| p50 | 0.6550 |
-| p75 | 0.9853 |
-| p95 | 2.2751 |
-| p99 | 3.9454 |
+| required input | published source | installed path |
+|---|---|---|
+| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
+| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
 
-C33 class counts:
+## Results
 
-| class | count | fraction |
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
+
+### Numeric targets
+
+| task | defined | missing | p05 | median | p95 |
+|---|---:|---:|---:|---:|---:|
+| C31 | 10,000 | 0 | 0.295513 | 0.655021 | 2.27508 |
+
+### C32 label distribution
+
+<details>
+<summary>All 112 released labels</summary>
+
+| label | count | share |
 |---|---:|---:|
-| `weak` | 1009 | 0.1009 |
-| `moderate` | 3978 | 0.3978 |
-| `strong` | 4032 | 0.4032 |
-| `very_sharp` | 981 | 0.0981 |
+| `r7c0-r7c1` | 133 | 1.33% |
+| `r2c0-r3c0` | 125 | 1.25% |
+| `r0c0-r1c0` | 122 | 1.22% |
+| `r6c7-r7c7` | 118 | 1.18% |
+| `r0c7-r1c7` | 118 | 1.18% |
+| `r5c7-r6c7` | 114 | 1.14% |
+| `r1c0-r2c0` | 112 | 1.12% |
+| `r4c7-r5c7` | 112 | 1.12% |
+| `r4c0-r5c0` | 112 | 1.12% |
+| `r6c0-r7c0` | 111 | 1.11% |
+| `r0c6-r0c7` | 111 | 1.11% |
+| `r0c0-r0c1` | 110 | 1.10% |
+| `r6c6-r7c6` | 102 | 1.02% |
+| `r0c6-r1c6` | 102 | 1.02% |
+| `r1c6-r1c7` | 101 | 1.01% |
+| `r7c6-r7c7` | 101 | 1.01% |
+| `r5c0-r6c0` | 101 | 1.01% |
+| `r4c1-r5c1` | 101 | 1.01% |
+| `r0c3-r0c4` | 100 | 1.00% |
+| `r0c5-r0c6` | 99 | 0.99% |
+| `r2c4-r3c4` | 99 | 0.99% |
+| `r6c2-r6c3` | 98 | 0.98% |
+| `r5c3-r5c4` | 98 | 0.98% |
+| `r7c4-r7c5` | 97 | 0.97% |
+| `r0c2-r0c3` | 97 | 0.97% |
+| `r2c7-r3c7` | 96 | 0.96% |
+| `r0c2-r1c2` | 96 | 0.96% |
+| `r7c1-r7c2` | 95 | 0.95% |
+| `r6c5-r7c5` | 95 | 0.95% |
+| `r4c1-r4c2` | 95 | 0.95% |
+| `r7c3-r7c4` | 95 | 0.95% |
+| `r5c1-r5c2` | 95 | 0.95% |
+| `r5c1-r6c1` | 94 | 0.94% |
+| `r1c4-r2c4` | 94 | 0.94% |
+| `r6c0-r6c1` | 94 | 0.94% |
+| `r5c6-r5c7` | 94 | 0.94% |
+| `r4c2-r5c2` | 94 | 0.94% |
+| `r6c4-r7c4` | 93 | 0.93% |
+| `r7c5-r7c6` | 93 | 0.93% |
+| `r3c1-r4c1` | 92 | 0.92% |
+| `r4c2-r4c3` | 92 | 0.92% |
+| `r6c2-r7c2` | 92 | 0.92% |
+| `r3c0-r4c0` | 92 | 0.92% |
+| `r4c4-r5c4` | 92 | 0.92% |
+| `r2c0-r2c1` | 91 | 0.91% |
+| `r6c1-r6c2` | 90 | 0.90% |
+| `r0c4-r0c5` | 90 | 0.90% |
+| `r0c4-r1c4` | 90 | 0.90% |
+| `r0c5-r1c5` | 89 | 0.89% |
+| `r5c4-r5c5` | 89 | 0.89% |
+| `r4c6-r5c6` | 89 | 0.89% |
+| `r3c0-r3c1` | 88 | 0.88% |
+| `r3c4-r4c4` | 88 | 0.88% |
+| `r2c5-r2c6` | 88 | 0.88% |
+| `r2c6-r2c7` | 87 | 0.87% |
+| `r1c5-r2c5` | 87 | 0.87% |
+| `r4c4-r4c5` | 87 | 0.87% |
+| `r1c1-r2c1` | 86 | 0.86% |
+| `r6c4-r6c5` | 86 | 0.86% |
+| `r5c2-r6c2` | 86 | 0.86% |
+| `r3c2-r4c2` | 86 | 0.86% |
+| `r1c0-r1c1` | 86 | 0.86% |
+| `r1c4-r1c5` | 86 | 0.86% |
+| `r2c6-r3c6` | 86 | 0.86% |
+| `r2c2-r3c2` | 86 | 0.86% |
+| `r2c2-r2c3` | 86 | 0.86% |
+| `r2c3-r3c3` | 86 | 0.86% |
+| `r2c3-r2c4` | 85 | 0.85% |
+| `r4c5-r5c5` | 85 | 0.85% |
+| `r2c1-r2c2` | 85 | 0.85% |
+| `r0c3-r1c3` | 85 | 0.85% |
+| `r3c7-r4c7` | 85 | 0.85% |
+| `r7c2-r7c3` | 85 | 0.85% |
+| `r4c5-r4c6` | 84 | 0.84% |
+| `r6c3-r7c3` | 84 | 0.84% |
+| `r6c1-r7c1` | 84 | 0.84% |
+| `r1c7-r2c7` | 84 | 0.84% |
+| `r1c5-r1c6` | 84 | 0.84% |
+| `r6c5-r6c6` | 83 | 0.83% |
+| `r3c4-r3c5` | 82 | 0.82% |
+| `r1c2-r1c3` | 82 | 0.82% |
+| `r3c6-r3c7` | 82 | 0.82% |
+| `r5c6-r6c6` | 81 | 0.81% |
+| `r5c3-r6c3` | 81 | 0.81% |
+| `r5c0-r5c1` | 81 | 0.81% |
+| `r2c4-r2c5` | 80 | 0.80% |
+| `r3c3-r4c3` | 80 | 0.80% |
+| `r6c6-r6c7` | 79 | 0.79% |
+| `r4c0-r4c1` | 79 | 0.79% |
+| `r3c2-r3c3` | 79 | 0.79% |
+| `r5c4-r6c4` | 79 | 0.79% |
+| `r4c3-r5c3` | 79 | 0.79% |
+| `r1c1-r1c2` | 79 | 0.79% |
+| `r4c3-r4c4` | 78 | 0.78% |
+| `r3c5-r4c5` | 77 | 0.77% |
+| `r5c5-r5c6` | 76 | 0.76% |
+| `r0c1-r0c2` | 76 | 0.76% |
+| `r2c1-r3c1` | 76 | 0.76% |
+| `r3c6-r4c6` | 76 | 0.76% |
+| `r1c6-r2c6` | 75 | 0.75% |
+| `r2c5-r3c5` | 74 | 0.74% |
+| `r1c3-r2c3` | 74 | 0.74% |
+| `r5c2-r5c3` | 73 | 0.73% |
+| `r3c1-r3c2` | 72 | 0.72% |
+| `r1c3-r1c4` | 72 | 0.72% |
+| `r4c6-r4c7` | 71 | 0.71% |
+| `r1c2-r2c2` | 71 | 0.71% |
+| `r3c5-r3c6` | 71 | 0.71% |
+| `r0c1-r1c1` | 71 | 0.71% |
+| `r3c3-r3c4` | 69 | 0.69% |
+| `r6c3-r6c4` | 62 | 0.62% |
+| `r5c5-r6c5` | 60 | 0.60% |
 
-## File Inventory
+</details>
 
-- `c3_final_table.csv`: canonical final table with C31, C32, and C33.
-- `c3_compute.py`: reproducible computation script.
+### C33 label distribution
+
+| label | count | share |
+|---|---:|---:|
+| `strong` | 4,032 | 40.32% |
+| `moderate` | 3,978 | 39.78% |
+| `weak` | 1,009 | 10.09% |
+| `very_sharp` | 981 | 9.81% |

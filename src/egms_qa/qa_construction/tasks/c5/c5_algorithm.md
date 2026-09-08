@@ -1,20 +1,18 @@
-# C5 Algorithm: Spatial Monitoring Context
+# C5: Spatial monitoring context
 
-## Delivered Tasks
+## Task overview
 
-`C51_monitoring_priority`
+| task | description |
+|---|---|
+| **C5 group** | Combine overall motion and local spatial evidence into a monitoring interpretation. |
+| C51 | Monitoring priority derived from the prescribed upstream motion and spatial classes. |
+| C52 | Local-risk category indicating spatial evidence that the mean-motion class may obscure. |
 
-C51 asks whether a tile that already triggers monitoring should be treated as a
-standard watch-list case or a high-priority spatial case because it also has a
-very sharp deformation front.
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c5/c5_final_table.csv) · [Implementation](c5_compute.py)
 
-`C52_hidden_local_risk`
+## Key concepts
 
-C52 asks whether the tile's mean subsidence band looks low, while the local
-worst-point velocity tail is still high. This captures a spatially hidden local
-signal that can be diluted by tile-level averaging.
-
-## Inputs
+### Inputs
 
 C5 is a composite family using existing EGMS-QA outputs:
 
@@ -25,7 +23,9 @@ C5 is a composite family using existing EGMS-QA outputs:
 
 No new point-level, bin-level, or encoder computation is introduced.
 
-## Rules
+## Algorithm steps
+
+### Rules
 
 C51:
 
@@ -51,25 +51,49 @@ else:
 The C52 rule preserves the old EGMS-QA C10 logic: mean severity was only slight or
 mild, but the local worst-point significance was high.
 
-## Current All10k Result
+## Run and files
 
-C51 counts:
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-```text
-none      9405
-standard   199
-high       396
+```bash
+python -m egms_qa.qa_construction.tasks.c5.c5_compute \
+    --out-dir outputs/tasks-rebuilt/c5
 ```
 
-C52 counts:
+The new table is written to `outputs/tasks-rebuilt/c5/c5_final_table.csv`.
+The installed reference remains at `outputs/tasks/c5/c5_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
 
-```text
-no   9593
-yes   407
-```
+| required input | published source | installed path |
+|---|---|---|
+| B2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b2/b2_final_table.csv) | `outputs/tasks/b2/b2_final_table.csv` |
+| B3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) | `outputs/tasks/b3/b3_final_table.csv` |
+| B6 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b6/b6_final_table.csv) | `outputs/tasks/b6/b6_final_table.csv` |
+| C3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) | `outputs/tasks/c3/c3_final_table.csv` |
 
-## File Inventory
+The computation may also write local summaries or diagnostics next to its
+new table. Their filenames and options are defined in the linked script;
+they are not part of the published reference-table inventory unless linked
+explicitly above.
 
-- `c5_final_table.csv`: final C5 table with upstream B/C labels and C51/C52.
-- `c5_compute.py`: reproducible composite computation script.
-- `c5_summary.json`: counts and rule summary.
+## Results
+
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c5/c5_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
+
+### C51 label distribution
+
+| label | count | share |
+|---|---:|---:|
+| `none` | 9,405 | 94.05% |
+| `high` | 396 | 3.96% |
+| `standard` | 199 | 1.99% |
+
+### C52 label distribution
+
+| label | count | share |
+|---|---:|---:|
+| `no` | 9,593 | 95.93% |
+| `yes` | 407 | 4.07% |

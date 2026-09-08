@@ -1,10 +1,26 @@
-# B31-B36 Velocity Tail Family
+# B3: Velocity tails and direction
 
-## Task Question
+## Task overview
+
+| task | description |
+|---|---|
+| **B3 group** | Describe the velocity distribution's tails, direction, significance, and European reference typicality. |
+| B31 | 10th percentile of point velocity, describing the sinking tail. |
+| B32 | 90th percentile of point velocity, describing the upper tail. |
+| B33 | 90th percentile of absolute point velocity, describing the magnitude of the fast tail. |
+| B34 | Direction class that retains evidence of uplift instead of treating every strong tail as subsidence. |
+| B35 | Significance class comparing extreme point motion with its measurement uncertainty. |
+| B36 | Velocity typicality class relative to the specified European reference distribution. |
+
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) · [Implementation](b3_compute.py)
+
+## Key concepts
 
 What do the tile's velocity tails say about sinking-side motion, uplift protection, local worst-point strength, and European velocity typicality?
 
-## Targets
+## Algorithm steps
+
+### Targets
 
 ```text
 B31_velocity_p10_mm_yr = percentile(point mean_velocity, 10)
@@ -14,7 +30,7 @@ B33_vel_abs_p90_mm_yr = percentile(abs(point mean_velocity), 90)
 
 B31 captures the sinking-side tail. B32 captures the upper-side tail. B33 captures local absolute motion strength.
 
-## Derived Labels
+### Derived Labels
 
 Uplift-protected direction:
 
@@ -50,32 +66,62 @@ B36 is a European reference distribution label, not a causal anomaly claim. The
 cutoffs are **corpus-relative**: fixed quantiles of the full European
 candidate-pool distribution, baked into the compute script as constants.
 
-## Final Counts
+## Run and files
 
-All 10k EGMS encoder tiles:
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-| B34 class | count | fraction |
+```bash
+python -m egms_qa.qa_construction.tasks.b3.b3_compute \
+    --out-dir outputs/tasks-rebuilt/b3
+```
+
+The new table is written to `outputs/tasks-rebuilt/b3/b3_final_table.csv`.
+The installed reference remains at `outputs/tasks/b3/b3_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
+
+| required input | published source | installed path |
+|---|---|---|
+| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
+| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
+
+## Results
+
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
+
+### Numeric targets
+
+| task | defined | missing | p05 | median | p95 |
+|---|---:|---:|---:|---:|---:|
+| B31 | 10,000 | 0 | -4.243 | -1.9 | -0.8 |
+| B32 | 10,000 | 0 | -1.1 | -0.3 | 1 |
+| B33 | 10,000 | 0 | 0.9 | 1.9 | 4.4 |
+
+### B34 label distribution
+
+| label | count | share |
 |---|---:|---:|
-| `non_uplift` | 9664 | 0.9664 |
-| `uplift` | 336 | 0.0336 |
+| `non_uplift` | 9,664 | 96.64% |
+| `uplift` | 336 | 3.36% |
 
-| B35 class | count | fraction |
+### B35 label distribution
+
+| label | count | share |
 |---|---:|---:|
-| `very_low` | 2307 | 0.2307 |
-| `low` | 2206 | 0.2206 |
-| `moderate` | 2022 | 0.2022 |
-| `high` | 1713 | 0.1713 |
-| `very_high` | 1752 | 0.1752 |
+| `very_low` | 2,307 | 23.07% |
+| `low` | 2,206 | 22.06% |
+| `moderate` | 2,022 | 20.22% |
+| `very_high` | 1,752 | 17.52% |
+| `high` | 1,713 | 17.13% |
 
-| B36 class | count | fraction |
+### B36 label distribution
+
+| label | count | share |
 |---|---:|---:|
-| `low` | 1857 | 0.1857 |
-| `typ_low` | 3768 | 0.3768 |
-| `typ_high` | 3056 | 0.3056 |
-| `high` | 922 | 0.0922 |
-| `extreme` | 397 | 0.0397 |
-
-## File Inventory
-
-- `b3_final_table.csv`: canonical family table with B31, B32, B33, B34, B35, and B36.
-- `b3_compute.py`: reproducible computation script.
+| `typ_low` | 3,768 | 37.68% |
+| `typ_high` | 3,056 | 30.56% |
+| `low` | 1,857 | 18.57% |
+| `high` | 922 | 9.22% |
+| `extreme` | 397 | 3.97% |

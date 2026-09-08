@@ -1,19 +1,38 @@
-# C21/C22 Spatial Concentration
+# C2: Spatial concentration
 
-## Task Question
+## Task overview
+
+| task | description |
+|---|---|
+| **C2 group** | Measure how unevenly motion is distributed across the tile's spatial cells. |
+| C21 | Spatial concentration score computed from the distribution of cell-level motion magnitudes. |
+| C22 | Concentration class derived from C21 using the specified reference thresholds. |
+
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c2/c2_final_table.csv) · [Implementation](c2_compute.py)
+
+## Key concepts
 
 Is the motion magnitude spatially concentrated in a few parts of the tile, or spread more evenly?
 
-## Inputs
+### Inputs
 
 - `coords`: point coordinates.
 - `mean_velocity`: point-level mean velocity in mm/yr.
 
 Arrays are read from the EGMS encoder 10k tile manifest:
 
-`./data/encoder/manifest/split.parquet`
+[HF split.parquet](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) (installed at `data/encoder/manifest/split.parquet`)
 
-## Formula
+### Intentional Exclusions
+
+- C21/C22 do not use RMSE or motion SNR. RMSE belongs to A41 and noise-aware point activity belongs to C11.
+- C21/C22 do not count active bins; the old active spatial extent task was deleted.
+- C21/C22 do not use a fixed `2 mm/yr` active threshold.
+- C21/C22 do not classify moving-support location; C13 handles the C1-derived bin string.
+
+## Algorithm steps
+
+### Formula
 
 For each point:
 
@@ -34,7 +53,7 @@ For each tile:
 
 Higher values mean the motion magnitude is more spatially concentrated.
 
-## Distribution Class
+### Distribution Class
 
 C22 is derived from the observed C21 train-split distribution. The distribution
 is unimodal and right-skewed with a long high-concentration tail, so C22 uses
@@ -48,40 +67,42 @@ organization class:
 | `concentrated` | 0.181511 < C21 <= 0.312813 |
 | `highly_concentrated` | C21 > 0.312813 |
 
-## Intentional Exclusions
+## Run and files
 
-- C21/C22 do not use RMSE or motion SNR. RMSE belongs to A41 and noise-aware point activity belongs to C11.
-- C21/C22 do not count active bins; the old active spatial extent task was deleted.
-- C21/C22 do not use a fixed `2 mm/yr` active threshold.
-- C21/C22 do not classify moving-support location; C13 handles the C1-derived bin string.
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-## Final Distribution
+```bash
+python -m egms_qa.qa_construction.tasks.c2.c2_compute \
+    --out-dir outputs/tasks-rebuilt/c2
+```
 
-All 10k EGMS encoder tiles:
+The new table is written to `outputs/tasks-rebuilt/c2/c2_final_table.csv`.
+The installed reference remains at `outputs/tasks/c2/c2_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
 
-| statistic | value |
-|---|---:|
-| p01 | 0.0550 |
-| p05 | 0.0785 |
-| p25 | 0.1282 |
-| p50 | 0.1815 |
-| p75 | 0.2461 |
-| p95 | 0.3622 |
-| p99 | 0.4870 |
+| required input | published source | installed path |
+|---|---|---|
+| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
+| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
 
-C22 class counts:
+## Results
 
-| class | count | fraction |
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c2/c2_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
+
+### Numeric targets
+
+| task | defined | missing | p05 | median | p95 |
+|---|---:|---:|---:|---:|---:|
+| C21 | 10,000 | 0 | 0.0784815 | 0.18154 | 0.362198 |
+
+### C22 label distribution
+
+| label | count | share |
 |---|---:|---:|
-| `diffuse` | 984 | 0.0984 |
-| `mildly_concentrated` | 4015 | 0.4015 |
-| `concentrated` | 3998 | 0.3998 |
-| `highly_concentrated` | 1003 | 0.1003 |
-
-## File Inventory
-
-- `c2_final_table.csv`: canonical final table with C21 and C22.
-- `c2_compute.py`: reproducible computation script.
-- `c2_gini_distribution.png`: diagnostic distribution plot.
-- `c1_c2_hexbin.png`: diagnostic C11-C21 relationship plot.
-- `examples/`: diagnostic 8x8 bin example plots.
+| `mildly_concentrated` | 4,015 | 40.15% |
+| `concentrated` | 3,998 | 39.98% |
+| `highly_concentrated` | 1,003 | 10.03% |
+| `diffuse` | 984 | 9.84% |

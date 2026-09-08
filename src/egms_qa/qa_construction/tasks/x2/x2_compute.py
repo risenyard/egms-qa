@@ -1,12 +1,12 @@
 """Build X2 unsupported-data/scope boundary catalog."""
 from __future__ import annotations
 
+import argparse
 import csv
 from pathlib import Path
 
 
 OUT_DIR = Path("./outputs/tasks/x2")
-OUT_PATH = OUT_DIR / "x2_final_table.csv"
 
 ANSWER_POLICY = (
     "Refuse unsupported data/scope requests, name the missing scale/channel/time/reference universe, "
@@ -84,7 +84,11 @@ TASKS = [
 
 
 def main() -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--out-dir", type=Path, default=OUT_DIR)
+    args = parser.parse_args()
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = args.out_dir / "x2_final_table.csv"
     fieldnames = [
         "task_id",
         "target_column",
@@ -96,10 +100,11 @@ def main() -> None:
         "answer_policy",
         "response_template",
     ]
-    with OUT_PATH.open("w", newline="", encoding="utf-8") as f:
+    with out_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(TASKS)
+    print(f"wrote {out_path}")
 
 
 if __name__ == "__main__":

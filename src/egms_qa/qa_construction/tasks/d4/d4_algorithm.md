@@ -1,6 +1,16 @@
-# D4 Temporal Composition Algorithm
+# D4: Temporal composition
 
-## Current Scope
+## Task overview
+
+| task | description |
+|---|---|
+| **D4 group** | Combine trend, seasonality, and acceleration into a dominant process and evolution archetype. |
+| D41 | Dominant temporal process selected by comparing train-reference ranks of the prescribed process indicators. |
+| D42 | Evolution archetype combining the dominant process with trend shape, seasonal phase, and intensification. |
+
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d4/d4_final_table.csv) · [Implementation](d4_compute.py)
+
+## Key concepts
 
 This folder is the D4 temporal composition family. The delivered target is:
 
@@ -20,7 +30,7 @@ D42 is a readable temporal archetype. It does not introduce a new measurement,
 model, or threshold. It uses D41 as the routing label and then attaches the most
 relevant already delivered temporal detail from D11, D21, or D31.
 
-## Inputs
+### Inputs
 
 | process | input scalar | meaning |
 |---|---|---|
@@ -32,7 +42,28 @@ The three inputs have different physical units, so D41 does not compare raw
 values directly. It first converts each input to a train-split empirical
 percentile rank and applies those train-fitted ranks to all 10k tiles.
 
-## Formula
+### Interpretation
+
+- `low_activity`: all three process strengths are weak relative to the 10k corpus.
+- `trend_dominant`: long-term motion strength clearly leads.
+- `seasonal_dominant`: seasonal strength clearly leads.
+- `acceleration_dominant`: acceleration strength clearly leads.
+- `mixed`: multiple temporal processes are comparable.
+
+### Intentional Exclusions
+
+- D41 does not replace D1, D2, or D3. It summarizes their broad process context.
+- D41 uses B33/B51/B41 as base strengths, not D11/D21/D31 labels, because it is
+  a composition comparison across process magnitudes.
+- D42 does not use D12/D13/D14/D22/D23/D24/D32/D33/D34/D35. Those columns are
+  important diagnostics, but adding them to D42 would make the class a mixed
+  heuristic rather than a readable story label.
+- D42 does not add any new threshold. Its only thresholded input is D41, whose
+  thresholds are already labeled corpus-relative.
+
+## Algorithm steps
+
+### Formula
 
 For each process:
 
@@ -64,15 +95,7 @@ The `0.30` and `0.15` thresholds are corpus-relative design choices selected
 after inspecting the top-rank and margin distributions and class proportions.
 They are not physical thresholds.
 
-## Interpretation
-
-- `low_activity`: all three process strengths are weak relative to the 10k corpus.
-- `trend_dominant`: long-term motion strength clearly leads.
-- `seasonal_dominant`: seasonal strength clearly leads.
-- `acceleration_dominant`: acceleration strength clearly leads.
-- `mixed`: multiple temporal processes are comparable.
-
-## D42 Temporal Evolution Archetype
+### D42 Temporal Evolution Archetype
 
 D42 converts the D-family temporal story into one answerable class:
 
@@ -105,58 +128,63 @@ Class rule:
 | `D41 = acceleration_dominant` and D31 is missing or zero | `uncertain_direction_acceleration_dominated` |
 | `D41 = mixed` | unordered top-two rank pair: `trend_seasonal_mixed`, `trend_acceleration_mixed`, or `seasonal_acceleration_mixed` |
 
-## Intentional Exclusions
+## Run and files
 
-- D41 does not replace D1, D2, or D3. It summarizes their broad process context.
-- D41 uses B33/B51/B41 as base strengths, not D11/D21/D31 labels, because it is
-  a composition comparison across process magnitudes.
-- D42 does not use D12/D13/D14/D22/D23/D24/D32/D33/D34/D35. Those columns are
-  important diagnostics, but adding them to D42 would make the class a mixed
-  heuristic rather than a readable story label.
-- D42 does not add any new threshold. Its only thresholded input is D41, whose
-  thresholds are already labeled corpus-relative.
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-## Current All-10k Result
+```bash
+python -m egms_qa.qa_construction.tasks.d4.d4_compute \
+    --out-dir outputs/tasks-rebuilt/d4
+```
 
-| class | count |
-|---|---:|
-| `low_activity` | 864 |
-| `trend_dominant` | 1529 |
-| `seasonal_dominant` | 1825 |
-| `acceleration_dominant` | 1093 |
-| `mixed` | 4689 |
+The new table is written to `outputs/tasks-rebuilt/d4/d4_final_table.csv`.
+The installed reference remains at `outputs/tasks/d4/d4_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
 
-D42 result:
+| required input | published source | installed path |
+|---|---|---|
+| B3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) | `outputs/tasks/b3/b3_final_table.csv` |
+| B4 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b4/b4_final_table.csv) | `outputs/tasks/b4/b4_final_table.csv` |
+| B5 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b5/b5_final_table.csv) | `outputs/tasks/b5/b5_final_table.csv` |
+| D1 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv) | `outputs/tasks/d1/d1_final_table.csv` |
+| D2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d2/d2_final_table.csv) | `outputs/tasks/d2/d2_final_table.csv` |
+| D3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv) | `outputs/tasks/d3/d3_final_table.csv` |
 
-| class | count |
-|---|---:|
-| `low_activity` | 864 |
-| `linear_trend_dominated` | 765 |
-| `curved_trend_dominated` | 389 |
-| `regime_change_trend_dominated` | 375 |
-| `coherent_seasonal_dominated` | 1429 |
-| `incoherent_seasonal_dominated` | 396 |
-| `intensifying_acceleration_dominated` | 487 |
-| `weakening_acceleration_dominated` | 290 |
-| `uncertain_direction_acceleration_dominated` | 316 |
-| `trend_seasonal_mixed` | 1321 |
-| `trend_acceleration_mixed` | 1905 |
-| `seasonal_acceleration_mixed` | 1463 |
+The computation may also write local summaries or diagnostics next to its
+new table. Their filenames and options are defined in the linked script;
+they are not part of the published reference-table inventory unless linked
+explicitly above.
 
-Rank profile:
+## Results
 
-| class | trend rank mean | seasonal rank mean | acceleration rank mean | top rank mean | margin mean |
-|---|---:|---:|---:|---:|---:|
-| `low_activity` | 0.129 | 0.151 | 0.105 | 0.207 | 0.091 |
-| `trend_dominant` | 0.687 | 0.254 | 0.362 | 0.687 | 0.294 |
-| `seasonal_dominant` | 0.286 | 0.701 | 0.302 | 0.701 | 0.335 |
-| `acceleration_dominant` | 0.358 | 0.382 | 0.745 | 0.745 | 0.288 |
-| `mixed` | 0.624 | 0.591 | 0.641 | 0.734 | 0.065 |
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d4/d4_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
 
-## File Inventory
+### D41 label distribution
 
-- `d4_final_table.csv`: canonical D41/D42 target table plus base inputs, ranks,
-  and the upstream D11/D21/D31 columns needed to reproduce D42.
-- `d4_final_summary.json`: class counts, rule, and rank summaries.
-- `d4_final_distribution.png`: D41/D42 class counts and rank/margin distributions.
-- `d4_compute.py`: recomputes D41/D42 from B3/B4/B5 and D1/D2/D3 final tables.
+| label | count | share |
+|---|---:|---:|
+| `mixed` | 4,689 | 46.89% |
+| `seasonal_dominant` | 1,825 | 18.25% |
+| `trend_dominant` | 1,529 | 15.29% |
+| `acceleration_dominant` | 1,093 | 10.93% |
+| `low_activity` | 864 | 8.64% |
+
+### D42 label distribution
+
+| label | count | share |
+|---|---:|---:|
+| `trend_acceleration_mixed` | 1,905 | 19.05% |
+| `seasonal_acceleration_mixed` | 1,463 | 14.63% |
+| `coherent_seasonal_dominated` | 1,429 | 14.29% |
+| `trend_seasonal_mixed` | 1,321 | 13.21% |
+| `low_activity` | 864 | 8.64% |
+| `linear_trend_dominated` | 765 | 7.65% |
+| `intensifying_acceleration_dominated` | 487 | 4.87% |
+| `incoherent_seasonal_dominated` | 396 | 3.96% |
+| `curved_trend_dominated` | 389 | 3.89% |
+| `regime_change_trend_dominated` | 375 | 3.75% |
+| `uncertain_direction_acceleration_dominated` | 316 | 3.16% |
+| `weakening_acceleration_dominated` | 290 | 2.90% |

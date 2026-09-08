@@ -1,23 +1,23 @@
-# D1 Temporal Trend Geometry Algorithm
+# D1: Temporal trend geometry
+
+## Task overview
+
+| task | description |
+|---|---|
+| **D1 group** | Describe curvature, changepoint strength, and trend shape in the tile-median displacement history. |
+| D11 | Trend-shape class obtained from the strong-curvature and strong-changepoint flags. |
+| D12 | Curvature strength combining quadratic-fit improvement with the normalized curvature effect. |
+| D13 | Changepoint strength combining piecewise-linear fit improvement with the slope-change effect. |
+| D14 | Time of the selected changepoint, reported when the changepoint-strength criterion is satisfied. |
+
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv) · [Implementation](d1_compute.py)
+
+## Key concepts
 
 D1 describes the geometry of each tile's median displacement history through
 curvature, changepoint strength, trend shape, and changepoint time.
 
-## Run
-
-After installing the Dataset as described in the [QA guide](../../README.md), run:
-
-```bash
-python -m egms_qa.qa_construction.tasks.d1.d1_compute \
-    --out-dir outputs/tasks-rebuilt/d1 --workers 8
-```
-
-The command reads the installed split manifest, data config, and NPZ tiles.
-Use `--manifest`, `--data-config`, and `--source-tiles-root` to read a release
-directly from another directory. It writes the new table and fitted-threshold
-summary without modifying the installed reference tables.
-
-## Inputs
+### Inputs
 
 For each tile, read the stored model-ready EGMS displacement interval `[0,294)`
 and take the median displacement over all points at each epoch. This stored
@@ -25,7 +25,9 @@ interval corresponds exactly to `[8,302)` on the original 304-step prepared
 axis. The epoch cadence is 6 days and the original index offset is retained in
 the data config for physical-time calculations.
 
-## Fitted Geometry
+## Algorithm steps
+
+### Fitted Geometry
 
 All fits include intercept, normalized time, and annual plus semiannual sine/cosine terms.
 
@@ -56,7 +58,7 @@ strength uses the best hinge coefficient and hinge standard deviation in the
 same calculation. The linear residual scale is the square root of linear SSE
 divided by the valid epoch count minus the six baseline coefficients.
 
-## Train-Fitted Thresholds
+### Train-Fitted Thresholds
 
 Thresholds are corpus-relative and fitted on train only:
 
@@ -88,38 +90,54 @@ D11 class rule:
 | yes | no | `stage_change` |
 | yes | yes | `complex_trend` |
 
-## Current All-10k Counts
+## Run and files
 
-D11:
+Complete the [task setup](../README.md#setup) first. Run these commands from
+the repository root:
 
-| value | count |
-|---|---:|
-| `linear_trend` | 8218 |
-| `complex_trend` | 1229 |
-| `stage_change` | 280 |
-| `curved_trend` | 273 |
+```bash
+python -m egms_qa.qa_construction.tasks.d1.d1_compute \
+    --out-dir outputs/tasks-rebuilt/d1
+```
 
-D11_has_break:
+The new table is written to `outputs/tasks-rebuilt/d1/d1_final_table.csv`.
+The installed reference remains at `outputs/tasks/d1/d1_final_table.csv`.
+See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
 
-| value | count |
-|---|---:|
-| `no_strong_break` | 8491 |
-| `has_break` | 1509 |
+| required input | published source | installed path |
+|---|---|---|
+| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
+| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
+| Data configuration | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/data_config.json) | `data/encoder/manifest/data_config.json` |
 
-D11_is_curved:
+The computation may also write local summaries or diagnostics next to its
+new table. Their filenames and options are defined in the linked script;
+they are not part of the published reference-table inventory unless linked
+explicitly above.
 
-| value | count |
-|---|---:|
-| `not_curved` | 8498 |
-| `curved` | 1502 |
+The published NPZ values and split remain fixed. Recomputing the table
+preserves its categorical targets, missingness, and numerical values up to
+floating-point rounding across linear-algebra implementations.
 
-## File Inventory
+## Results
 
-- `d1_final_table.csv`: canonical D11-D14 targets plus diagnostics needed to reproduce them.
-- `d1_summary.json`: thresholds, class counts, and score summaries.
-- `d1_algorithm.md`: this algorithm note.
-- `d1_compute.py`: fits the tile histories and generates the canonical D1 columns.
+The following summaries use all 10,000 rows of the
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv). Numeric summaries use finite
+values. Missing targets are reported separately.
 
-The published NPZ values and split remain fixed. Recomputing the table preserves
-its categorical targets, missingness, and numerical values up to floating-point
-rounding across linear-algebra implementations.
+### Numeric targets
+
+| task | defined | missing | p05 | median | p95 |
+|---|---:|---:|---:|---:|---:|
+| D12 | 10,000 | 0 | 0 | 0.0113259 | 0.457342 |
+| D13 | 10,000 | 0 | 0.00238516 | 0.0824703 | 0.940769 |
+| D14 | 1,509 | 8,491 | 2019.94 | 2021.43 | 2022.78 |
+
+### D11 label distribution
+
+| label | count | share |
+|---|---:|---:|
+| `linear_trend` | 8,218 | 82.18% |
+| `complex_trend` | 1,229 | 12.29% |
+| `stage_change` | 280 | 2.80% |
+| `curved_trend` | 273 | 2.73% |
