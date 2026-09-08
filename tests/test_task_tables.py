@@ -1,4 +1,4 @@
-"""Table joins must preserve tile identity and the published D target schema."""
+"""Task inputs preserve tile identity and defined class boundaries."""
 from pathlib import Path
 
 import pandas as pd
@@ -6,7 +6,6 @@ import numpy as np
 import pytest
 
 from egms_qa.qa_construction.tables import align_family_to_base, merge_task_tables, read_family
-from egms_qa.qa_construction.summarize_temporal import D_COLUMNS, merge_temporal_tables
 
 
 @pytest.mark.parametrize('boundary,below,at', [
@@ -95,27 +94,3 @@ def test_manifest_resolves_configured_data_root_outside_working_directory(tmp_pa
     path = tmp_path / 'split.parquet'
     pd.DataFrame({'tile_id': ['a'], 'split': ['train'], 'path': ['data/tiles/cell/a.npz']}).to_parquet(path)
     assert inputs.read_tile_manifest(path)['path'].tolist() == [str(data / 'tiles/cell/a.npz')]
-
-
-def test_temporal_summary_reads_current_columns_and_preserves_order(tmp_path: Path):
-    ids = [f'tile-{i}' for i in range(10000)]
-    splits = ['train'] * 8000 + ['val'] * 1000 + ['test'] * 1000
-    for family, columns in D_COLUMNS.items():
-        directory = tmp_path / family
-        directory.mkdir()
-        table = pd.DataFrame({'tile_id': ids, 'split': splits})
-        for column in columns[2:]:
-            table[column] = range(10000)
-        if family != 'd1':
-            table = table.iloc[::-1]
-        table.to_csv(directory / f'{family}_final_table.csv', index=False)
-    result = merge_temporal_tables(tmp_path)
-    assert result['tile_id'].tolist() == ids
-    assert result['D12_curvature_strength'].tolist() == list(range(10000))
-    assert result['D13_changepoint_strength'].tolist() == list(range(10000))
-    assert result['D22_phase_coherence'].tolist() == list(range(10000))
-    # An incomplete family must fail instead of silently dropping tiles in a join.
-    path = tmp_path / 'd2/d2_final_table.csv'
-    pd.read_csv(path).iloc[:-1].to_csv(path, index=False)
-    with pytest.raises(ValueError, match='expected 10000 rows'):
-        merge_temporal_tables(tmp_path)

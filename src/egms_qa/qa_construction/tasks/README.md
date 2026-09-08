@@ -66,12 +66,9 @@ corresponding input flags listed in that task's method.
 | [build_labels.py](../build_labels.py) | Aggregate published tables into labels and collect the 14 X refusal tasks |
 | [qa_lib.py](../qa_lib.py) | Question phrasing, answer rendering and validation |
 | [generate_qa.py](../generate_qa.py) | Generate the three QA splits |
-| [summarize_temporal.py](../summarize_temporal.py) | Optional D1–D4 summary; see [usage](../temporal_summary.md) |
 
-The summary tool is separate from task algorithms and writes to
-`outputs/summaries/temporal/`. It does not define additional tasks or feed label
-aggregation. Shared table utilities enforce the released 10,000-tile contract;
-task-specific fitting, thresholds and label rules remain in their task groups.
+Label aggregation enforces the released 10,000-tile contract. Task-specific
+fitting, thresholds, and label rules remain in their task groups.
 
 For tasks with train-fitted thresholds or representations, a small sample is
 only a run check. Reproducing the published labels requires the full training
