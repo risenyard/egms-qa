@@ -100,17 +100,11 @@ python -m egms_qa.qa_construction.generate_qa \
 
 ## Construct QA for new tiles
 
-Complete the [task-system setup](tasks/README.md#setup), then supply your prepared
-tiles and manifest to the [new-tile workflow](tasks/README.md#new-tiles):
+Complete the [task-system setup](tasks/README.md#setup), then follow the
+[new-tile task computation instructions](tasks/README.md#new-tiles). That example
+writes the task tables to `outputs/tasks-new/`.
 
-```bash
-python -m egms_qa.qa_construction.run_tasks \
-    --mode new-tiles --manifest my_data/split.parquet \
-    --out-dir outputs/tasks-new
-```
-
-This computes task values for your tiles using the published reference system.
-Assemble those targets into `my_data/labels.parquet` following the
+Assemble the computed targets into `my_data/labels.parquet` following the
 [Dataset label contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#labels-and-task-metadata).
 The release label builder retains its fixed 10,000-tile requirement; other
 collections need their own label-table assembly.

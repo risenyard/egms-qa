@@ -123,6 +123,10 @@ required, and the collection can have a different number of tiles.
 Reference settings are saved in `reference_state.joblib`, with input hashes
 and run details in `run.json`.
 
+The task tables are written to `outputs/tasks-new/<group>/<group>_final_table.csv`.
+Continue with [label assembly and QA generation](../README.md#construct-qa-for-new-tiles)
+in the QA construction guide.
+
 ### Task reference
 
 For a single task group, use its linked implementation and `--help` to see the
