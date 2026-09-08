@@ -62,12 +62,12 @@ The label builder writes `labels.parquet` and `labels_meta.json`.
 `--skip-cache-validation` omits the optional alignment check against encoder
 tokens; reference-table validation still runs.
 
-QA files appear under `outputs/qa-reproduced/qa/`: two training phrasing cycles
+QA files appear under `outputs/qa-reproduced/qa/`: two different question phrasings for training dataset
 (`v1_train_e00.jsonl` and `v1_train_e01.jsonl`), plus `v1_val.jsonl` and
 `v1_test.jsonl`. `meta.json` and `task_counts.csv` record generation settings
 and output counts.
 
-Set `--train-cycles` to change the number of training cycles. For a small run,
+Set `--train-cycles` to change the number of question phrasings for training dataset. For a small run,
 add `--max-tiles 2 --train-cycles 1` to the generation command. The Dataset
 contains fixed published splits; these commands generate a new corpus from
 the released targets and approved phrasings.
