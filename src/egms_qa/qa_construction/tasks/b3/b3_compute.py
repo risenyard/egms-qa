@@ -31,15 +31,12 @@ def _direction_from_tails(p10: float, p90: float) -> str:
 
 
 def _worst_point_significance(vel_abs_p90: float) -> str:
-    if vel_abs_p90 < 1.5:
-        return "very_low"
-    if vel_abs_p90 < 1.9:
-        return "low"
-    if vel_abs_p90 < 2.24:
-        return "moderate"
-    if vel_abs_p90 < 2.9:
-        return "high"
-    return "very_high"
+    # Compare at the released NPZ velocity precision. Promoting a stored 1.9
+    # to float64 gives 1.899999976..., which must remain on the 1.9 boundary.
+    boundaries = np.asarray([1.5, 1.9, 2.24, 2.9], dtype=np.float32)
+    labels = ["very_low", "low", "moderate", "high", "very_high"]
+    index = np.searchsorted(boundaries, np.float32(vel_abs_p90), side="right")
+    return labels[int(index)]
 
 
 def _velocity_typicality(vel_abs_p90: float) -> str:

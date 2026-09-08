@@ -9,7 +9,7 @@
 | B32 | 90th percentile of point velocity, describing the upper tail. |
 | B33 | 90th percentile of absolute point velocity, describing the magnitude of the fast tail. |
 | B34 | Direction class that retains evidence of uplift instead of treating every strong tail as subsidence. |
-| B35 | Significance class comparing extreme point motion with its measurement uncertainty. |
+| B35 | Worst-point strength class applying fixed velocity boundaries to B33. |
 | B36 | Velocity typicality class relative to the specified European reference distribution. |
 
 [Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) · [Implementation](b3_compute.py)
@@ -50,6 +50,10 @@ B35_worst_point_significance =
     high       if 2.24 <= B33 < 2.9
     very_high  if B33 >= 2.9
 ```
+
+Boundary comparisons use the released NPZ's float32 precision: a stored
+1.9 mm/yr belongs to `moderate`. B35 uses velocity strength rather than a
+point-specific uncertainty ratio.
 
 European velocity typicality:
 

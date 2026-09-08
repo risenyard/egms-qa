@@ -2,10 +2,24 @@
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 import pytest
 
 from egms_qa.qa_construction.tables import align_family_to_base, merge_task_tables, read_family
 from egms_qa.qa_construction.summarize_temporal import D_COLUMNS, merge_temporal_tables
+
+
+@pytest.mark.parametrize('boundary,below,at', [
+    (1.5, 'very_low', 'low'),
+    (1.9, 'low', 'moderate'),
+    (2.24, 'moderate', 'high'),
+    (2.9, 'high', 'very_high'),
+])
+def test_b35_preserves_float32_boundary_membership(boundary, below, at):
+    from egms_qa.qa_construction.tasks.b3.b3_compute import _worst_point_significance
+    stored = np.float32(boundary)
+    assert _worst_point_significance(float(stored)) == at
+    assert _worst_point_significance(float(np.nextafter(stored, np.float32(-np.inf)))) == below
 
 
 def test_alignment_uses_tile_and_split_keys():
