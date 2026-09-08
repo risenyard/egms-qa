@@ -1,72 +1,131 @@
 # EGMS-QA Construction
 
-This module converts task reference values into labels and natural-language
-question–answer records. The Dataset supplies the released reference tables,
-labels, QA splits, and encoder tokens.
+This module builds task reference values, aggregates labels, and renders
+natural-language question–answer records. The released tables and labels can
+also be used as starting points for new QA corpora.
 
-[Released Dataset](https://huggingface.co/datasets/risenyard/egms-qa-dataset) ·
-[Project guide](../../../README.md) ·
-[Translator guide](../translator/README.md)
+## Architecture
+
+```mermaid
+flowchart LR
+    I["Task-specific inputs"] --> C["Task computation"]
+    C --> R["Reference tables"]
+    R --> L["Label aggregation"]
+    L --> Q["Question and answer rendering"]
+    P["Task definitions and approved phrasings"] --> Q
+    Q --> O["QA split files"]
+```
+
+Task scripts use prepared tiles, encoder artifacts, or other scientific inputs
+specified by their methods. Label aggregation joins the reference tables by
+tile ID and split. Rendering combines those targets with approved question
+phrasings and answer templates. The [task index](tasks/README.md) identifies
+the inputs and implementation for each group.
+
+## Workflows
+
+This guide covers construction commands and the task catalog for
+[EGMS-QA](../../../README.md). The
+[Hugging Face Dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
+documents the released records, fields, file layout, and scientific provenance.
+
+| goal | where to start |
+|---|---|
+| Read the published QA records | [HF QA use](https://huggingface.co/datasets/risenyard/egms-qa-dataset#qa-use) |
+| Use released artifacts in this codebase | [Install the code](#installation), then [install the Dataset](#use-the-released-records) |
+| Render a new QA corpus | [Generate question–answer records](#generate-questionanswer-records) |
+| Rebuild labels or reference values | [Construction workflow](#construction-workflow) and [task index](tasks/README.md) |
+| Find a task definition | [Task catalog](#task-catalog) |
+
+## Installation
+
+Python 3.10 or later is required. Clone and install the code, then run all
+commands below from the `egms-qa` repository root.
+
+```bash
+git clone https://github.com/risenyard/egms-qa
+cd egms-qa
+pip install -e .
+```
+
+Label aggregation and QA rendering can run on CPU. Task-specific computation
+may require additional dependencies or GPU execution, as described in the
+linked methods.
 
 ## Use the released records
 
-Run these commands from the repository root to download and install the Dataset:
+After [installing the code](#installation), download and install the Dataset:
 
 ```bash
-pip install -e .
 hf download risenyard/egms-qa-dataset --repo-type dataset \
     --local-dir release/egms-qa-dataset
 python -m egms_qa.release install \
     --release-dir release/egms-qa-dataset --target-root .
 ```
 
-The release provides QA under `data/qa/`, labels under `artifacts/labels/`,
-and task-group tables under `artifacts/reference_tables/`. The installer links
-these files to `outputs/qa/` and `outputs/tasks/` for use by the code.
+This downloads the full release, including source tiles and encoder tokens.
+The installer checks its inventory, then links the artifacts into the runtime
+paths expected by the code. It refuses to overwrite an existing target.
 
-The installer checks the release inventory before creating links. To verify
-every file's SHA256 as well, run `python -m egms_qa.release audit
---release-dir release/egms-qa-dataset --verify-hashes`.
+| HF source | installed local path |
+|---|---|
+| [Source tiles](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
+| [split_manifest.parquet](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
+| [data_config.json](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/data_config.json) | `data/encoder/manifest/data_config.json` |
+| [Encoder tokens](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/representations) | `data/encoder/tokens/` |
+| [Reference tables](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/reference_tables) | `outputs/tasks/` |
+| [labels.parquet](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/labels/labels.parquet) | `outputs/qa/labels.parquet` |
+| [Labels metadata](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/labels/metadata.json) | `outputs/qa/labels_meta.json` |
+| [train.jsonl](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/data/qa/train.jsonl) | `outputs/qa/v1_train.jsonl` |
+| [validation.jsonl](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/data/qa/validation.jsonl) | `outputs/qa/v1_val.jsonl` |
+| [test.jsonl](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/data/qa/test.jsonl) | `outputs/qa/v1_test.jsonl` |
+| [QA audit](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/qa_audit.json) | `outputs/qa/qa_audit.json` |
+
+To verify every file's SHA256, run:
+
+```bash
+python -m egms_qa.release audit \
+    --release-dir release/egms-qa-dataset --verify-hashes
+```
+
+Use these installed records for the published
+[Translator workflows](../translator/README.md).
 
 ## Generate question–answer records
 
-With the Dataset installed, render QA from its labels and approved phrasings:
+Start with a small rendering run from the installed labels and approved phrasings:
 
 ```bash
 python -m egms_qa.qa_construction.generate_qa \
-    --out-dir outputs/qa-generated
+    --out-dir outputs/qa-generated \
+    --max-tiles 2 --train-cycles 1
 ```
 
-Generated JSONL files appear in `outputs/qa-generated/qa/`, with record counts
-and rendering metadata in the parent directory. The default command writes
-two training phrasing cycles (`v1_train_e00.jsonl` and `v1_train_e01.jsonl`),
-plus `v1_val.jsonl` and `v1_test.jsonl`. Each token-dependent tile–task pair
-receives one phrasing per cycle from a pool of 20. Refusal tasks use a capped
-sample of tiles per task.
+The command writes `v1_train_e00.jsonl`, `v1_val.jsonl`, and `v1_test.jsonl`
+under `outputs/qa-generated/qa/`. Record counts and rendering metadata appear
+in the parent directory.
 
-These are newly rendered corpora. The canonical published QA files remain
-`data/qa/{train,validation,test}.jsonl` in the Dataset. Matching record counts
-alone does not establish byte-for-byte reproduction of those files.
+Remove `--max-tiles 2 --train-cycles 1` to render the full installed corpus
+with the default two training phrasing cycles. This also writes
+`v1_train_e01.jsonl`. Each token-dependent tile–task pair receives one phrasing
+per cycle from a pool of 20. Refusal tasks use a capped sample of tiles per task.
 
-Add `--max-tiles 2 --train-cycles 1` for a small rendering check. These options
-reduce the generated records and do not reproduce the full release counts.
+These commands create new corpora in a separate output directory. Use the
+Dataset's fixed `data/qa/{train,validation,test}.jsonl` files when reproducing
+the published model results. Matching record counts alone does not establish
+byte-for-byte reproduction of those files.
 
 ## Construction workflow
 
 | step | implementation | output |
 |---|---|---|
 | Task reference values | group scripts and algorithm notes in `tasks/` | one reference table per task group |
-| Label aggregation | `build_labels.py` | `labels.parquet` and `labels_meta.json` |
+| Label aggregation | `build_labels.py`, `task_specs.py`, and `tables.py` | `labels.parquet` and `labels_meta.json` |
 | Question and answer rendering | `generate_qa.py` and `qa_lib.py` | split JSONL files and rendering metadata |
 
-The [task implementation index](tasks/README.md) links all 27 task groups,
-their algorithms, dependencies, and reconstruction scope. The task-group
-notes define the inputs, formulas, thresholds, and target columns used by the
-reference tables. Label aggregation joins the tables by
-tile ID and split. Rendering converts the resulting targets into visible
-natural-language answers using the approved question phrasings.
-
-To rebuild labels from the released tables and render them into a new directory:
+The [task implementation index](tasks/README.md) links all 27 task groups and
+their dependencies. To rebuild labels from the installed reference tables and
+render them into a new directory:
 
 ```bash
 python -m egms_qa.qa_construction.build_labels \
@@ -77,18 +136,17 @@ python -m egms_qa.qa_construction.generate_qa \
     --out-dir outputs/qa-generated
 ```
 
-The label builder checks table identities and splits against the published encoder
-token cache, then aligns label rows to its tile order. No additional
-representation cache is required. The released label file remains the canonical
-input for reproducing model results. The optional
-[temporal summary](temporal_summary.md) combines the D1–D4 tables for analysis.
+The label builder checks table identities and splits against the published
+encoder token cache, then aligns label rows to its tile order. The released
+label file remains the canonical input for reproducing model results. The
+optional [temporal summary](temporal_summary.md) combines D1–D4 tables for analysis.
 
 ## Recompute D1 and S3
 
-D1 fits temporal geometry directly from the installed NPZ tiles and data
-configuration. Its curvature and changepoint thresholds are fitted on the
-training split. S3 combines the released monitoring tables with the frozen
-Bayesian temporal inputs in `outputs/tasks/s3/s3_temporal_inputs.csv`.
+With the Dataset installed, D1 fits temporal geometry from the NPZ tiles and
+data configuration. Its curvature and changepoint thresholds are fitted on
+the training split. S3 combines the reference tables with the frozen Bayesian
+temporal inputs in `outputs/tasks/s3/s3_temporal_inputs.csv`.
 
 ```bash
 pip install -e '.[tasks]'
@@ -98,33 +156,23 @@ python -m egms_qa.qa_construction.tasks.s3.s3_compute \
     --out-dir outputs/tasks-rebuilt/s3
 ```
 
-Both commands write new outputs separately from the installed tables. The
+Both commands write outputs separately from the installed tables. The
 [D1 method](tasks/d1/d1_algorithm.md) and [S3 method](tasks/s3/s3_algorithm.md)
-describe their inputs and formulas. S3 uses posterior trend order and
-changepoint probability from BEAST. Exact S3 reproduction uses the frozen
-posterior table supplied in the Dataset. The S3 guide also provides a refitting
-command for new estimates, which can vary across estimator builds and hardware.
+describe their inputs and formulas. Exact S3 reproduction uses the frozen
+BEAST posterior table supplied in the Dataset. The S3 guide also provides a
+refitting command for new estimates, which can vary across estimator builds
+and hardware.
 
 The label-generation examples above use the canonical released tables.
 Consult the task index for other groups' dependencies and reconstruction scope.
 
 ## Dataset contract
 
-| property | released value |
-|---|---|
-| source | EGMS Level-3 Ortho Vertical, 2019–2023 |
-| spatial unit | overlapping 7 km tiles |
-| tile count | 10,000 |
-| tile split | 8,000 train, 1,000 validation, 1,000 test |
-| stored displacement | `time_series [N,294]` in NPZ |
-| tile representation | 65 tokens of width 256 and a validity mask |
-| released QA records | 554,000 train, 68,200 validation, 68,200 test |
-
-The split is fixed at tile level. Overlapping tiles can share measurement
-points. Stored indices `[0,294)` correspond to source-preparation indices
-`[8,302)` on a 304-step axis. The
+The [Dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset)
+is the reference for QA fields, split sizes, source-tile arrays, normalization,
+and supporting scientific inputs. Its
 [source provenance](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/SOURCE_PROVENANCE.md)
-describes the source product and preparation contract.
+documents the EGMS product and the relationship between stored and source time indices.
 
 ## Task catalog
 
@@ -134,6 +182,15 @@ or categorical targets. Family X contains
 14 refusal tasks for questions outside the supported scope. Numeric targets
 describe quantities, categorical targets assign classes, and refusal targets
 state the evidence boundary.
+
+| family | task groups | leaf tasks | focus |
+|---|---:|---:|---|
+| A | 5 | 10 | Observation quality and usability |
+| B | 6 | 14 | Motion magnitude, direction, and typicality |
+| C | 5 | 12 | Spatial organization and monitoring context |
+| D | 4 | 15 | Temporal trend, seasonality, and intensification |
+| S | 4 | 13 | Properties of the encoder representation |
+| X | 3 | 14 | Boundaries of supported questions |
 
 The tables use `num` for numeric targets and `cat` for categorical targets.
 The translator's reported evaluation uses a defined 71-task subset of this
@@ -218,8 +275,8 @@ task-specific inputs, reference-value definitions, and validity conditions.
 
 ## License and scope
 
-The QA records and derived reference tables are released under CC-BY-4.0.
-Copernicus-derived measurements retain the source and modification requirements
-in [DATA_LICENSE](../../../DATA_LICENSE). Task targets describe observed
-displacement and representation properties. Refusal tasks define the limits on
-causal, predictive, safety-related, and otherwise unsupported answers.
+Task targets describe observed displacement and representation properties.
+Refusal tasks define the boundary of supported questions. Data provenance,
+licensing, and application limits are documented in the
+[Dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset#provenance-terms-and-limitations)
+and [DATA_LICENSE](../../../DATA_LICENSE).
