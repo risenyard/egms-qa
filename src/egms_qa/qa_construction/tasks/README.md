@@ -163,9 +163,9 @@ catalogs, rather than 10,000 tile-level records.
 
 The supported complete QA workflow starts from the released reference tables:
 rebuild labels, then render questions and answers. The Dataset supplies all 27
-tables needed for that workflow. The [reference-table workflow](../README.md#reproduce-qa-construction)
+tables needed for that workflow. The [reference-table workflow](../README.md#generate-qa-from-released-task-results)
 provides the label and QA commands. The
-[task recomputation workflow](../README.md#recompute-task-labels-and-regenerate-qa)
+[task recomputation workflow](../README.md#recompute-task-results-and-generate-qa)
 shows how to pass a complete working set of task tables to label aggregation
 and QA generation. Both write outputs separately from installed
 reference files.

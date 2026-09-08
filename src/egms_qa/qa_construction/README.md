@@ -15,11 +15,19 @@ documents the released files, data formats, and splits. The
 [task index](tasks/README.md) provides task definitions, methods, and computation
 commands.
 
-| goal | where to start |
-|---|---|
-| Rebuild labels and QA from released reference tables | [Reproduce QA construction](#reproduce-qa-construction) |
-| Recompute task values and update QA | [Recompute task labels and regenerate QA](#recompute-task-labels-and-regenerate-qa) |
-| Generate QA for a new collection | [Construct QA from your own data](#construct-qa-from-your-own-data) |
+The middle columns show which released artifacts each workflow reuses.
+“Partial” means that task groups not being recomputed retain their released
+results.
+
+| Goal | Released tiles | Released task results | Released QA records | Where to start |
+|---|---|---|---|---|
+| Use published QA | — | — | ✓ | [Read QA records](https://huggingface.co/datasets/risenyard/egms-qa-dataset#qa-use) |
+| Reproduce QA | — | ✓ | — | [Generate QA from released task results](#generate-qa-from-released-task-results) |
+| Reproduce task results and QA | As needed | Partial | — | [Recompute task results and generate QA](#recompute-task-results-and-generate-qa) |
+| Generate QA for a new collection | — | — | — | [Generate QA from your own labels](#generate-qa-from-your-own-labels) |
+
+The last workflow takes your prepared labels as input. Task-specific token
+and metadata requirements are listed in the [task index](tasks/README.md#setup).
 
 ## Installation and data setup
 
@@ -40,7 +48,7 @@ tables under `outputs/tasks/` and published labels, metadata, and QA under
 To read the published QA directly, use the
 [Dataset loading example](https://huggingface.co/datasets/risenyard/egms-qa-dataset#qa-use).
 
-## Reproduce QA construction
+## Generate QA from released task results
 
 After completing [setup](#installation-and-data-setup), rebuild labels from
 the released reference tables and pass them to the QA generator:
@@ -68,7 +76,7 @@ add `--max-tiles 2 --train-cycles 1` to the generation command. The Dataset
 contains fixed published splits; these commands generate a new corpus from
 the released targets and approved phrasings.
 
-## Recompute task labels and regenerate QA
+## Recompute task results and generate QA
 
 Complete [setup](#installation-and-data-setup), then follow the
 [task setup and input requirements](tasks/README.md#setup) to install task
@@ -99,12 +107,12 @@ python -m egms_qa.qa_construction.generate_qa \
     --out-dir outputs/qa-recomputed
 ```
 
-The output layout matches the reproduction workflow. Compare recomputed
+The output layout matches the QA generation workflow above. Compare recomputed
 values and class counts with the installed references before using the new QA.
 Task-specific fitting requirements and reproduction limits are documented in
 the [task methods and reconstruction scope](tasks/README.md#reconstruction-scope).
 
-## Construct QA from your own data
+## Generate QA from your own labels
 
 With [setup](#installation-and-data-setup) complete, provide a Parquet label
 table following the [Dataset label contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#labels-and-task-metadata).
