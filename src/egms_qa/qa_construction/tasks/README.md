@@ -23,10 +23,47 @@ A12 classifies that same score.
 | X | Questions that require unsupported inference or unavailable information |
 
 Start with the [group index](#task-groups) for definitions and results, or
-[Run and files](#run-and-files) to compute a table. Each method introduces its
+[Implementation](#Implementation) to compute a table. Each method introduces its
 own inputs and explains any upstream task it uses. “Training percentile” means
 a cutoff fitted on training tiles and then applied to all splits;
 “corpus-relative” means that the reference population determines the scale.
+
+## Task groups
+
+The script links identify the implementation entry points.  Each released table lives at
+`artifacts/reference_tables/<group>/<group>_final_table.csv` in
+[the Dataset](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/reference_tables).
+The release installer exposes these under `outputs/tasks/<group>/`.
+
+| Group and method | Leaf tasks | Subject | Implementation | HF reference table | Main inputs / steps |
+|---|---|---|---|---|---|
+| [A1](a1/a1_algorithm.md) | A11–A12 | Representation drift and stability | [script](a1/a1_compute.py) · [run](#run-a1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a1/a1_final_table.csv) | NPZ tiles, encoder and token cache; combine shards |
+| [A2](a2/a2_algorithm.md) | A21–A22 | Masked reconstruction and reliability | [script](a2/a2_compute.py) · [run](#run-a2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a2/a2_final_table.csv) | NPZ tiles and encoder; combine shards |
+| [A3](a3/a3_algorithm.md) | A31–A32 | Spatial observation coverage | [script](a3/a3_compute.py) · [run](#run-a3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a3/a3_final_table.csv) | Cached spatial-cell point counts |
+| [A4](a4/a4_algorithm.md) | A41–A42 | Measurement noise | [script](a4/a4_compute.py) · [run](#run-a4) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a4/a4_final_table.csv) | NPZ tiles |
+| [A5](a5/a5_algorithm.md) | A51–A52 | Monitoring usability | [script](a5/a5_compute.py) · [run](#run-a5) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a5/a5_final_table.csv) | A1, A2, A3, A4 tables |
+| [B1](b1/b1_algorithm.md) | B11–B12 | Subsidence signal-to-noise ratio | [script](b1/b1_compute.py) · [run](#run-b1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b1/b1_final_table.csv) | NPZ tiles |
+| [B2](b2/b2_algorithm.md) | B21–B22 | Mean velocity | [script](b2/b2_compute.py) · [run](#run-b2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b2/b2_final_table.csv) | NPZ tiles |
+| [B3](b3/b3_algorithm.md) | B31–B36 | Velocity tails and direction | [script](b3/b3_compute.py) · [run](#run-b3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) | NPZ tiles |
+| [B4](b4/b4_algorithm.md) | B41–B42 | Acceleration strength | [script](b4/b4_compute.py) · [run](#run-b4) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b4/b4_final_table.csv) | NPZ tiles |
+| [B5](b5/b5_algorithm.md) | B51 | Seasonality strength | [script](b5/b5_compute.py) · [run](#run-b5) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b5/b5_final_table.csv) | NPZ tiles |
+| [B6](b6/b6_algorithm.md) | B61 | Monitoring trigger | [script](b6/b6_compute.py) · [run](#run-b6) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b6/b6_final_table.csv) | B3, B4 tables |
+| [C1](c1/c1_algorithm.md) | C11–C13 | Moving fraction and location | [script](c1/c1_compute.py) · [run](#run-c1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c1/c1_final_table.csv) | NPZ tiles |
+| [C2](c2/c2_algorithm.md) | C21–C22 | Spatial concentration | [script](c2/c2_compute.py) · [run](#run-c2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c2/c2_final_table.csv) | NPZ tiles |
+| [C3](c3/c3_algorithm.md) | C31–C33 | Deformation fronts | [script](c3/c3_compute.py) · [run](#run-c3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) | NPZ tiles |
+| [C4](c4/c4_algorithm.md) | C41–C42 | Fast-tail spatial extent | [script](c4/c4_compute.py) · [run](#run-c4) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv) | NPZ tiles |
+| [C5](c5/c5_algorithm.md) | C51–C52 | Monitoring priority | [script](c5/c5_compute.py) · [run](#run-c5) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c5/c5_final_table.csv) | B2, B3, B6, C3 tables |
+| [D1](d1/d1_algorithm.md) | D11–D14 | Trend geometry and changepoints | [script](d1/d1_compute.py) · [run](#run-d1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv) | NPZ tiles, split manifest and data config |
+| [D2](d2/d2_algorithm.md) | D21–D24 | Seasonal phase and amplitude | [script](d2/d2_compute.py) · [run](#run-d2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d2/d2_final_table.csv) | NPZ tiles, data config, B5 table |
+| [D3](d3/d3_algorithm.md) | D31–D35 | Motion intensification | [script](d3/d3_compute.py) · [run](#run-d3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv) | NPZ tiles |
+| [D4](d4/d4_algorithm.md) | D41–D42 | Dominant temporal process | [script](d4/d4_compute.py) · [run](#run-d4) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d4/d4_final_table.csv) | B3, B4, B5, D1, D2, D3 tables |
+| [S1](s1/s1_algorithm.md) | S11–S15 | Representation anchors | [script](s1/s1_compute.py) · [run](#run-s1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s1/s1_final_table.csv) | Token cache |
+| [S2](s2/s2_algorithm.md) | S21–S22 | Representation isolation | [script](s2/s2_compute.py) · [run](#run-s2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s2/s2_final_table.csv) | Token cache |
+| [S3](s3/s3_algorithm.md) | S31–S33 | Representation–monitoring relation | [script](s3/s3_compute.py) · [run](#run-s3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv) | A4, B3–B5, C1–C4, D1–D3, S2 reference tables |
+| [S4](s4/s4_algorithm.md) | S41–S43 | Local representation structure | [script](s4/s4_compute.py) · [run](#run-s4) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s4/s4_final_table.csv) | Token cache |
+| [X1](x1/x1_algorithm.md) | X11–X15 | Unsupported inference | [script](x1/x1_compute.py) · [run](#run-x1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x1/x1_final_table.csv) | Static refusal catalog |
+| [X2](x2/x2_algorithm.md) | X21–X26 | Unavailable data or scale | [script](x2/x2_compute.py) · [run](#run-x2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x2/x2_final_table.csv) | Static refusal catalog |
+| [X3](x3/x3_algorithm.md) | X31–X33 | Representation boundary | [script](x3/x3_compute.py) · [run](#run-x3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x3/x3_final_table.csv) | Static refusal catalog |
 
 ## Setup
 
@@ -50,9 +87,9 @@ hf download risenyard/egms-qa-encoder --local-dir data/encoder/checkpoint
 The X1–X3 catalogs are static Python definitions. They require the code
 installation but no Dataset or encoder download.
 
-## Paths
+## Paths and modules
 
-The [Run and files](#run-and-files) section below collects commands for every
+The [Implementation](#Implementation) section below collects commands for every
 group. Shared inputs and their installed paths are listed once here. Each
 method page links directly to its command.
 
@@ -96,7 +133,7 @@ splits to NPZ files; measurements live in the NPZ files themselves.
 | Encoder normalization | [HF file](https://huggingface.co/risenyard/egms-qa-encoder/blob/main/normalization.json) | `data/encoder/checkpoint/normalization.json` |
 | Encoder training recipe | [HF file](https://huggingface.co/risenyard/egms-qa-encoder/blob/main/training_args.json) | `data/encoder/checkpoint/training_args.json` |
 
-## Shared modules
+### Shared modules
 
 | Module | Responsibility |
 |---|---|
@@ -115,51 +152,7 @@ only a run check. Reproducing the published labels requires the full training
 reference pool described in the method, including when classifying validation
 or test tiles.
 
-## Task groups
-
-The script links identify the implementation entry points. They are not a
-claim that every group can be rebuilt from the released inputs alone; see the
-reconstruction scope below. Each released table lives at
-`artifacts/reference_tables/<group>/<group>_final_table.csv` in
-[the Dataset](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/reference_tables).
-The release installer exposes these under `outputs/tasks/<group>/`.
-
-| Group and method | Leaf tasks | Subject | Implementation | HF reference table | Main inputs / steps |
-|---|---|---|---|---|---|
-| [A1](a1/a1_algorithm.md) | A11–A12 | Representation drift and stability | [script](a1/a1_compute.py) · [run](#run-a1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a1/a1_final_table.csv) | NPZ tiles, encoder and token cache; combine shards |
-| [A2](a2/a2_algorithm.md) | A21–A22 | Masked reconstruction and reliability | [script](a2/a2_compute.py) · [run](#run-a2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a2/a2_final_table.csv) | NPZ tiles and encoder; combine shards |
-| [A3](a3/a3_algorithm.md) | A31–A32 | Spatial observation coverage | [script](a3/a3_compute.py) · [run](#run-a3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a3/a3_final_table.csv) | Cached spatial-cell point counts |
-| [A4](a4/a4_algorithm.md) | A41–A42 | Measurement noise | [script](a4/a4_compute.py) · [run](#run-a4) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a4/a4_final_table.csv) | NPZ tiles |
-| [A5](a5/a5_algorithm.md) | A51–A52 | Monitoring usability | [script](a5/a5_compute.py) · [run](#run-a5) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a5/a5_final_table.csv) | A1, A2, A3, A4 tables |
-| [B1](b1/b1_algorithm.md) | B11–B12 | Subsidence signal-to-noise ratio | [script](b1/b1_compute.py) · [run](#run-b1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b1/b1_final_table.csv) | NPZ tiles |
-| [B2](b2/b2_algorithm.md) | B21–B22 | Mean velocity | [script](b2/b2_compute.py) · [run](#run-b2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b2/b2_final_table.csv) | NPZ tiles |
-| [B3](b3/b3_algorithm.md) | B31–B36 | Velocity tails and direction | [script](b3/b3_compute.py) · [run](#run-b3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) | NPZ tiles |
-| [B4](b4/b4_algorithm.md) | B41–B42 | Acceleration strength | [script](b4/b4_compute.py) · [run](#run-b4) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b4/b4_final_table.csv) | NPZ tiles |
-| [B5](b5/b5_algorithm.md) | B51 | Seasonality strength | [script](b5/b5_compute.py) · [run](#run-b5) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b5/b5_final_table.csv) | NPZ tiles |
-| [B6](b6/b6_algorithm.md) | B61 | Monitoring trigger | [script](b6/b6_compute.py) · [run](#run-b6) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b6/b6_final_table.csv) | B3, B4 tables |
-| [C1](c1/c1_algorithm.md) | C11–C13 | Moving fraction and location | [script](c1/c1_compute.py) · [run](#run-c1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c1/c1_final_table.csv) | NPZ tiles |
-| [C2](c2/c2_algorithm.md) | C21–C22 | Spatial concentration | [script](c2/c2_compute.py) · [run](#run-c2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c2/c2_final_table.csv) | NPZ tiles |
-| [C3](c3/c3_algorithm.md) | C31–C33 | Deformation fronts | [script](c3/c3_compute.py) · [run](#run-c3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) | NPZ tiles |
-| [C4](c4/c4_algorithm.md) | C41–C42 | Fast-tail spatial extent | [script](c4/c4_compute.py) · [run](#run-c4) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv) | NPZ tiles |
-| [C5](c5/c5_algorithm.md) | C51–C52 | Monitoring priority | [script](c5/c5_compute.py) · [run](#run-c5) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c5/c5_final_table.csv) | B2, B3, B6, C3 tables |
-| [D1](d1/d1_algorithm.md) | D11–D14 | Trend geometry and changepoints | [script](d1/d1_compute.py) · [run](#run-d1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv) | NPZ tiles, split manifest and data config |
-| [D2](d2/d2_algorithm.md) | D21–D24 | Seasonal phase and amplitude | [script](d2/d2_compute.py) · [run](#run-d2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d2/d2_final_table.csv) | NPZ tiles, data config, B5 table |
-| [D3](d3/d3_algorithm.md) | D31–D35 | Motion intensification | [script](d3/d3_compute.py) · [run](#run-d3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv) | NPZ tiles |
-| [D4](d4/d4_algorithm.md) | D41–D42 | Dominant temporal process | [script](d4/d4_compute.py) · [run](#run-d4) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d4/d4_final_table.csv) | B3, B4, B5, D1, D2, D3 tables |
-| [S1](s1/s1_algorithm.md) | S11–S15 | Representation anchors | [script](s1/s1_compute.py) · [run](#run-s1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s1/s1_final_table.csv) | Token cache |
-| [S2](s2/s2_algorithm.md) | S21–S22 | Representation isolation | [script](s2/s2_compute.py) · [run](#run-s2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s2/s2_final_table.csv) | Token cache |
-| [S3](s3/s3_algorithm.md) | S31–S33 | Representation–monitoring relation | [script](s3/s3_compute.py) · [run](#run-s3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv) | A4, B3–B5, C1–C4, D1–D3, S2 reference tables |
-| [S4](s4/s4_algorithm.md) | S41–S43 | Local representation structure | [script](s4/s4_compute.py) · [run](#run-s4) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s4/s4_final_table.csv) | Token cache |
-| [X1](x1/x1_algorithm.md) | X11–X15 | Unsupported inference | [script](x1/x1_compute.py) · [run](#run-x1) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x1/x1_final_table.csv) | Static refusal catalog |
-| [X2](x2/x2_algorithm.md) | X21–X26 | Unavailable data or scale | [script](x2/x2_compute.py) · [run](#run-x2) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x2/x2_final_table.csv) | Static refusal catalog |
-| [X3](x3/x3_algorithm.md) | X31–X33 | Representation boundary | [script](x3/x3_compute.py) · [run](#run-x3) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x3/x3_final_table.csv) | Static refusal catalog |
-
-A1 and A2 also provide [A1 shard aggregation](a1/a1_combine_shards.py) and
-[A2 shard aggregation](a2/a2_combine_shards.py). Use their `--help` output for
-shard locations and final-table destinations. X1–X3 write task-level refusal
-catalogs, rather than 10,000 tile-level records.
-
-## Run and files
+## Implementation
 
 Complete [Setup](#setup), then run the chosen command from the repository root.
 The [shared input files](#shared-input-files) table gives download sources and
