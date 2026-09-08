@@ -1,10 +1,9 @@
 # EGMS-QA Construction
 
-This module builds task reference values, aggregates labels, and renders
-natural-language question–answer records. The released tables and labels can
-also be used as starting points for new QA corpora.
-
-Each task group computes reference values from the required data or encoder outputs. These values provide the answers to predefined questions. See the [task index](tasks/README.md) for task definitions, inputs, and runnable scripts.
+This module builds task reference values, and renders
+natural-language question–answer records. Each task group computes reference values from the required data or encoder outputs. 
+These values provide the answers to predefined questions. See the [task index](tasks/README.md) for task definitions, inputs, and runnable scripts. The released tables and labels can
+also be used as starting points for new QA corpora. 
 
 ## Workflows
 
