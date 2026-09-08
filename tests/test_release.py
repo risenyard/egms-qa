@@ -49,6 +49,17 @@ def test_release_manifest_audit_and_install(tmp_path: Path) -> None:
     assert (target / "outputs/tasks/a1/a1_final_table.csv").exists()
 
 
+def test_manifest_preserves_public_inventory_exclusions(tmp_path: Path) -> None:
+    _write(tmp_path / "README.md", b"Dataset")
+    _write(tmp_path / ".gitattributes", b"*.npz filter=lfs\n")
+    first = build_manifest(tmp_path, workers=1)
+    inventory = (tmp_path / "metadata/files.sha256").read_text()
+    second = build_manifest(tmp_path, workers=1)
+    assert first["integrity"]["files_hashed"] == second["integrity"]["files_hashed"] == 1
+    assert (tmp_path / "metadata/files.sha256").read_text() == inventory
+    assert inventory.endswith("  README.md\n")
+
+
 def test_release_installer_rejects_legacy_token_names(tmp_path: Path) -> None:
     release = tmp_path / "release"
     _write(release / "artifacts/source_tiles/E00N00/tile_0.npz", b"tile")

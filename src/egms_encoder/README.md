@@ -77,8 +77,12 @@ before using the local-input options below. The extractor normalizes
 displacement values and centers coordinates within each tile.
 
 After [installing the code](#installation), provide `--manifest` and
-`--data-config` together. Use `--source-tiles-root` to resolve relative tile
+`--data-config` together. The manifest needs `tile_id`, `split`, and `path`;
+missing `n_points`, `centroid_x`, and `centroid_y` columns are derived from
+the NPZ coordinates. Use `--source-tiles-root` to resolve relative tile
 paths against a different directory. Encoder inference uses displacement histories and coordinates.
+For example, a manifest path `tile_01.npz` with `--source-tiles-root my_tiles`
+reads `my_tiles/tile_01.npz`. Absolute manifest paths remain absolute.
 
 For a local checkpoint, provide `--checkpoint`, `--model-config`, and
 `--normalization` together. The [training guide](#reproduce-training) shows how to extract tokens with

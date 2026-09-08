@@ -204,9 +204,7 @@ class TileStore:
                 elif path.parts[:2] == ("artifacts", "source_tiles"):
                     relative = Path(*path.parts[2:])
                 else:
-                    raise ValueError(
-                        f"manifest path is outside the source-tile tree: {path}"
-                    )
+                    relative = path
                 return str(source_root / relative)
 
             manifest = manifest.copy()
@@ -239,6 +237,27 @@ class TileStore:
             ) from exc
         if "split" not in manifest.columns:
             raise ValueError("released manifest is missing the split column")
+        missing_keys = {"tile_id", "path"} - set(manifest)
+        if missing_keys:
+            raise ValueError(f"manifest missing required columns: {missing_keys}")
+        metadata_columns = ("n_points", "centroid_x", "centroid_y")
+        missing_metadata = [key for key in metadata_columns if key not in manifest]
+        if missing_metadata:
+            values = []
+            root = Path(data_root) if data_root is not None else Path.cwd()
+            for value in manifest["path"]:
+                path = Path(str(value))
+                path = path if path.is_absolute() else root / path
+                with np.load(path, allow_pickle=False) as tile:
+                    coords = np.asarray(tile["coords"], dtype=np.float32)
+                if coords.ndim != 2 or coords.shape[1] != 2 or not len(coords):
+                    raise ValueError(f"invalid coordinates in {path}")
+                center = coords.mean(axis=0)
+                values.append((len(coords), float(center[0]), float(center[1])))
+            manifest = manifest.copy()
+            for key in missing_metadata:
+                index = metadata_columns.index(key)
+                manifest[key] = [value[index] for value in values]
         split_assignments = dict(
             zip(manifest["tile_id"].astype(str), manifest["split"].astype(str))
         )

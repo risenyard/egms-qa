@@ -604,6 +604,15 @@ def main() -> None:
     dumpf = open(args.dump, "a" if append_dump else "w", encoding="utf-8", buffering=1) if args.dump else None
     xverifyf = open(args.xverify_export, "w", encoding="utf-8", buffering=1) if args.xverify_export else None
     results = list(resume_records.values())
+    for record in results:
+        if dumpf and not append_dump:
+            dumpf.write(json.dumps(record, ensure_ascii=False) + "\n")
+        if xverifyf:
+            xverifyf.write(json.dumps({
+                "question": record["question"],
+                "correct_answer": record["answer"],
+                "llm_output": record.get("generation", record.get("natural_answer", "")),
+            }, ensure_ascii=False) + "\n")
     t0 = time.monotonic()
     by_task = collections.defaultdict(list)
     for r in rows:

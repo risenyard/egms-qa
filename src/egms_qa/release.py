@@ -69,7 +69,7 @@ def sha256_file(path: Path, chunk_size: int = 8 * 1024 * 1024) -> str:
 
 
 def _release_files(release_dir: Path) -> list[Path]:
-    excluded = {RELEASE_MANIFEST.as_posix(), CHECKSUMS.as_posix()}
+    excluded = {".gitattributes", RELEASE_MANIFEST.as_posix(), CHECKSUMS.as_posix()}
     files = []
     for path in release_dir.rglob("*"):
         relative = path.relative_to(release_dir).as_posix()

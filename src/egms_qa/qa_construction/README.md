@@ -123,6 +123,10 @@ Use `--source-tiles-root` to change the tile directory or `--data-config` to
 supply a data configuration. Tiles must still contain 294 steps of vertical
 displacement.
 
+Manifest paths may be absolute or relative to `--source-tiles-root`. For
+example, `tile_01.npz` with `--source-tiles-root my_tiles` reads
+`my_tiles/tile_01.npz`.
+
 New tiles use the release's training reference for classification and
 representation scores. These settings stay fixed. A train split is not
 required, and the collection can have a different number of tiles.

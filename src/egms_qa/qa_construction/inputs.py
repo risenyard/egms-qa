@@ -28,9 +28,10 @@ def read_tile_manifest(path: str | Path, source_tiles_root: str | Path | None = 
             return str(tile)
         prefix = tile.parts[:2]
         if source_tiles_root is not None:
-            if prefix not in {("data", "tiles"), ("artifacts", "source_tiles")}:
-                raise ValueError(f"unrecognized source tile path: {tile}")
-            return str(Path(source_tiles_root).resolve().joinpath(*tile.parts[2:]))
+            relative = Path(*tile.parts[2:]) if prefix in {
+                ("data", "tiles"), ("artifacts", "source_tiles")
+            } else tile
+            return str(Path(source_tiles_root).resolve() / relative)
         if prefix == ("data", "tiles"):
             return str((DATA_DIR / "tiles").joinpath(*tile.parts[2:]).resolve())
         if prefix == ("artifacts", "source_tiles"):

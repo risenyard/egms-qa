@@ -14,6 +14,41 @@ def _static_arrays(n_points: int) -> dict[str, np.ndarray]:
     return {key: np.arange(n_points, dtype=np.float32) for key in STATIC_KEYS}
 
 
+@pytest.mark.parametrize("stored_path", [
+    "tile.npz", "nested/tile.npz", "data/tiles/tile.npz",
+    "artifacts/source_tiles/tile.npz",
+])
+def test_local_manifest_infers_metadata_and_resolves_source_root(tmp_path, stored_path):
+    from egms_qa.qa_construction.inputs import read_tile_manifest
+
+    relative = stored_path
+    for prefix in ("data/tiles/", "artifacts/source_tiles/"):
+        if relative.startswith(prefix):
+            relative = relative[len(prefix):]
+    source = tmp_path / "inputs" / relative
+    source.parent.mkdir(parents=True)
+    coords = np.array([[0, 1], [2, 3], [4, 5]], dtype=np.float32)
+    np.savez(source, coords=coords, time_series=np.zeros((3, 294), dtype=np.float32),
+             **_static_arrays(3))
+    manifest = tmp_path / "split.parquet"
+    pd.DataFrame([{"tile_id": "custom", "split": "test", "path": stored_path,
+                   "centroid_x": 100.0}]).to_parquet(manifest, index=False)
+    config = tmp_path / "data_config.json"
+    config.write_text(json.dumps({
+        "schema_version": "egms-qa-data-config-1.1",
+        "time_window": {"stored_steps": 294, "t_start": 0, "t_end": 294,
+                        "input_length": 294},
+        "tile_field_layout": {"feature_columns_count": 10},
+    }))
+    store = TileStore.from_manifest(manifest, config, source_tiles_root=tmp_path / "inputs")
+    assert store.get_tile(0).shape == (3, 304)
+    assert store.manifest.loc[0, "n_points"] == 3
+    assert store.manifest.loc[0, "centroid_x"] == 100.0
+    assert store.manifest.loc[0, "centroid_y"] == 3.0
+    resolved = read_tile_manifest(manifest, tmp_path / "inputs")
+    assert Path(resolved.loc[0, "path"]) == source
+
+
 def test_installed_release_contract_constructs_tile_store(
     tmp_path: Path, monkeypatch
 ) -> None:
