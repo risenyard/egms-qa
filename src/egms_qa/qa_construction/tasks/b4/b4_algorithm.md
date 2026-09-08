@@ -2,17 +2,14 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **B4 group** | Summarize strong acceleration and its reference-distribution typicality. |
-| B41 | 90th percentile of absolute point acceleration. |
-| B42 | Acceleration typicality class relative to the specified European reference distribution. |
+B4 summarizes strong acceleration across the observation points in a tile. Acceleration measures change in velocity; its absolute value measures the size of that change regardless of direction.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b4/b4_final_table.csv) · [Implementation](b4_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| B41 | Numeric value (mm/yr²) | 90th percentile of absolute point acceleration: the stronger end of changes in velocity. |
+| B42 | Classification | Places B41 in five levels relative to the European candidate-pool distribution. |
 
-## Key concepts
-
-How strong is the tile's acceleration signal, and how typical is that acceleration relative to the European reference distribution?
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b4/b4_final_table.csv) · [Implementation](b4_compute.py) · [Run and files](../README.md#run-b4)
 
 ## Algorithm steps
 
@@ -37,30 +34,12 @@ B42 is a European reference distribution label, not a causal anomaly claim. The
 cutoffs are **corpus-relative**: fixed quantiles of the full European
 candidate-pool distribution, baked into the compute script as constants.
 
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.b4.b4_compute \
-    --out-dir outputs/tasks-rebuilt/b4
-```
-
-The new table is written to `outputs/tasks-rebuilt/b4/b4_final_table.csv`.
-The installed reference remains at `outputs/tasks/b4/b4_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
-| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b4/b4_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### Numeric targets
 

@@ -2,35 +2,17 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **C1 group** | Describe how much of the tile is moving and where the strongest motion occurs. |
-| C11 | Fraction of points meeting the uncertainty-aware motion criterion. |
-| C12 | Spatial extent class derived from the moving-point fraction. |
-| C13 | Location of the strongest-motion cell in the 8×8 grid. |
+C1 describes how many observation points in a tile show motion above the task’s noise criterion, and where motion is strongest. It reads point vertical velocity, root mean squared error (RMSE), and coordinates. Negative velocity means subsidence; positive velocity means uplift.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c1/c1_final_table.csv) · [Implementation](c1_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| C11 | Numeric fraction | Share of points whose absolute velocity is at least their reported RMSE, using the task's motion-to-noise rule. |
+| C12 | Classification | Converts C11 into four moving-point extent levels using training-split percentiles. |
+| C13 | Grid location | Identifies the cell with the largest mean absolute velocity. Complements C11 with a location, using all eligible cells. |
 
-## Key concepts
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c1/c1_final_table.csv) · [Implementation](c1_compute.py) · [Run and files](../README.md#run-c1)
 
-What fraction of points in this tile show motion larger than their own observation noise, how broad is that moving-point extent, and which 8x8 bin has the strongest mean motion magnitude?
-
-### Inputs
-
-- `mean_velocity`: point-level mean velocity in mm/yr.
-- `rmse`: point-level RMSE/noise estimate.
-- `coords`: point coordinates.
-
-Both arrays are read from the EGMS encoder 10k tile manifest:
-
-[HF split.parquet](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) (installed at `data/encoder/manifest/split.parquet`)
-
-### Intentional Exclusions
-
-- C11 does not use the old fixed `abs(mean_velocity) > 2 mm/yr` threshold.
-- C11/C12 do not judge noise level by itself; A41 handles tile-level RMSE.
-- C11/C12 do not decide direction or European intensity; B-family tasks handle those.
-- C13 is an explanation string derived from the same 8x8 binning used by the C family. It is not a separate location family and should not be treated as a core probe target.
+The source NPZ files contain `mean_velocity` (mm/yr), `rmse` (mm), and `coords`. The velocity-to-RMSE ratio below is the released motion-screening rule, not a statistical significance test. `eps = 1e-12` prevents division by zero.
 
 ## Algorithm steps
 
@@ -55,7 +37,7 @@ C13 locates the strongest bin by bin-level average velocity magnitude:
 
 ```text
 1. Center point coordinates by the tile coordinate mean.
-2. Split the tile into an 8x8 local grid.
+2. Split a 7000 m square around that center into an 8x8 grid (875 m cells).
 3. Keep bins with at least 5 finite points.
 4. For each valid bin:
    bin_mean_abs_velocity = mean(abs(point mean_velocity))
@@ -63,10 +45,10 @@ C13 locates the strongest bin by bin-level average velocity magnitude:
 ```
 
 Ties are resolved by larger valid point count, then by bin order. The location
-string uses `r{row}c{col}`, for example `r4c3`. If no valid bin exists, C13 is
+string uses `r{row}c{col}`, for example `r4c3`. Rows and columns run from 0 to 7, increasing with the centered y and x coordinates. If no valid bin exists, C13 is
 `none`.
 
-### Distribution Class
+### C12 extent class
 
 C12 is derived from the observed C11 train-split distribution. The distribution
 has a broad middle body and two thinner tails, so C12 uses train p10/p50/p90
@@ -80,30 +62,12 @@ physical risk threshold:
 | `broad` | 0.423910 < C11 <= 0.776414 |
 | `widespread` | C11 > 0.776414 |
 
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.c1.c1_compute \
-    --out-dir outputs/tasks-rebuilt/c1
-```
-
-The new table is written to `outputs/tasks-rebuilt/c1/c1_final_table.csv`.
-The installed reference remains at `outputs/tasks/c1/c1_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
-| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c1/c1_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### Numeric targets
 

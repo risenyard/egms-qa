@@ -2,22 +2,16 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **D1 group** | Describe curvature, changepoint strength, and trend shape in the tile-median displacement history. |
-| D11 | Trend-shape class obtained from the strong-curvature and strong-changepoint flags. |
-| D12 | Curvature strength combining quadratic-fit improvement with the normalized curvature effect. |
-| D13 | Changepoint strength combining piecewise-linear fit improvement with the slope-change effect. |
-| D14 | Time of the selected changepoint, reported when the changepoint-strength criterion is satisfied. |
+D1 describes the shape of a tile’s displacement history. At each observation time, it takes the median displacement across points. It then checks whether that curve bends gradually or contains a breakpoint where its slope changes.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv) · [Implementation](d1_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| D11 | Classification | Combines D12 curvature and D13 changepoint strength into linear, curved, stage-change, or complex trend shape. |
+| D12 | Numeric score | Measures how much a curved trend improves on a linear fit, accounting for the size of the curvature. |
+| D13 | Numeric score | Measures how much a change in slope improves on a linear fit, accounting for the size of that change. |
+| D14 | Numeric time (year) | Reports the D13 breakpoint time as a fractional year, only when D13 meets the strong-change criterion. |
 
-## Key concepts
-
-D1 describes the geometry of each tile's median displacement history through
-curvature, changepoint strength, trend shape, and changepoint time.
-
-### Inputs
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv) · [Implementation](d1_compute.py) · [Run and files](../README.md#run-d1)
 
 For each tile, read the stored model-ready EGMS displacement interval `[0,294)`
 and take the median displacement over all points at each epoch. This stored
@@ -30,9 +24,9 @@ epochs and finite D12/D13 scores.
 
 ## Algorithm steps
 
-### Fitted Geometry
+### Fitted geometry
 
-All fits include intercept, normalized time, and annual plus semiannual sine/cosine terms.
+All fits include an intercept (constant offset), normalized time, and annual plus semiannual sine/cosine terms to account for seasonality. A quadratic term allows a smooth bend; a hinge term allows the slope to change at a candidate breakpoint. SSE below means the sum of squared fitting errors.
 
 Time is normalized to the interval [-1,1]. Fits use four Huber reweighting
 iterations with NumPy least squares, a median-absolute-deviation scale factor
@@ -61,21 +55,17 @@ strength uses the best hinge coefficient and hinge standard deviation in the
 same calculation. The linear residual scale is the square root of linear SSE
 divided by the valid epoch count minus the six baseline coefficients.
 
-### Train-Fitted Thresholds
+### Training thresholds and D11 classes
 
 Thresholds are corpus-relative and fitted on train only:
 
-```json
-{
-  "threshold_mode": "train_p85_primitives",
-  "d12_strong_quantile": 0.85,
-  "d12_strong_threshold": 0.20298744933908217,
-  "d13_strong_quantile": 0.85,
-  "d13_strong_threshold": 0.6056297951274243,
-  "d14_time_source": "D14_candidate_changepoint_time_year",
-  "cp_bins": 8
-}
-```
+| Score | Strong threshold (training 85th percentile) |
+|---|---:|
+| D12 curvature strength | 0.20298744933908217 |
+| D13 changepoint strength | 0.6056297951274243 |
+
+D14 reports the fractional-year time of the best D13 breakpoint only when
+D13 reaches its strong threshold; otherwise D14 is missing.
 
 D12/D13 strong flags:
 
@@ -93,40 +83,12 @@ D11 class rule:
 | yes | no | `stage_change` |
 | yes | yes | `complex_trend` |
 
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.d1.d1_compute \
-    --out-dir outputs/tasks-rebuilt/d1
-```
-
-The new table is written to `outputs/tasks-rebuilt/d1/d1_final_table.csv`.
-The installed reference remains at `outputs/tasks/d1/d1_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
-| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
-| Data configuration | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/data_config.json) | `data/encoder/manifest/data_config.json` |
-
-The computation may also write local summaries or diagnostics next to its
-new table. Their filenames and options are defined in the linked script;
-they are not part of the published reference-table inventory unless linked
-explicitly above.
-
-The published NPZ values and split remain fixed. Recomputing the table
-preserves its categorical targets, missingness, and numerical values up to
-floating-point rounding across linear-algebra implementations.
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### Numeric targets
 

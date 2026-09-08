@@ -2,26 +2,14 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **C5 group** | Combine overall motion and local spatial evidence into a monitoring interpretation. |
-| C51 | Monitoring priority derived from the prescribed upstream motion and spatial classes. |
-| C52 | Local-risk category indicating spatial evidence that the mean-motion class may obscure. |
+C5 combines overall motion and local spatial evidence. It reads [B61 monitoring trigger](../b6/b6_algorithm.md), [C33 front strength](../c3/c3_algorithm.md), [B22 mean subsidence band](../b2/b2_algorithm.md), and [B35 local motion strength](../b3/b3_algorithm.md). The resulting labels describe monitoring evidence, rather than an assessed probability of damage.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c5/c5_final_table.csv) · [Implementation](c5_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| C51 | Combined classification | Uses the monitoring-trigger and front-strength classes to assign no, standard, or high monitoring priority. |
+| C52 | Yes/no classification | Flags strong local motion when the mean subsidence band is low or low-mid. Complements C51 with evidence that an average can obscure. |
 
-## Key concepts
-
-### Inputs
-
-C5 is a composite family using existing EGMS-QA outputs:
-
-- `B61_monitoring_trigger`
-- `C33_deformation_front_strength_class`
-- `B22_mean_subsidence_intensity_band`
-- `B35_worst_point_significance`
-
-No new point-level, bin-level, or encoder computation is introduced.
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c5/c5_final_table.csv) · [Implementation](c5_compute.py) · [Run and files](../README.md#run-c5)
 
 ## Algorithm steps
 
@@ -48,40 +36,12 @@ else:
     C52_hidden_local_risk = no
 ```
 
-The C52 rule preserves the old EGMS-QA C10 logic: mean severity was only slight or
-mild, but the local worst-point significance was high.
-
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.c5.c5_compute \
-    --out-dir outputs/tasks-rebuilt/c5
-```
-
-The new table is written to `outputs/tasks-rebuilt/c5/c5_final_table.csv`.
-The installed reference remains at `outputs/tasks/c5/c5_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| B2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b2/b2_final_table.csv) | `outputs/tasks/b2/b2_final_table.csv` |
-| B3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) | `outputs/tasks/b3/b3_final_table.csv` |
-| B6 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b6/b6_final_table.csv) | `outputs/tasks/b6/b6_final_table.csv` |
-| C3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) | `outputs/tasks/c3/c3_final_table.csv` |
-
-The computation may also write local summaries or diagnostics next to its
-new table. Their filenames and options are defined in the linked script;
-they are not part of the published reference-table inventory unless linked
-explicitly above.
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c5/c5_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### C51 label distribution
 

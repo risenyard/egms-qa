@@ -2,24 +2,18 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **X2 group** | Define refusals for information, components, scales, and comparisons outside the available data. |
-| X21 | Refuse conclusions about a specific address, building, road segment, parcel, or named asset. |
-| X22 | Refuse point-level, sub-cell, pixel-level, or exact-coordinate conclusions. |
-| X23 | Refuse displacement components or directions not provided by the input data. |
-| X24 | Refuse inferences requiring external imagery, land use, geology, or asset inventories. |
-| X25 | Refuse claims about live conditions or times beyond the observation window. |
-| X26 | Refuse undefined open-world rankings and superlatives. |
+X2 defines answers for questions requiring unavailable data or a finer scope than the supported outputs. EGMS-QA reports tile summaries, 8×8 cell locations, and comparisons against specified reference populations. Each task is a separate refusal category.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x2/x2_final_table.csv) · [Implementation](x2_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| X21 | Refusal | Declines conclusions about a named address, building, road segment, parcel, or asset. |
+| X22 | Refusal | Declines point-level, sub-cell, pixel-level, or exact-coordinate answers beyond the supported output scale. |
+| X23 | Refusal | Declines displacement components or directions absent from the input data. |
+| X24 | Refusal | Declines claims requiring unavailable imagery, land use, geology, or asset inventories. |
+| X25 | Refusal | Declines claims about live conditions or times outside the observation window. |
+| X26 | Refusal | Declines rankings such as “worst” or “most severe” without a defined comparison population. |
 
-## Key concepts
-
-### Role
-
-X2 is a boundary/refusal task group for questions that exceed the available input
-channels, spatial scale, temporal status, or reference universe.
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x2/x2_final_table.csv) · [Implementation](x2_compute.py) · [Run and files](../README.md#run-x2)
 
 ## Algorithm steps
 
@@ -44,9 +38,8 @@ most severe, or highest-risk claims.
 Every X2 catalog row includes:
 
 - `answer_policy`: the group-level refusal policy.
-- `response_template`: a task-specific answer template suitable for VQA
-  generation.
-- `supported_redirect_tasks`: concrete A/B/C/D/S task IDs that can answer the
+- `response_template`: a task-specific answer template for question–answer generation.
+- `supported_redirect_tasks`: task IDs from the [task index](../README.md#task-groups) that can answer the
   nearest supported tile-level, bin-level, or corpus-relative question.
 
 Generic pattern:
@@ -57,23 +50,6 @@ ranking from the current inputs. State the missing scale/channel/time/reference
 universe, then redirect to supported tile-level, 8x8 bin-level, or predefined
 Europe/corpus-relative tasks.
 ```
-
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.x2.x2_compute \
-    --out-dir outputs/tasks-rebuilt/x2
-```
-
-The new table is written to `outputs/tasks-rebuilt/x2/x2_final_table.csv`.
-The installed reference remains at `outputs/tasks/x2/x2_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-This static catalog is generated from the task definitions in the Python
-script. It does not require tile measurements or encoder tokens.
 
 ## Results
 

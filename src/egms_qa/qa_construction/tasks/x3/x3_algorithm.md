@@ -2,22 +2,15 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **X3 group** | Define refusals for unsupported interpretations of the encoder representation. |
-| X31 | Refuse treating a representation anchor or rarity score as a direct physical or engineering truth label. |
-| X32 | Refuse interpreting an embedding pattern or reference-anchor assignment as proof of a real-world cause. |
-| X33 | Refuse assigning a certain meaning to a token dimension or model mechanism without attribution evidence. |
+X3 defines answers for unsupported interpretations of encoder vectors. These vectors summarize tile observations; reference anchors are representative training vectors, and rarity measures isolation from other training vectors. Each task covers a different interpretation boundary.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x3/x3_final_table.csv) · [Implementation](x3_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| X31 | Refusal | Declines treating a representation profile or rarity score as a physical or engineering truth label. |
+| X32 | Refusal | Declines treating similarity in the representation as proof of a real-world cause. |
+| X33 | Refusal | Declines assigning a certain meaning to a vector dimension or model mechanism without attribution evidence. |
 
-## Key concepts
-
-### Role
-
-X3 protects S-group representation tasks from over-interpretation. S outputs
-are encoder constructs, not direct physical, geological, engineering, or causal
-truth labels.
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x3/x3_final_table.csv) · [Implementation](x3_compute.py) · [Run and files](../README.md#run-x3)
 
 ## Algorithm steps
 
@@ -29,8 +22,8 @@ return a refusal-style answer:
 
 ```text
 1. State that the representation-level claim is not supported as physical truth.
-2. Name the missing attribution, probe, causal, or validation evidence.
-3. Redirect to the supported representation construct and any supported A/B/C/D facts.
+2. Name the missing model-attribution, causal, or physical-validation evidence.
+3. Redirect to the supported representation property and measured motion facts.
 ```
 
 ### Answer Guidance
@@ -38,36 +31,17 @@ return a refusal-style answer:
 Every X3 catalog row includes:
 
 - `answer_policy`: the group-level refusal policy.
-- `response_template`: a task-specific answer template suitable for VQA
-  generation.
-- `supported_redirect_tasks`: concrete S task IDs, plus relevant A/B/C/D task
-  IDs when representation results should be separated from monitoring facts.
+- `response_template`: a task-specific answer template for question–answer generation.
+- `supported_redirect_tasks`: representation and measurement task IDs from the [task index](../README.md#task-groups) when representation results should be separated from monitoring facts.
 
 Generic pattern:
 
 ```text
 Do not convert encoder representation outputs into direct physical truth,
 causal proof, or certain model-mechanism semantics. State that the claim is
-representation-level, then separately report supported S constructs and
-A/B/C/D monitoring facts.
+representation-level, then separately report supported representation properties and measured
+monitoring facts.
 ```
-
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.x3.x3_compute \
-    --out-dir outputs/tasks-rebuilt/x3
-```
-
-The new table is written to `outputs/tasks-rebuilt/x3/x3_final_table.csv`.
-The installed reference remains at `outputs/tasks/x3/x3_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-This static catalog is generated from the task definitions in the Python
-script. It does not require tile measurements or encoder tokens.
 
 ## Results
 

@@ -2,38 +2,23 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **D3 group** | Describe whether motion is intensifying, how widely that change is supported, and where it concentrates. |
-| D31 | Signed motion-intensification summary distinguishing intensification from weakening. |
-| D32 | Fraction of observations supporting the acceleration criterion. |
-| D33 | Spread of the point-level motion-intensification values. |
-| D34 | Strength of the spatial intensification hotspot. |
-| D35 | Location of the identified intensification hotspot. |
+D3 describes whether motion is speeding up or slowing down across the observation points in a tile. It combines each point’s vertical velocity and acceleration so that positive intensification means faster motion in its existing direction, whether downward or upward.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv) · [Implementation](d3_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| D31 | Numeric value (mm/yr²) | Median acceleration signed by each point's motion direction. Positive means intensifying motion; negative means weakening. |
+| D32 | Numeric fraction | Share of valid moving points whose intensification sign agrees with D31. |
+| D33 | Numeric value (mm/yr²) | 90th minus 10th percentile of the point intensification values used for D31: their spread across the tile. |
+| D34 | Numeric value (mm/yr²) | Largest cell mean absolute intensification, using the same valid moving points as D31. |
+| D35 | Grid location | Identifies the cell that supplies the D34 hotspot strength. |
 
-## Key concepts
-
-This folder is the D3 acceleration family. The implemented targets are:
-
-- `D31_motion_intensification_mm_yr2`
-- `D32_acceleration_support_fraction`
-- `D33_intensification_spread_mm_yr2`
-- `D34_intensification_hotspot_strength_mm_yr2`
-- `D35_intensification_hotspot_location`
-
-D3 is a point-level acceleration-field story. It asks whether moving points in
-the tile are intensifying or weakening, whether that acceleration direction is
-spatially supported, how spread out the direction-aware acceleration field is,
-and where the strongest local hotspot sits in an 8x8 tile grid. It does not use
-a tile-level direction such as B34 to flip point-level acceleration.
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv) · [Implementation](d3_compute.py) · [Run and files](../README.md#run-d3)
 
 ## Algorithm steps
 
 ### Point-Level Definition
 
-For each point, read:
+For each point, read vertical velocity `v_i` (mm/yr), acceleration `a_i` (mm/yr²), and root mean squared measurement error `r_i` (mm). The small constant `eps = 1e-9` prevents division by zero:
 
 ```text
 v_i = mean_velocity_i
@@ -126,15 +111,10 @@ Interpretation:
   points
 - low: direction-aware acceleration is more compact or uniform
 
-D33 is not raw acceleration strength. Raw absolute acceleration strength remains
-the B41/B42 story. D33 only measures the distribution width of the D31
-direction-aware acceleration field.
-
 ### D34/D35 Formula
 
 D34 and D35 reuse the same `point_intensification_i` and the same valid moving
-point gate as D31-D33. Split the tile into the same 8x8 local grid style used by
-the C-family location tasks. Keep only bins with at least 5 valid moving points.
+point gate as D31-D33. Center the coordinates on their tile mean and divide a 7000 m square into an 8×8 grid of 875 m cells. Keep cells with at least 5 valid moving points.
 
 For every valid bin:
 
@@ -150,69 +130,19 @@ D34_intensification_hotspot_strength_mm_yr2 = max(bin_hotspot_score)
 D35_intensification_hotspot_location = r{row}c{col} of the max bin
 ```
 
-If the tile-level validity gate fails, D34 is undefined and D35 is `none`.
+If the tile-level validity gate fails, D34 is undefined and D35 is `none`. The location format is `r{row}c{col}`, with row and column indices from 0 to 7 increasing along centered y and x.
 
 Interpretation:
 
 - D34 high: one local 8x8 bin has strong direction-aware acceleration activity
 - D35: the local bin where that activity is strongest
 
-D34 is not raw acceleration strength. It is the strongest local bin of the D31
-direction-aware acceleration field.
-
-### Relationship To B41
-
-| task | formula | meaning |
-|---|---|---|
-| B41 | `p90(abs(point acceleration))` | acceleration strength |
-| D31 | `median(sign(mean_velocity) * acceleration)` over valid moving points | dominant-motion intensification |
-| D32 | support fraction for D31 direction | spatial consistency of intensification/weakening |
-| D33 | `p90(point_intensification) - p10(point_intensification)` | spread of the direction-aware acceleration field |
-| D34 | max 8x8-bin `mean(abs(point_intensification))` | hotspot strength of the direction-aware acceleration field |
-| D35 | `r{row}c{col}` of the D34 max bin | hotspot location |
-
-D31, D32, D33 and D34 remain scalar-only. D35 is location-only. They have no
-hard acceleration class thresholds.
-
-### Exclusions
-
-- D3 does not include changepoint slope jump. That belongs to the D1 trend/regime
-  story, because it depends on D13/D14 and tile-level trend timing rather than
-  point-level acceleration fields.
-- D3 does not classify D31/D32/D33/D34 into hard bands.
-- D3 does not replace B41 acceleration strength; B41 measures raw acceleration
-  magnitude, while D31-D35 measure direction-aware intensification, support,
-  spread, hotspot strength, and hotspot location.
-
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.d3.d3_compute \
-    --out-dir outputs/tasks-rebuilt/d3
-```
-
-The new table is written to `outputs/tasks-rebuilt/d3/d3_final_table.csv`.
-The installed reference remains at `outputs/tasks/d3/d3_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
-| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
-
-The computation may also write local summaries or diagnostics next to its
-new table. Their filenames and options are defined in the linked script;
-they are not part of the published reference-table inventory unless linked
-explicitly above.
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### Numeric targets
 

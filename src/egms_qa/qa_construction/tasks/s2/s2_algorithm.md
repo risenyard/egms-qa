@@ -2,34 +2,27 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **S2 group** | Measure local isolation from the training-set reference representations. |
-| S21 | Mean cosine distance to the nearest 20 training neighbors after train-fitted standardization and PCA. |
-| S22 | Corpus-relative rarity class derived from train-only percentiles of S21. |
+S2 measures how isolated a tile’s encoder summary vector is from nearby training-tile vectors. A summary vector is the encoder’s representation of the whole tile; nearby vectors indicate similar representations, rather than geographic proximity.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s2/s2_final_table.csv) · [Implementation](s2_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| S21 | Numeric distance | Mean cosine distance to the 20 nearest training tiles after reducing the representation to 25 features. Larger values mean greater isolation. |
+| S22 | Classification | Converts S21 into common, unusual, rare, or extreme using training-split percentiles. |
 
-## Key concepts
-
-S2 describes whether a tile is locally supported by nearby train reference tiles in the encoder representation space. It is a representation construct, not an external geophysical truth label.
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s2/s2_final_table.csv) · [Implementation](s2_compute.py) · [Run and files](../README.md#run-s2)
 
 ## Algorithm steps
 
 ### Algorithms
 
-Input token cache:
-
-[HF input](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/representations/egms_tokens_10k.pt) · installed path: `data/encoder/tokens/egms_tokens_10k.pt`
-
 Steps:
 
 1. Extract summary embeddings from `spatial_tokens[:, 0, :]`.
-2. Fit `StandardScaler` on train summary embeddings only.
-3. Fit `PCA(n_components=25)` on train embeddings only.
-4. L2-normalize PCA features.
+2. Standardize each vector dimension using its training mean and standard deviation (`StandardScaler`).
+3. Fit principal component analysis (`PCA`) on training vectors to retain 25 dimensions of variation.
+4. Scale each reduced vector to unit length (L2 normalization).
 5. Use train tiles as the reference library.
-6. For every tile, find the nearest `k=20` train neighbors using cosine distance.
+6. Find the `k=20` nearest training vectors by cosine distance (`1 - cosine similarity`).
 7. For train queries, exclude the tile itself.
 8. Output:
 
@@ -37,10 +30,7 @@ Steps:
 S21_local_isolation_score = mean(distance to nearest 20 train neighbors)
 ```
 
-Higher values mean the tile is more isolated from the train reference manifold.
-
-The final table stores only one S21 task value: `S21_local_isolation_score`.
-The neighbor count `k=20` is an algorithm parameter, not a task output.
+Higher values mean the tile is more isolated from the training-vector population.
 
 S22 uses train-only p75/p95/p99 thresholds on S21:
 
@@ -53,34 +43,12 @@ S22 uses train-only p75/p95/p99 thresholds on S21:
 
 These thresholds are corpus-relative representation rarity labels, not physical or regulatory thresholds.
 
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.s2.s2_compute \
-    --out-dir outputs/tasks-rebuilt/s2
-```
-
-The new table is written to `outputs/tasks-rebuilt/s2/s2_final_table.csv`.
-The installed reference remains at `outputs/tasks/s2/s2_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| Encoder token cache | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/representations/egms_tokens_10k.pt) | `data/encoder/tokens/egms_tokens_10k.pt` |
-
-The computation may also write local summaries or diagnostics next to its
-new table. Their filenames and options are defined in the linked script;
-they are not part of the published reference-table inventory unless linked
-explicitly above.
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s2/s2_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### Numeric targets
 
@@ -101,9 +69,9 @@ values. Missing targets are reported separately.
 
 #### k Selection
 
-Candidate values were swept: `5, 10, 20, 50, 100, 200, 500`.
+Here `k` is the number of training neighbors. Candidate values were compared: `5, 10, 20, 50, 100, 200, 500`.
 
-`k=20` is retained because `k=10/20/50` form a stable local-neighborhood range, while `k>=100` changes the rare tail substantially and behaves more like broad manifold sparsity than local isolation.
+`k=20` is retained because `k=10/20/50` form a stable local-neighborhood range, while `k>=100` changes the rare tail substantially and measures isolation over a broader part of the reference population.
 
 Key train quantiles for `k=20`:
 
@@ -118,7 +86,7 @@ Key train quantiles for `k=20`:
 
 S21 is unimodal and right-skewed, so no clear natural valley is used as a threshold.
 
-Candidate rules compared:
+Candidate rules compared (q denotes a quantile; IQR is the 75th minus 25th percentile; Tukey cutoffs add 1.5 or 3 IQRs to q75):
 
 | rule | thresholds | all10k class counts |
 |---|---|---|
@@ -129,4 +97,4 @@ Candidate rules compared:
 
 Released S22 rule: `q75_q95_q99`.
 
-Reason: it directly matches the rarity story: common core, unusual upper quartile, rare top 5%, and extreme top 1%. The thresholds are train-only and corpus-relative.
+The selected cutoffs define a common core, an unusual upper quartile, a rare top 5%, and an extreme top 1%. The thresholds are train-only and corpus-relative.

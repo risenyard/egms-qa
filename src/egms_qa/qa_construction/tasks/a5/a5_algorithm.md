@@ -2,36 +2,20 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **A5 group** | Combine representation stability, reconstruction reliability, coverage, and noise into a monitoring usability decision. |
-| A51 | Usability class derived from the severity of the A12, A22, A32, and A42 quality flags. |
-| A52 | Reason for the usability decision, including rules for multiple simultaneous quality issues. |
+A5 combines four quality checks into a tile usability decision and its reason. It reads [A12 representation stability](../a1/a1_algorithm.md), [A22 reconstruction reliability](../a2/a2_algorithm.md), [A32 spatial coverage](../a3/a3_algorithm.md), and [A42 measurement noise](../a4/a4_algorithm.md).
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a5/a5_final_table.csv) · [Implementation](a5_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| A51 | Combined classification | Combines four input quality classes: representation stability, reconstruction reliability, spatial coverage, and measurement noise. |
+| A52 | Reason category | Explains the A51 decision by naming the quality issue, multiple issues, or stable inputs. |
 
-## Key concepts
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a5/a5_final_table.csv) · [Implementation](a5_compute.py) · [Run and files](../README.md#run-a5)
 
-A51/A52 are the A-group monitoring usability gate and reason tasks:
-
-> Can this tile be used normally for downstream QA and monitoring, or should the interpretation carry a quality warning?
-
-A51/A52 are deterministic roll-ups of A12/A22/A32/A42. They are not encoder-advantage tasks and
-does not introduce a new learned model.
-
-### Inputs
-
-- `A12_representation_stability_class`
-- `A22_reconstruction_reliability_class`
-- `A32_spatial_coverage_class`
-- `A42_noise_level_class`
-
-A12 and A22 use train-fitted corpus-relative thresholds before this roll-up is
-computed. A5 itself does not fit any thresholds.
+A12 and A22 use training-split, corpus-relative thresholds. A5 applies the class rules below without fitting additional thresholds.
 
 ## Algorithm steps
 
-### Class Rules
+### A51 usability rules
 
 `unreliable` if any severe issue is present:
 
@@ -57,7 +41,7 @@ Otherwise:
 usable
 ```
 
-### Reason Rules
+### A52 reason rules
 
 Severe reasons:
 
@@ -78,32 +62,12 @@ caution issue, the reason is `multiple_quality_issues`. If multiple caution
 issues are present without a severe issue, the reason is `multiple_minor_issues`.
 If no issue is present, the reason is `stable_inputs`.
 
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.a5.a5_compute \
-    --out-path outputs/tasks-rebuilt/a5/a5_final_table.csv
-```
-
-The new table is written to `outputs/tasks-rebuilt/a5/a5_final_table.csv`.
-The installed reference remains at `outputs/tasks/a5/a5_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| A1 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a1/a1_final_table.csv) | `outputs/tasks/a1/a1_final_table.csv` |
-| A2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a2/a2_final_table.csv) | `outputs/tasks/a2/a2_final_table.csv` |
-| A3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a3/a3_final_table.csv) | `outputs/tasks/a3/a3_final_table.csv` |
-| A4 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a4/a4_final_table.csv) | `outputs/tasks/a4/a4_final_table.csv` |
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a5/a5_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### A51 label distribution
 

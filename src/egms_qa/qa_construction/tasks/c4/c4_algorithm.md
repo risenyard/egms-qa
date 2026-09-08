@@ -2,43 +2,16 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **C4 group** | Measure whether high-velocity tail cells occupy a substantial spatial area. |
-| C41 | Fraction of valid cells whose absolute-velocity tail statistic exceeds the fixed reference threshold. |
-| C42 | Extent class combining the number of high-tail cells and their fraction of valid cells. |
+C4 measures the area occupied by fast-moving parts of a tile. Observation points are grouped into an 8×8 grid; each valid cell is represented by the 90th percentile of absolute vertical velocity, meaning the value below which 90% of its point magnitudes fall.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv) · [Implementation](c4_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| C41 | Numeric fraction | Share of valid cells whose 90th-percentile absolute velocity reaches 4.8 mm/yr, a fixed corpus-relative fast-motion cutoff. |
+| C42 | Classification | Combines C41 with the number of fast cells to label their extent as none, sparse, localized, or extensive. |
 
-## Key concepts
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv) · [Implementation](c4_compute.py) · [Run and files](../README.md#run-c4)
 
-Do high-velocity tail bins occupy a spatial area, or are they confined to a very small part of the tile?
-
-### Inputs
-
-- `coords`: point coordinates.
-- `mean_velocity`: point-level mean velocity in mm/yr.
-
-The 10k final table uses:
-
-[HF split.parquet](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) (installed at `data/encoder/manifest/split.parquet`)
-
-The fast-motion threshold `T_fast` is **corpus-relative**: it is the p95 of the
-per-bin abs-velocity p90 over the full European candidate pool (83,323 tiles).
-The `final` subcommand uses the fixed value in the code
-(`FAST_THRESHOLD_MM_YR = 4.8`, in mm/yr). Re-estimating `T_fast` with the
-optional `reference` subcommand requires the full candidate pool, which is
-not included in the Dataset. That subcommand generates a reference JSON that
-can be supplied to `final` through `--reference-json`.
-
-
-
-### Intentional Exclusions
-
-- C4 does not measure the strongest velocity itself; B33/B36 handle velocity-tail magnitude.
-- C4 does not measure all meaningful motion; C11 handles noise-aware moving-point fraction.
-- C4 does not measure global concentration; C21/C22 handle spatial concentration over all motion.
-- C4 does not measure a deformation front; C31/C33 handle adjacent-bin jumps.
+The fast-motion cutoff is corpus-relative: 4.8 mm/yr is the 95th percentile of cell-level velocity-tail values from 83,323 European candidate tiles. This reference pool is distinct from the released 10,000-tile dataset.
 
 ## Algorithm steps
 
@@ -48,7 +21,7 @@ For every European candidate tile:
 
 ```text
 1. Center point coordinates by the tile coordinate mean.
-2. Split the tile into an 8x8 local grid.
+2. Split a 7000 m square around that center into an 8x8 grid (875 m cells).
 3. Keep bins with at least 5 finite points.
 4. For each valid bin:
    bin_abs_velocity_p90 = percentile(abs(point mean_velocity), 90)
@@ -75,12 +48,9 @@ to an extreme-only cutoff. EGMS-QA freezes:
 T_fast = full-Europe bin-level p95 = 4.800000 mm/yr
 ```
 
-For reference, the trimmed log-bulk fit gives `z2 = 5.287757 mm/yr`, close to p95,
-which supports p95 as a stable high-tail threshold rather than an arbitrary cut.
+### C41 fraction and C42 extent class
 
-### Final Formula
-
-For each 10k VQA tile:
+For each of the 10,000 released tiles:
 
 ```text
 fast_tail_bin = bin_abs_velocity_p90 >= T_fast
@@ -102,40 +72,12 @@ The `sparse` class uses absolute bin count because one or two high-tail bins are
 not enough to claim a spatial area. The `extensive` class uses a quarter of valid
 bins as an interpretable area-coverage threshold.
 
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.c4.c4_compute final \
-    --out-dir outputs/tasks-rebuilt/c4
-```
-
-The new table is written to `outputs/tasks-rebuilt/c4/c4_final_table.csv`.
-The installed reference remains at `outputs/tasks/c4/c4_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
-| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
-
-The `final` subcommand uses the published fixed threshold. The optional
-`reference` subcommand needs a separate full candidate-pool manifest, which is
-not distributed with this Dataset. Its threshold JSON and diagnostics are
-generated locally; they are not downloadable release files.
-
-The computation may also write local summaries or diagnostics next to its
-new table. Their filenames and options are defined in the linked script;
-they are not part of the published reference-table inventory unless linked
-explicitly above.
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### Numeric targets
 
@@ -156,7 +98,7 @@ values. Missing targets are reported separately.
 
 #### Reference calibration
 
-Derived reference distribution over the pool (for provenance):
+Additional reference percentiles from the 83,323-tile European candidate pool:
 
 | statistic | value (mm/yr) |
 |---|---|
@@ -166,5 +108,6 @@ Derived reference distribution over the pool (for provenance):
 | p99 | 8.20 |
 | p99.9 | 18.60 |
 
-(log-bulk fit: mu=0.594, sigma=0.536, over log values trimmed to [p1, p99];
-n_tiles=83,323, n_valid_bins=3,351,762.)
+For an additional distribution check, the natural-log cell velocities were
+trimmed to their 1st–99th percentiles. Their fitted mean was 0.594 and standard
+deviation 0.536. The reference pool contained 3,351,762 valid cells.

@@ -2,44 +2,39 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **S1 group** | Describe a tile's position relative to reference anchors in the encoder representation space. |
-| S11 | Assigned reference-anchor profile. |
-| S12 | Distance to the nearest reference anchor. |
-| S13 | Assignment margin between the nearest competing anchors. |
-| S14 | Assignment status describing how the representation is supported by the reference profiles. |
-| S15 | Descriptive category for the assigned reference-anchor profile. |
+S1 compares each tile’s encoder summary vector with six reference anchors learned from the training tiles. An anchor is a representative vector from a dense cluster of similar tiles. The profile names describe these reference groups; they are not independently verified physical classes.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s1/s1_final_table.csv) · [Implementation](s1_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| S11 | Profile assignment | Names the nearest training-derived reference anchor: a representative tile vector from a dense cluster. |
+| S12 | Numeric distance | Cosine distance to the anchor assigned by S11. Smaller values mean closer resemblance. |
+| S13 | Numeric margin | Second-nearest anchor distance minus S12. Larger values mean a clearer preference for the assigned anchor. |
+| S14 | Classification | Combines S12 distance and S13 margin into strong, weak/transition, or far/ambiguous anchor support. |
+| S15 | Profile description | Provides the fixed text description of the S11 anchor profile; it is not a separate measurement. |
 
-## Key concepts
-
-S1 describes where each tile sits relative to train-defined encoder summary-token reference anchors. It is a representation construct, not an external geophysical class.
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s1/s1_final_table.csv) · [Implementation](s1_compute.py) · [Run and files](../README.md#run-s1)
 
 ## Algorithm steps
 
 ### Algorithm
 
-Input token cache:
-
-[HF input](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/representations/egms_tokens_10k.pt) · installed path: `data/encoder/tokens/egms_tokens_10k.pt`
-
 Steps:
 
 1. Extract summary embeddings from `spatial_tokens[:, 0, :]`.
-2. Fit `StandardScaler` on train summary embeddings only.
-3. Fit `PCA(n_components=25)` on train embeddings only.
-4. L2-normalize PCA features.
-5. Fit `sklearn.cluster.HDBSCAN(min_cluster_size=50, min_samples=80)` on train features.
+2. Standardize each vector dimension using its training mean and standard deviation (`StandardScaler`).
+3. Fit principal component analysis (`PCA(n_components=25)`) on the training vectors to retain 25 dimensions of variation.
+4. Scale each reduced vector to unit length (L2 normalization).
+5. Find dense training clusters with `sklearn.cluster.HDBSCAN(min_cluster_size=50, min_samples=80)`, a density-based clustering method.
 6. Keep the 6 train dense-core clusters as reference anchors.
-7. Use each cluster medoid as the anchor vector.
-8. For every tile, compute nearest-anchor distance and nearest-vs-second margin.
-9. Fit a train-only 2D Gaussian mixture over `[S12 distance, S13 margin]`; BIC selects `k=6`.
-10. Merge GMM components into S14:
-    - `strongly_anchored`
-    - `transition_or_weakly_anchored`
-    - `far_or_ambiguous_from_reference_anchors`
+7. Use each cluster medoid as its anchor: the member vector with the smallest total cosine distance to other members.
+8. For each tile, S12 is the nearest-anchor cosine distance (`1 - cosine similarity`), and S13 is second-nearest distance minus nearest distance.
+9. Standardize distance and margin using their training statistics, then fit a Gaussian mixture model (GMM) to the training pairs `[S12 distance, S13 margin]`. This groups similar assignment patterns; the Bayesian information criterion (BIC) selects six components from candidates with one to six components.
+10. Convert mixture components to S14 labels using their training medians in
+    the original distance and margin units. Start with
+    `transition_or_weakly_anchored`; assign `strongly_anchored` to the component
+    with the smallest median distance minus median margin. Then assign
+    `far_or_ambiguous_from_reference_anchors` to the components with the largest
+    median distance or smallest median margin; these assignments take precedence.
 
 ### Anchor Profiles
 
@@ -52,34 +47,12 @@ Steps:
 | 4 | `stable_low_activity_background_reference` | large low-activity stable background reference with low velocity and acceleration |
 | 5 | `summer_trend_seasonal_mixed_reference` | summer-associated trend-seasonal mixed reference with relatively diffuse spatial structure |
 
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.s1.s1_compute \
-    --out-dir outputs/tasks-rebuilt/s1
-```
-
-The new table is written to `outputs/tasks-rebuilt/s1/s1_final_table.csv`.
-The installed reference remains at `outputs/tasks/s1/s1_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| Encoder token cache | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/representations/egms_tokens_10k.pt) | `data/encoder/tokens/egms_tokens_10k.pt` |
-
-The computation may also write local summaries or diagnostics next to its
-new table. Their filenames and options are defined in the linked script;
-they are not part of the published reference-table inventory unless linked
-explicitly above.
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s1/s1_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### Numeric targets
 

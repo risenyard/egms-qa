@@ -2,33 +2,15 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **C3 group** | Describe velocity contrasts between neighboring spatial cells. |
-| C31 | Deformation-front strength computed from adjacent-cell velocity contrasts. |
-| C32 | Grid location of the identified deformation front. |
-| C33 | Front-strength class derived from the contrast score. |
+C3 looks for sharp changes in mean vertical velocity between neighboring cells in a tile’s 8×8 grid. A deformation front here means a spatial velocity contrast; the task reports its strength and location.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) · [Implementation](c3_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| C31 | Numeric value (mm/yr) | 90th percentile of velocity differences between neighboring cells: typical strong spatial contrast. |
+| C32 | Grid-pair location | Locates the largest neighboring-cell contrast among the pairs used for C31. |
+| C33 | Classification | Converts C31 into four front-strength levels using training-split percentiles. |
 
-## Key concepts
-
-Does this tile contain a strong spatial velocity jump, where is the strongest jump located, and how sharp is the front relative to the 10k corpus?
-
-### Inputs
-
-- `coords`: point coordinates.
-- `mean_velocity`: point-level mean velocity in mm/yr.
-
-Arrays are read from the EGMS encoder 10k tile manifest:
-
-[HF split.parquet](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) (installed at `data/encoder/manifest/split.parquet`)
-
-### Intentional Exclusions
-
-- C31/C32/C33 do not use RMSE; A41 and C11 handle noise-aware reliability.
-- C33 is the only sharp-front class kept in EGMS-QA. There is no separate sharp-differential score/flag; downstream monitoring context should use `C33=very_sharp` when it needs a sharp-front predicate.
-- C31 uses p90 neighbor difference as the stable main scalar and uses max neighbor difference only for location.
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) · [Implementation](c3_compute.py) · [Run and files](../README.md#run-c3)
 
 ## Algorithm steps
 
@@ -38,7 +20,7 @@ For each tile:
 
 ```text
 1. Center point coordinates by the tile coordinate mean.
-2. Split the tile into an 8x8 local grid.
+2. Split a 7000 m square around that center into an 8x8 grid (875 m cells).
 3. Keep bins with at least 5 points.
 4. For each valid bin:
    bin_mean_velocity = mean(point mean_velocity)
@@ -54,9 +36,9 @@ For each tile:
 r{row_a}c{col_a}-r{row_b}c{col_b}
 ```
 
-Example: `r4c2-r4c3`.
+Example: `r4c2-r4c3`. Rows and columns run from 0 to 7, increasing with the centered y and x coordinates.
 
-### Distribution Class
+### C33 front-strength class
 
 C33 is derived from the observed C31 train-split distribution. The distribution
 is strongly right-skewed with a long high-front tail, so C33 uses train
@@ -70,30 +52,12 @@ class:
 | `strong` | 0.653784 < C31 <= 1.583580 |
 | `very_sharp` | C31 > 1.583580 |
 
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.c3.c3_compute \
-    --out-dir outputs/tasks-rebuilt/c3
-```
-
-The new table is written to `outputs/tasks-rebuilt/c3/c3_final_table.csv`.
-The installed reference remains at `outputs/tasks/c3/c3_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
-| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### Numeric targets
 

@@ -2,21 +2,18 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **B3 group** | Describe the velocity distribution's tails, direction, significance, and European reference typicality. |
-| B31 | 10th percentile of point velocity, describing the sinking tail. |
-| B32 | 90th percentile of point velocity, describing the upper tail. |
-| B33 | 90th percentile of absolute point velocity, describing the magnitude of the fast tail. |
-| B34 | Direction class that retains evidence of uplift instead of treating every strong tail as subsidence. |
-| B35 | Worst-point strength class applying fixed velocity boundaries to B33. |
-| B36 | Velocity typicality class relative to the specified European reference distribution. |
+B3 describes the slow and fast ends of the point-velocity distribution in a tile. Negative vertical velocity means subsidence and positive velocity means uplift. A percentile marks a position in that distribution: p10 has 10% of values below it, and p90 has 90% below it.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) · [Implementation](b3_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| B31 | Numeric value (mm/yr) | 10th percentile of point velocity: the lower, more downward-moving tail. |
+| B32 | Numeric value (mm/yr) | 90th percentile of point velocity: the upper, more upward-moving tail. |
+| B33 | Numeric value (mm/yr) | 90th percentile of absolute point velocity: fast-motion magnitude regardless of direction. |
+| B34 | Classification | Uses B31 and B32 to label uplift when the upper tail exceeds the lower tail's magnitude; otherwise labels non-uplift. |
+| B35 | Classification | Converts B33 into five motion-strength levels using fixed velocity cutoffs. |
+| B36 | Classification | Places B33 in five levels relative to the European candidate-pool distribution. |
 
-## Key concepts
-
-What do the tile's velocity tails say about sinking-side motion, uplift protection, local worst-point strength, and European velocity typicality?
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) · [Implementation](b3_compute.py) · [Run and files](../README.md#run-b3)
 
 ## Algorithm steps
 
@@ -40,7 +37,7 @@ B34_uplift_protected_direction = uplift
     else non_uplift
 ```
 
-Worst-point significance:
+B35 motion-strength class (stored as `worst_point_significance`):
 
 ```text
 B35_worst_point_significance =
@@ -55,7 +52,7 @@ Boundary comparisons use the released NPZ's float32 precision: a stored
 1.9 mm/yr belongs to `moderate`. B35 uses velocity strength rather than a
 point-specific uncertainty ratio.
 
-European velocity typicality:
+B36 European reference class:
 
 ```text
 B36_european_velocity_typicality =
@@ -70,30 +67,12 @@ B36 is a European reference distribution label, not a causal anomaly claim. The
 cutoffs are **corpus-relative**: fixed quantiles of the full European
 candidate-pool distribution, baked into the compute script as constants.
 
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.b3.b3_compute \
-    --out-dir outputs/tasks-rebuilt/b3
-```
-
-The new table is written to `outputs/tasks-rebuilt/b3/b3_final_table.csv`.
-The installed reference remains at `outputs/tasks/b3/b3_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| NPZ source tiles | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/tree/main/artifacts/source_tiles) | `data/tiles/` |
-| Split manifest | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/metadata/split_manifest.parquet) | `data/encoder/manifest/split.parquet` |
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### Numeric targets
 

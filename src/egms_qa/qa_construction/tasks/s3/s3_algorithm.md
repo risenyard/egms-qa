@@ -2,44 +2,30 @@
 
 ## Task overview
 
-| task | description |
+S3 compares two kinds of rarity: isolation of the encoder representation and unusual values in measured monitoring indicators. It reads [S21 local representation isolation](../s2/s2_algorithm.md) and the quality, motion, spatial, and temporal indicators listed below. Both sides are ranked against training tiles before comparison.
+
+| Task | Type | Output and relationship |
+|---|---|---|
+| S31 | Numeric rank gap | Representation-rarity rank minus monitoring-rarity rank. Positive values mean greater rarity on the representation side. |
+| S32 | Classification | Converts S31 into aligned, monitoring-excess, or encoder-excess levels using the training mean and standard deviation. |
+| S33 | Explanation category | Names the strongest monitoring dimension used in S31: quality, motion, spatial, or temporal. |
+
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv) · [Implementation](s3_compute.py) · [Run and files](../README.md#run-s3)
+
+The monitoring inputs are grouped into four dimensions. A percentile rank
+places a value within the training distribution; this task uses a 0–99 scale.
+
+| Dimension | Input tasks and meaning |
 |---|---|
-| **S3 group** | Compare representation rarity with rarity in the scalar monitoring indicators. |
-| S31 | Difference between the training-reference percentile ranks of representation rarity and monitoring rarity. |
-| S32 | Relation class derived from the S31 gap using train-fitted standardized thresholds. |
-| S33 | Monitoring dimension with the largest axis-level reference score: quality, motion, spatial, or temporal. |
+| Quality | [A41](../a4/a4_algorithm.md): median point measurement RMSE |
+| Motion | [B33](../b3/b3_algorithm.md): absolute velocity p90; [B41](../b4/b4_algorithm.md): absolute acceleration p90; [B51](../b5/b5_algorithm.md): seasonality p90 |
+| Spatial | [C11](../c1/c1_algorithm.md): moving-point fraction; [C21](../c2/c2_algorithm.md): motion concentration; [C31](../c3/c3_algorithm.md): neighboring-cell velocity contrast; [C41](../c4/c4_algorithm.md): fast-cell fraction |
+| Temporal | [D12 and D13](../d1/d1_algorithm.md): curvature and changepoint strengths; [D22](../d2/d2_algorithm.md): phase coherence; [D31](../d3/d3_algorithm.md): signed motion intensification |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv) · [Implementation](s3_compute.py)
-
-## Key concepts
-
-S31 is a difference of percentile ranks on a train-defined `p0-p99` scale.
-S32 classifies this difference. S33 identifies the most distinctive monitoring
-dimension.
-
-### Inputs
-
-Encoder-side input:
-
-- `S21_local_isolation_score`
-
-A/B/C/D monitoring sentinel scalars:
-
-- quality axis: `A41_median_rmse_mm`
-- motion axis: `B33_vel_abs_p90_mm_yr`, `B41_acc_abs_p90`, `B51_seasonality_p90`
-- spatial axis: `C11_noise_aware_moving_fraction`, `C21_spatial_concentration_score`,
-  `C31_deformation_front_strength_mm_yr`, `C41_fast_tail_bin_fraction`
-- temporal axis: `D12_curvature_strength`, `D13_changepoint_strength`,
-  `D22_phase_coherence`, `D31_motion_intensification_mm_yr2`
-
-The temporal axis reads curvature and changepoint strength directly from the
-[D1 reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv).
-The [D1 method](../d1/d1_algorithm.md) computes these geometry scores from the
-same tile-median displacement series. Undefined scores are omitted when taking
-the temporal-axis maximum; the remaining temporal indicators still contribute.
-
-These sentinels are oriented so larger values mean stronger monitoring signal,
-stronger structure, or worse observation quality.
+Here p90 means the 90th percentile of point values, and RMSE means root mean
+squared error. Larger input values represent higher noise, stronger motion or
+structure, greater phase agreement, or more positive intensification.
+Undefined values are omitted from the maximum within each dimension.
 
 ## Algorithm steps
 
@@ -61,7 +47,7 @@ S31_representation_monitoring_rarity_gap_p
 ```
 
 Positive values mean the encoder representation is rarer than expected from the
-A/B/C/D monitoring scalar system. Negative values mean the scalar monitoring
+monitoring indicators listed above. Negative values mean the scalar monitoring
 system is rarer than the encoder representation.
 
 ### S32 Class Rule
@@ -110,44 +96,6 @@ S33 is a monitoring-side explanation task. It explains which scalar monitoring
 dimension is most distinctive, not why the encoder embedding itself is rare.
 Exact ties are resolved deterministically by axis order:
 `quality -> motion -> spatial -> temporal`.
-
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.s3.s3_compute \
-    --out-dir outputs/tasks-rebuilt/s3
-```
-
-The new table is written to `outputs/tasks-rebuilt/s3/s3_final_table.csv`.
-The installed reference remains at `outputs/tasks/s3/s3_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| A4 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a4/a4_final_table.csv) | `outputs/tasks/a4/a4_final_table.csv` |
-| B3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) | `outputs/tasks/b3/b3_final_table.csv` |
-| B4 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b4/b4_final_table.csv) | `outputs/tasks/b4/b4_final_table.csv` |
-| B5 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b5/b5_final_table.csv) | `outputs/tasks/b5/b5_final_table.csv` |
-| C1 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c1/c1_final_table.csv) | `outputs/tasks/c1/c1_final_table.csv` |
-| C2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c2/c2_final_table.csv) | `outputs/tasks/c2/c2_final_table.csv` |
-| C3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) | `outputs/tasks/c3/c3_final_table.csv` |
-| C4 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv) | `outputs/tasks/c4/c4_final_table.csv` |
-| D1 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv) | `outputs/tasks/d1/d1_final_table.csv` |
-| D2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d2/d2_final_table.csv) | `outputs/tasks/d2/d2_final_table.csv` |
-| D3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv) | `outputs/tasks/d3/d3_final_table.csv` |
-| S2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s2/s2_final_table.csv) | `outputs/tasks/s2/s2_final_table.csv` |
-
-To use a newly computed D1 table, add
-`--d1-table outputs/tasks-rebuilt/d1/d1_final_table.csv`. Other input tables
-continue to come from `--tasks-root` (the installed reference directory by default).
-
-The computation may also write local summaries or diagnostics next to its
-new table. Their filenames and options are defined in the linked script;
-they are not part of the published reference-table inventory unless linked
-explicitly above.
 
 ## Results
 

@@ -2,19 +2,14 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **A3 group** | Describe how widely the observations occupy the tile's 8×8 spatial grid. |
-| A31 | Fraction of the 64 grid cells containing observations, computed from the cached point counts. |
-| A32 | Coverage class assigned from fixed thresholds on the occupied-cell fraction. |
+A3 describes how widely observation points cover a tile. The tile is divided into an 8×8 grid, and a cell is occupied if it contains at least one point.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a3/a3_final_table.csv) · [Implementation](a3_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| A31 | Numeric fraction | Share of the 64 spatial cells that contain observations, from 0 to 1. |
+| A32 | Classification | Converts A31 into four coverage levels using fixed occupied-cell thresholds. |
 
-## Key concepts
-
-A31 measures spatial observation coverage:
-
-> Are the observations spread across the tile, or concentrated into only a few spatial bins?
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a3/a3_final_table.csv) · [Implementation](a3_compute.py) · [Run and files](../README.md#run-a3)
 
 ## Algorithm steps
 
@@ -27,9 +22,7 @@ occupied_bins = count(point_count_per_bin > 0)
 A31_valid_bin_fraction_8x8 = occupied_bins / 64
 ```
 
-This is a raw observation-support target. It is not an encoder-advantage task.
-
-### Classes
+### A32 coverage classes
 
 The class label uses fixed structural thresholds, not empirical percentiles:
 
@@ -40,29 +33,12 @@ The class label uses fixed structural thresholds, not empirical percentiles:
 | `sparse` | 0.25 <= fraction < 0.50 | sparse spatial support |
 | `highly_fragmented` | fraction < 0.25 | very fragmented support |
 
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.a3.a3_compute \
-    --out-path outputs/tasks-rebuilt/a3/a3_final_table.csv
-```
-
-The new table is written to `outputs/tasks-rebuilt/a3/a3_final_table.csv`.
-The installed reference remains at `outputs/tasks/a3/a3_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| Encoder token cache | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/representations/egms_tokens_10k.pt) | `data/encoder/tokens/egms_tokens_10k.pt` |
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a3/a3_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### Numeric targets
 

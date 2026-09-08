@@ -2,37 +2,17 @@
 
 ## Task overview
 
-| task | description |
-|---|---|
-| **S4 group** | Describe variation and concentration among the valid spatial-cell representations inside a tile. |
-| S41 | RMS deviation from the cell-token centroid divided by the RMS magnitude of the cell tokens. |
-| S42 | Local-structure class derived from train-reference thresholds on S41. |
-| S43 | Gini concentration of the cell-token residual magnitudes around their centroid. |
+S4 measures variation among the encoder vectors for a tile’s 8×8 spatial cells. Each cell vector, also called a patch token, represents observations in that part of the tile. These outputs describe the encoder representation, rather than a directly measured deformation pattern.
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s4/s4_final_table.csv) · [Implementation](s4_compute.py)
+| Task | Type | Output and relationship |
+|---|---|---|
+| S41 | Numeric score | Variation among spatial-cell vectors divided by their overall magnitude. Larger values mean stronger local differences in the representation. |
+| S42 | Classification | Converts S41 into four local-structure levels using training-split percentiles. |
+| S43 | Numeric score | Gini inequality of cell-vector deviations from their mean. Complements S41 by showing whether variation is concentrated in a few cells. |
 
-## Key concepts
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s4/s4_final_table.csv) · [Implementation](s4_compute.py) · [Run and files](../README.md#run-s4)
 
-### Inputs
-
-Current tile tokens only:
-
-- `spatial_tokens[:, 1:65, :]`: the 64 patch tokens.
-- `token_mask[:, 1:65]`: valid patch-token mask.
-
-S4 does not use the tile-summary token, geographic neighbors, A/B/C/D labels, S11 anchors, or
-reference libraries.
-
-### Interpretation Boundary
-
-S4 is not a direct physical ground-truth label. It describes
-encoder-perceived local spatial structure inside a tile. Because the 64 patch
-tokens are tied to the 8x8 tile layout, the task has geographic monitoring
-meaning, but the claim remains representation-level:
-
-```text
-Does the encoder see local spatial structure inside this tile?
-```
+The cached `spatial_tokens[:, 1:65, :]` contain the 64 cell vectors, and `token_mask[:, 1:65]` identifies valid cells. The centroid is their mean vector; RMS means root mean square. S41 and S43 use only the current tile’s valid cells, while S42 uses thresholds fitted on training tiles.
 
 ## Algorithm steps
 
@@ -59,9 +39,7 @@ S43_encoder_perceived_local_structure_concentration
 
 Low values indicate that local structure is more evenly distributed across
 valid patches. High values indicate that local structure is concentrated in
-fewer valid patches. S43 is delivered as a continuous scalar and is not
-classified because its empirical distribution is continuous without a clear
-natural breakpoint.
+fewer valid patches. Gini measures inequality: zero indicates equal residual magnitudes; larger values indicate greater inequality.
 
 ### S42 Class Rule
 
@@ -85,34 +63,12 @@ S41 > train p95
 These thresholds are corpus-relative train-distribution labels, not physical
 thresholds.
 
-## Run and files
-
-Complete the [task setup](../README.md#setup) first. Run these commands from
-the repository root:
-
-```bash
-python -m egms_qa.qa_construction.tasks.s4.s4_compute \
-    --out-dir outputs/tasks-rebuilt/s4
-```
-
-The new table is written to `outputs/tasks-rebuilt/s4/s4_final_table.csv`.
-The installed reference remains at `outputs/tasks/s4/s4_final_table.csv`.
-See the [path conventions](../README.md#paths) for the relationship to Hugging Face.
-
-| required input | published source | installed path |
-|---|---|---|
-| Encoder token cache | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/representations/egms_tokens_10k.pt) | `data/encoder/tokens/egms_tokens_10k.pt` |
-
-The computation may also write local summaries or diagnostics next to its
-new table. Their filenames and options are defined in the linked script;
-they are not part of the published reference-table inventory unless linked
-explicitly above.
-
 ## Results
 
 The following summaries use all 10,000 rows of the
 [published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s4/s4_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+values. Missing targets are reported separately. In numeric tables, p05 and p95
+are the 5th and 95th percentiles.
 
 ### Numeric targets
 
