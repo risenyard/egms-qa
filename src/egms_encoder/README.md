@@ -81,6 +81,8 @@ After [installing the code](#installation), provide `--manifest` and
 missing `n_points`, `centroid_x`, and `centroid_y` columns are derived from
 the NPZ coordinates. Use `--source-tiles-root` to resolve relative tile
 paths against a different directory. Encoder inference uses displacement histories and coordinates.
+The NPZ needs `coords [N,2]` and finite `time_series [N,294]`; coordinates must
+also be finite. Static EGMS attributes are required by QA task computation.
 For example, a manifest path `tile_01.npz` with `--source-tiles-root my_tiles`
 reads `my_tiles/tile_01.npz`. Absolute manifest paths remain absolute.
 

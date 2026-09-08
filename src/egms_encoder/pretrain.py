@@ -381,7 +381,9 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load data via TileStore
-    tile_store = TileStore.from_manifest(args.manifest, args.data_config)
+    tile_store = TileStore.from_manifest(
+        args.manifest, args.data_config, require_static_fields=False,
+    )
     configured_input_length = tile_store.time_window.input_length
     if args.input_length != configured_input_length:
         raise ValueError(

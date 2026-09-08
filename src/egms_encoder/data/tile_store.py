@@ -91,6 +91,7 @@ class TileStore:
         feature_columns_count: int = FEATURE_COLUMNS_COUNT,
         data_root: str | Path | None = None,
         data_config: dict | None = None,
+        require_static_fields: bool = True,
     ) -> None:
         required = {"tile_id", "path", "n_points", "centroid_x", "centroid_y"}
         missing = required - set(manifest.columns)
@@ -114,6 +115,7 @@ class TileStore:
         self.manifest = manifest.reset_index(drop=True).copy()
         self.time_window = time_window
         self.data_config = dict(data_config or {})
+        self.require_static_fields = require_static_fields
         self.feature_columns_count = int(feature_columns_count)
         self.num_tiles = len(self.manifest)
         self.data_root = Path(data_root) if data_root is not None else Path.cwd()
@@ -182,6 +184,7 @@ class TileStore:
         data_config_path: str | Path,
         data_root: str | Path | None = None,
         source_tiles_root: str | Path | None = None,
+        require_static_fields: bool = True,
     ) -> "TileStore":
         """Build a store from the released manifest and data configuration."""
         manifest_path = Path(manifest_path)
@@ -268,6 +271,7 @@ class TileStore:
             feature_columns_count=feature_columns_count,
             data_root=data_root,
             data_config=config,
+            require_static_fields=require_static_fields,
         )
         return store
 
@@ -291,6 +295,8 @@ class TileStore:
                 raise ValueError(
                     f"{meta['tile_id']}: coords must have shape [N,2], got {coords.shape}"
                 )
+            if not np.isfinite(coords).all():
+                raise ValueError(f"{meta['tile_id']}: coords contain non-finite values")
             n_points = coords.shape[0]
             if n_points != meta["num_points"]:
                 raise ValueError(
@@ -310,14 +316,21 @@ class TileStore:
                     "repeated cropping."
                 )
 
-            static_missing = set(STATIC_KEYS) - set(archive.files)
-            if static_missing:
-                raise ValueError(
-                    f"{meta['tile_id']}: NPZ missing fields {sorted(static_missing)}"
-                )
-            static_values = {
-                key: np.asarray(archive[key], dtype=np.float32) for key in STATIC_KEYS
-            }
+            if self.require_static_fields:
+                static_missing = set(STATIC_KEYS) - set(archive.files)
+                if static_missing:
+                    raise ValueError(
+                        f"{meta['tile_id']}: NPZ missing fields {sorted(static_missing)}"
+                    )
+                static_values = {
+                    key: np.asarray(archive[key], dtype=np.float32) for key in STATIC_KEYS
+                }
+            else:
+                # Preserve the materialized layout while encoder-only callers
+                # read only coordinates and displacement histories.
+                static_values = {
+                    key: np.full(n_points, np.nan, dtype=np.float32) for key in STATIC_KEYS
+                }
 
         time_series = series[:, self.time_window.t_start : self.time_window.t_end]
         if not np.isfinite(time_series).all():

@@ -239,6 +239,7 @@ def load_tile_store(
         manifest_path,
         data_config_path,
         source_tiles_root=source_tiles_root,
+        require_static_fields=False,
     )
     print(
         f"[manifest] {store.num_tiles} tiles, "

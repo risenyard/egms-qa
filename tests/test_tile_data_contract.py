@@ -255,3 +255,35 @@ def test_release_loader_rejects_legacy_304_step_contract(
     )
     with pytest.raises(ValueError, match=message):
         TileStore.from_manifest(manifest_path, config_path)
+
+
+def test_encoder_only_reader_ignores_unused_static_fields(tmp_path):
+    path = tmp_path / "tile.npz"
+    np.savez(path, coords=np.zeros((2, 2), dtype=np.float32),
+             time_series=np.ones((2, 294), dtype=np.float32),
+             rmse=np.array(["unused"], dtype=object))
+    manifest = pd.DataFrame([{"tile_id": "tile", "path": str(path), "n_points": 2,
+                              "centroid_x": 0.0, "centroid_y": 0.0}])
+    store = TileStore(manifest, TimeWindow(0, 294, stored_steps=294),
+                      require_static_fields=False)
+    values = store.get_tile(0)
+    assert values.shape == (2, 304)
+    np.testing.assert_array_equal(values[:, 10:], np.ones((2, 294)))
+    assert np.isnan(values[:, 2:10]).all()
+    strict = TileStore(manifest, TimeWindow(0, 294, stored_steps=294))
+    with pytest.raises(ValueError, match="missing fields"):
+        strict.get_tile(0)
+
+
+@pytest.mark.parametrize("value", [np.nan, np.inf])
+def test_reader_rejects_nonfinite_coordinates(tmp_path, value):
+    coords = np.zeros((2, 2), dtype=np.float32)
+    coords[0, 0] = value
+    path = tmp_path / "tile.npz"
+    np.savez(path, coords=coords, time_series=np.ones((2, 294), dtype=np.float32))
+    manifest = pd.DataFrame([{"tile_id": "tile", "path": str(path), "n_points": 2,
+                              "centroid_x": 0.0, "centroid_y": 0.0}])
+    store = TileStore(manifest, TimeWindow(0, 294, stored_steps=294),
+                      require_static_fields=False)
+    with pytest.raises(ValueError, match="coords contain non-finite"):
+        store.get_tile(0)
