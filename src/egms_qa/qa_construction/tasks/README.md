@@ -159,27 +159,6 @@ A1 and A2 also provide [A1 shard aggregation](a1/a1_combine_shards.py) and
 shard locations and final-table destinations. X1–X3 write task-level refusal
 catalogs, rather than 10,000 tile-level records.
 
-## Reconstruction scope
-
-The supported complete QA workflow starts from the released reference tables:
-rebuild labels, then render questions and answers. The Dataset supplies all 27
-tables needed for that workflow. The [reference-table workflow](../README.md#reproduce-qa-generation)
-provides the label and QA commands. The
-[task recomputation workflow](../README.md#reproduce-task-computation)
-shows how to pass a complete working set of task tables to label aggregation
-and QA generation. Both write outputs separately from installed
-reference files.
-
-D1 computes the published geometry scores directly from the model-ready NPZ
-tiles and source time axis. D4 reads its trend-shape label; S3 reads its
-curvature and changepoint strengths alongside the other reference tables.
-See the [D4](d4/d4_algorithm.md) and [S3](s3/s3_algorithm.md) methods for the
-input columns and the `--d1-table` override for a newly computed D1 table.
-
-For other groups, consult the linked method and script for the full input,
-parameter and execution requirements. The index records dependencies; it does
-not assert numerical equivalence of independently recomputed tables.
-
 ## Run and files
 
 Complete [Setup](#setup), then run the chosen command from the repository root.
