@@ -3,13 +3,14 @@
 The 78 leaf tasks are organized into 27 task groups under six families
 (A/B/C/D/S/X). A directory such as `a1/` implements A11 and A12; it is not a
 separate top-level family. Each linked task page describes all of its leaf tasks. See the
-[QA guide](../README.md) for downloading data and generating QA.
+[QA construction guide](../README.md#workflows) for reference-table reproduction,
+task recomputation, and construction from your own data.
 
 ## Setup
 
 Install the code using the [project installation](../../../../README.md#installation).
 For tasks that read measurements, representations, or upstream tables, also
-[install the required data groups](../README.md#download-and-try):
+[install the required data groups](../README.md#installation-and-data-setup):
 `qa` supplies reference tables, `tokens` supplies encoder representations, and
 `tiles` supplies source measurements. Select groups using the input columns
 in the task table below. Run commands from the cloned repository root.
@@ -123,8 +124,12 @@ catalogs, rather than 10,000 tile-level records.
 
 The supported complete QA workflow starts from the released reference tables:
 rebuild labels, then render questions and answers. The Dataset supplies all 27
-tables needed for that workflow. The [QA guide](../README.md) gives commands
-that write new outputs separately from the downloaded artifacts.
+tables needed for that workflow. The [reference-table workflow](../README.md#reproduce-qa-construction)
+provides the label and QA commands. The
+[task recomputation workflow](../README.md#recompute-task-labels-and-regenerate-qa)
+shows how to replace B2 and its dependent C5 table in a working set, then pass
+that set to label aggregation. Both write outputs separately from installed
+reference files.
 
 D1 computes the published geometry scores directly from the model-ready NPZ
 tiles and source time axis. D4 reads its trend-shape label; S3 reads its

@@ -27,7 +27,7 @@ Translator 通过投影器与 LoRA 适配宿主语言模型，使其根据冻结
 | 模块 | 代码与指南 | Hugging Face 发布内容 |
 |---|---|---|
 | Encoder | [预训练与 token 提取](src/egms_encoder/README.md) | [编码器权重、配置与归一化参数](https://huggingface.co/risenyard/egms-qa-encoder) |
-| QA construction | [任务定义与 QA 生成](src/egms_qa/qa_construction/README.md) | [源瓦片、tokens、标签、参考值表与 QA 记录](https://huggingface.co/datasets/risenyard/egms-qa-dataset) |
+| QA construction | [QA 构建与复现](src/egms_qa/qa_construction/README.md) | [源瓦片、tokens、标签、参考值表与 QA 记录](https://huggingface.co/datasets/risenyard/egms-qa-dataset) |
 | Translator | [语言模型适配与评测](src/egms_qa/translator/README.md) | [Qwen、Gemma、Llama 和 Mistral 四个版本](https://huggingface.co/risenyard/egms-qa-translator) |
 
 ## 安装

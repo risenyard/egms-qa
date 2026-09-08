@@ -31,7 +31,7 @@ weights, and recipes are available through the
 | component | code and guide | Hugging Face release |
 |---|---|---|
 | Encoder | [Pretraining and token extraction](src/egms_encoder/README.md) | [Encoder weights, configuration, and normalization](https://huggingface.co/risenyard/egms-qa-encoder) |
-| QA construction | [Task definitions and QA generation](src/egms_qa/qa_construction/README.md) | [Source tiles, tokens, labels, reference tables, and QA records](https://huggingface.co/datasets/risenyard/egms-qa-dataset) |
+| QA construction | [QA construction and reproduction](src/egms_qa/qa_construction/README.md) | [Source tiles, tokens, labels, reference tables, and QA records](https://huggingface.co/datasets/risenyard/egms-qa-dataset) |
 | Translator | [Language-model adaptation and evaluation](src/egms_qa/translator/README.md) | [Qwen, Gemma, Llama, and Mistral variants](https://huggingface.co/risenyard/egms-qa-translator) |
 
 ## Installation
