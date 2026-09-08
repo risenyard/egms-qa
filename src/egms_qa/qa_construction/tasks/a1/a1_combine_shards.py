@@ -9,6 +9,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from egms_qa.paths import OUTPUTS_DIR
+
 CLASS_LABELS = ["stable", "mildly_sensitive", "highly_sensitive", "extreme"]
 
 
@@ -77,9 +79,9 @@ def add_tail_strata(tile: pd.DataFrame, threshold_pool: str) -> tuple[pd.DataFra
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base-dir", default="outputs/tasks/a1/work")
-    ap.add_argument("--out-path", default="outputs/tasks/a1/a1_final_table.csv")
-    ap.add_argument("--num-shards", type=int, default=10)
+    ap.add_argument("--base-dir", default=str(OUTPUTS_DIR / "tasks-rebuilt/a1/work"))
+    ap.add_argument("--out-path", default=str(OUTPUTS_DIR / "tasks-rebuilt/a1/a1_final_table.csv"))
+    ap.add_argument("--num-shards", type=int, default=1)
     ap.add_argument("--threshold-pool", default="train", choices=["train", "train_val"])
     ap.add_argument("--keep-work", action="store_true")
     args = ap.parse_args()

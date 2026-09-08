@@ -5,8 +5,10 @@ import argparse
 import csv
 from pathlib import Path
 
+from egms_qa.paths import OUTPUTS_DIR
 
-OUT_DIR = Path("./outputs/tasks/x2")
+
+OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/x2"
 
 ANSWER_POLICY = (
     "Refuse unsupported data/scope requests, name the missing scale/channel/time/reference universe, "

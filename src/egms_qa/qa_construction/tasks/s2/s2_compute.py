@@ -30,10 +30,11 @@ from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler, normalize
 
+from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
 
-ROOT = Path(".")
-DEFAULT_TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
-DEFAULT_OUT_DIR = ROOT / "outputs/tasks/s2"
+
+DEFAULT_TOKEN_CACHE = DATA_DIR / "encoder/tokens/egms_tokens_10k.pt"
+DEFAULT_OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/s2"
 S22_LABELS = ("common", "unusual", "rare", "extreme")
 
 

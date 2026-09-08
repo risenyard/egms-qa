@@ -5,8 +5,10 @@ import argparse
 import csv
 from pathlib import Path
 
+from egms_qa.paths import OUTPUTS_DIR
 
-OUT_DIR = Path("./outputs/tasks/x3")
+
+OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/x3"
 
 ANSWER_POLICY = (
     "Refuse over-interpretation of encoder representations, name the missing attribution/probe/causal evidence, "

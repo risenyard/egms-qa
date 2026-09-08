@@ -11,13 +11,15 @@ from pathlib import Path
 
 import pandas as pd
 
+from egms_qa.paths import OUTPUTS_DIR, TASKS_DIR
+from egms_qa.qa_construction.tables import merge_task_tables
 
-ROOT = Path(".")
-DEFAULT_OUT_DIR = ROOT / "outputs/tasks/c5"
-DEFAULT_B2 = ROOT / "outputs/tasks/b2/b2_final_table.csv"
-DEFAULT_B3 = ROOT / "outputs/tasks/b3/b3_final_table.csv"
-DEFAULT_B6 = ROOT / "outputs/tasks/b6/b6_final_table.csv"
-DEFAULT_C3 = ROOT / "outputs/tasks/c3/c3_final_table.csv"
+
+DEFAULT_OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/c5"
+DEFAULT_B2 = TASKS_DIR / "b2/b2_final_table.csv"
+DEFAULT_B3 = TASKS_DIR / "b3/b3_final_table.csv"
+DEFAULT_B6 = TASKS_DIR / "b6/b6_final_table.csv"
+DEFAULT_C3 = TASKS_DIR / "c3/c3_final_table.csv"
 
 C51_COL = "C51_monitoring_priority"
 C52_COL = "C52_hidden_local_risk"
@@ -49,13 +51,9 @@ def build_table(b2_path: Path, b3_path: Path, b6_path: Path, c3_path: Path) -> p
         ["tile_id", "split", "B35_worst_point_significance"],
     )
 
-    out = (
-        b6.merge(c3, on=["tile_id", "split"], how="inner", validate="one_to_one")
-        .merge(b2, on=["tile_id", "split"], how="inner", validate="one_to_one")
-        .merge(b3, on=["tile_id", "split"], how="inner", validate="one_to_one")
-    )
-    if len(out) != len(b6):
-        raise ValueError(f"merged row count {len(out)} does not match B6 row count {len(b6)}")
+    out = merge_task_tables(b6, c3, "C3")
+    out = merge_task_tables(out, b2, "B2")
+    out = merge_task_tables(out, b3, "B3")
 
     out[C51_COL] = "none"
     triggered = out["B61_monitoring_trigger"].astype(str) == "yes"

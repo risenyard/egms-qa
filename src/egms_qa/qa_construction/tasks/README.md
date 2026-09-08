@@ -31,6 +31,12 @@ Each method's **Run and files** section links its inputs to the actual HF files
 and shows their installed paths. Use the paths in the commands from the
 repository root.
 
+Task scripts also honor `EGMS_QA_ROOT`, `EGMS_QA_DATA`, and `EGMS_QA_OUTPUTS`
+from the [shared path configuration](../../paths.py). Set these to absolute
+paths when running from another directory. Explicit command-line paths take
+precedence over defaults; the manifest's `data/tiles/` entries resolve under
+`EGMS_QA_DATA`.
+
 | location | role |
 |---|---|
 | HF `artifacts/reference_tables/<group>/` | published reference tables and explicitly listed scientific inputs |
@@ -41,15 +47,20 @@ repository root.
 A referenced CSV is not tracked beside the algorithm merely because the
 method mentions its filename. **HF file** links identify published inputs;
 other summaries, plots, and intermediate files are generated locally when
-supported by the script. Keep the documented output override when recomputing
-so that installed reference files stay intact.
+supported by the script. Computation outputs default to
+`outputs/tasks-rebuilt/<group>/`, keeping installed reference files intact.
+A1/A2 write numbered work shards there; their combiners default to one shard.
+When using multiple shards, pass the same shard count to the computation and
+combination commands. To use rebuilt tables as downstream inputs, pass the
+corresponding input flags listed in that task's method.
 
 ## Shared modules
 
 | Module | Responsibility |
 |---|---|
 | [task_specs.py](../task_specs.py) | Canonical columns, types and names for the 64 token-dependent targets |
-| [tables.py](../tables.py) | Read complete task tables and align unique tile/split keys |
+| [inputs.py](../inputs.py) | Resolve source-tile paths and load manifests with validated tile/split keys |
+| [tables.py](../tables.py) | Read task tables and reject missing, duplicate, or inconsistent join keys |
 | [build_labels.py](../build_labels.py) | Aggregate published tables into labels and collect the 14 X refusal tasks |
 | [qa_lib.py](../qa_lib.py) | Question phrasing, answer rendering and validation |
 | [generate_qa.py](../generate_qa.py) | Generate the three QA splits |
@@ -59,6 +70,11 @@ The summary tool is separate from task algorithms and writes to
 `outputs/summaries/temporal/`. It does not define additional tasks or feed label
 aggregation. Shared table utilities enforce the released 10,000-tile contract;
 task-specific fitting, thresholds and label rules remain in their task groups.
+
+For tasks with train-fitted thresholds or representations, a small sample is
+only a run check. Reproducing the published labels requires the full training
+reference pool described in the method, including when classifying validation
+or test tiles.
 
 ## Task groups
 

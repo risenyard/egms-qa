@@ -22,10 +22,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
+from egms_qa.qa_construction.inputs import read_tile_manifest
 
-ROOT = Path(".")
-VQA_MANIFEST = ROOT / "data/encoder/manifest/split.parquet"
-OUT_DIR = ROOT / "outputs/tasks/c4"
+
+VQA_MANIFEST = DATA_DIR / "encoder/manifest/split.parquet"
+OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/c4"
 
 GRID = 8
 TILE = 7000.0
@@ -247,6 +249,8 @@ def _extent_class(fraction: float, fast_bins: int) -> str:
 def _final_one(row: tuple[str, str, str], threshold: float) -> dict[str, object]:
     tile_id, split, path = row
     values, valid_bins, status = _tile_bin_abs_velocity_p90(path)
+    if status.startswith("read_error:") or status == "shape_mismatch":
+        raise ValueError(f"cannot compute C4 for tile {tile_id}: {path} ({status})")
     if status != "ok" or valid_bins <= 0:
         fast_bins = 0
         fraction = 0.0
@@ -282,7 +286,7 @@ def run_final(args: argparse.Namespace) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     threshold = _resolve_threshold(args)
 
-    manifest = pd.read_parquet(args.manifest)
+    manifest = read_tile_manifest(args.manifest)
     if args.max_tiles:
         manifest = manifest.iloc[: args.max_tiles].copy()
     rows = [(str(r.tile_id), str(r.split), str(r.path)) for r in manifest.itertuples(index=False)]

@@ -16,10 +16,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
+from egms_qa.qa_construction.inputs import read_tile_manifest
 
-ROOT = Path(".")
-MANIFEST = ROOT / "data/encoder/manifest/split.parquet"
-OUT_DIR = ROOT / "outputs/tasks/b2"
+
+MANIFEST = DATA_DIR / "encoder/manifest/split.parquet"
+OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/b2"
 
 
 def _direction_from_tails(p10: float, p90: float) -> str:
@@ -65,7 +67,7 @@ def main() -> None:
     ap.add_argument("--chunksize", type=int, default=32)
     args = ap.parse_args()
 
-    manifest = pd.read_parquet(args.manifest)
+    manifest = read_tile_manifest(args.manifest)
     rows = [(str(r.tile_id), str(r.split), str(r.path)) for r in manifest.itertuples(index=False)]
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
         records = list(ex.map(_read_one, rows, chunksize=args.chunksize))

@@ -5,8 +5,10 @@ import argparse
 import csv
 from pathlib import Path
 
+from egms_qa.paths import OUTPUTS_DIR
 
-OUT_DIR = Path("./outputs/tasks/x1")
+
+OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/x1"
 
 ANSWER_POLICY = (
     "Refuse unsupported inference, state the missing causal/predictive/engineering/economic evidence, "

@@ -26,7 +26,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[test]"
+          python -m pip install -e ".[test,tasks]"
       - name: Test network-free suite
         run: python -m pytest -q -m "not hf_integration"
       - name: Collect HF release integration suite

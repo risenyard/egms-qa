@@ -10,11 +10,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from egms_qa.paths import OUTPUTS_DIR, TASKS_DIR
+from egms_qa.qa_construction.tables import merge_task_tables
 
-ROOT = Path(".")
-B3_TABLE = ROOT / "outputs/tasks/b3/b3_final_table.csv"
-B4_TABLE = ROOT / "outputs/tasks/b4/b4_final_table.csv"
-OUT_DIR = ROOT / "outputs/tasks/b6"
+
+B3_TABLE = TASKS_DIR / "b3/b3_final_table.csv"
+B4_TABLE = TASKS_DIR / "b4/b4_final_table.csv"
+OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/b6"
 
 
 def _monitoring_trigger(row: pd.Series) -> str:
@@ -38,7 +40,7 @@ def main() -> None:
     b4 = pd.read_csv(args.b4_table)[
         ["tile_id", "split", "B42_european_acceleration_typicality"]
     ]
-    df = b3.merge(b4, on=["tile_id", "split"], how="inner", validate="one_to_one")
+    df = merge_task_tables(b3, b4, "B4")
     df["B61_monitoring_trigger"] = df.apply(_monitoring_trigger, axis=1)
 
     out_dir = Path(args.out_dir)

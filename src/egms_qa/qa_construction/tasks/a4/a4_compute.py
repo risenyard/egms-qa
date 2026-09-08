@@ -14,15 +14,16 @@ from collections import Counter
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
+
+from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
+from egms_qa.qa_construction.inputs import load_tile_store
 
 
-ROOT = Path(".")
-ENCODER_DATA = ROOT / "data/encoder"
+ENCODER_DATA = DATA_DIR / "encoder"
 
 MANIFEST = ENCODER_DATA / "manifest/split.parquet"
 DATA_CONFIG = ENCODER_DATA / "manifest/data_config.json"
-OUT_PATH = ROOT / "outputs/tasks/a4/a4_final_table.csv"
+OUT_PATH = OUTPUTS_DIR / "tasks-rebuilt/a4/a4_final_table.csv"
 COL_RMSE = 3
 
 
@@ -44,13 +45,8 @@ def main() -> None:
     ap.add_argument("--log-every", type=int, default=1000)
     args = ap.parse_args()
 
-    from egms_encoder.data.tile_store import TileStore, TimeWindow
-
-    cfg = json.load(open(args.data_config))
-    tw = TimeWindow.from_config(cfg)
-    manifest = pd.read_parquet(args.manifest)
-    split_assignments = dict(zip(manifest["tile_id"].astype(str), manifest["split"].astype(str)))
-    store = TileStore(manifest=manifest, time_window=tw, split_assignments=split_assignments)
+    store = load_tile_store(args.manifest, args.data_config)
+    manifest = store.manifest
 
     out_path = Path(args.out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)

@@ -27,12 +27,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from egms_qa.paths import DATA_DIR, OUTPUTS_DIR, TASKS_DIR
+from egms_qa.qa_construction.inputs import read_tile_manifest
+from egms_qa.qa_construction.tables import merge_task_tables
 
-ROOT = Path(".")
-MANIFEST = ROOT / "data/encoder/manifest/split.parquet"
-DATA_CONFIG = ROOT / "data/encoder/manifest/data_config.json"
-B51_TABLE = ROOT / "outputs/tasks/b5/b5_final_table.csv"
-OUT_DIR = ROOT / "outputs/tasks/d2"
+
+MANIFEST = DATA_DIR / "encoder/manifest/split.parquet"
+DATA_CONFIG = DATA_DIR / "encoder/manifest/data_config.json"
+B51_TABLE = TASKS_DIR / "b5/b5_final_table.csv"
+OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/d2"
 
 YEAR_DAYS = 365.25
 MIN_VALID_EPOCHS = 50
@@ -357,8 +360,8 @@ def _apply_d21_gate(row: object) -> tuple[str, str]:
 def _add_d21_labels(df_full: pd.DataFrame, b51_table: Path = B51_TABLE) -> pd.DataFrame:
     if not b51_table.exists():
         raise FileNotFoundError(f"Missing B51 table: {b51_table}")
-    b51 = pd.read_csv(b51_table)
-    out = df_full.merge(b51, on=["tile_id", "split"], how="left")
+    b51 = pd.read_csv(b51_table)[["tile_id", "split", "B51_seasonality_p90"]]
+    out = merge_task_tables(df_full, b51, "B5", allow_extra=True)
     labels = [_apply_d21_gate(row) for row in out.itertuples(index=False)]
     out["D21_dominant_seasonal_peak"] = [x[0] for x in labels]
     out["D21_gate_reason"] = [x[1] for x in labels]
@@ -437,7 +440,7 @@ def main() -> None:
             raise FileNotFoundError(f"Missing diagnostics for reuse: {detail_path}")
         df_full = pd.read_csv(detail_path)
     else:
-        manifest = pd.read_parquet(args.manifest)
+        manifest = read_tile_manifest(args.manifest)
         if args.limit:
             manifest = manifest.head(args.limit).copy()
         rows = [(str(r.tile_id), str(r.split), str(r.path)) for r in manifest.itertuples(index=False)]

@@ -30,10 +30,11 @@ from sklearn.decomposition import PCA
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler, normalize
 
+from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
 
-ROOT = Path(".")
-DEFAULT_TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
-DEFAULT_OUT_DIR = ROOT / "outputs/tasks/s1"
+
+DEFAULT_TOKEN_CACHE = DATA_DIR / "encoder/tokens/egms_tokens_10k.pt"
+DEFAULT_OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/s1"
 
 PROFILE_MAP = {
     0: {

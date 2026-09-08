@@ -25,10 +25,11 @@ import numpy as np
 import pandas as pd
 import torch
 
+from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
 
-ROOT = Path(".")
-DEFAULT_TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
-DEFAULT_OUT_DIR = ROOT / "outputs/tasks/s4"
+
+DEFAULT_TOKEN_CACHE = DATA_DIR / "encoder/tokens/egms_tokens_10k.pt"
+DEFAULT_OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/s4"
 S41_COL = "S41_encoder_perceived_local_structure_strength"
 S42_COL = "S42_encoder_perceived_local_structure_class"
 S43_COL = "S43_encoder_perceived_local_structure_concentration"

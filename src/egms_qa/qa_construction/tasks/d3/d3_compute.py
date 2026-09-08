@@ -26,10 +26,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
+from egms_qa.qa_construction.inputs import read_tile_manifest
 
-ROOT = Path(".")
-MANIFEST = ROOT / "data/encoder/manifest/split.parquet"
-OUT_DIR = ROOT / "outputs/tasks/d3"
+
+MANIFEST = DATA_DIR / "encoder/manifest/split.parquet"
+OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/d3"
 EPS = 1e-9
 MOTION_SNR_MIN = 1.0
 MIN_VALID_MOTION_POINTS = 100
@@ -280,7 +282,7 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=0)
     args = ap.parse_args()
 
-    manifest = pd.read_parquet(args.manifest)
+    manifest = read_tile_manifest(args.manifest)
     if args.limit:
         manifest = manifest.head(args.limit).copy()
     rows = [(str(r.tile_id), str(r.split), str(r.path)) for r in manifest.itertuples(index=False)]

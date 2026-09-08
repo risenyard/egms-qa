@@ -17,15 +17,19 @@ import pandas as pd
 import torch
 
 from egms_encoder.checkpoint import load_encoder_checkpoint, load_normalization
+from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT
 from egms_qa.paths import (
+    DATA_DIR,
     ENCODER_CKPT,
     ENCODER_CONFIG,
     ENCODER_NORMALIZATION,
     ENCODER_TRAINING_ARGS,
+    OUTPUTS_DIR,
 )
+from egms_qa.qa_construction.inputs import load_tile_store
 
-ROOT = Path(".")
-ENCODER_DATA = ROOT / "data/encoder"
+
+ENCODER_DATA = DATA_DIR / "encoder"
 
 CKPT = ENCODER_CKPT
 MODEL_CONFIG = ENCODER_CONFIG
@@ -33,8 +37,6 @@ NORMALIZATION = ENCODER_NORMALIZATION
 TRAINING_ARGS = ENCODER_TRAINING_ARGS
 MANIFEST = ENCODER_DATA / "manifest/split.parquet"
 DATA_CONFIG = ENCODER_DATA / "manifest/data_config.json"
-
-from egms_encoder.data.tile_store import FEATURE_COLUMNS_COUNT, TileStore  # noqa: E402
 
 
 def stable_seed(text: str) -> int:
@@ -82,7 +84,10 @@ def main() -> None:
     ap.add_argument("--training-args", default=str(TRAINING_ARGS))
     ap.add_argument("--manifest", default=str(MANIFEST))
     ap.add_argument("--data-config", default=str(DATA_CONFIG))
-    ap.add_argument("--out-dir", default="outputs/tasks/a2/work")
+    ap.add_argument(
+        "--out-dir",
+        help="Output shard directory; default: EGMS_QA_OUTPUTS/tasks-rebuilt/a2/work/shards/shard_<index>",
+    )
     ap.add_argument("--sample-tiles", type=int, default=10000)
     ap.add_argument("--num-shards", type=int, default=1)
     ap.add_argument("--shard-index", type=int, default=0)
@@ -90,7 +95,10 @@ def main() -> None:
     ap.add_argument("--log-every", type=int, default=20)
     args = ap.parse_args()
 
-    out_dir = Path(args.out_dir)
+    out_dir = (
+        Path(args.out_dir) if args.out_dir
+        else OUTPUTS_DIR / "tasks-rebuilt/a2/work/shards" / f"shard_{args.shard_index}"
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
     if args.device == "auto":
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -106,7 +114,7 @@ def main() -> None:
     norm_std = float(norm["std"])
     residual_std = float(norm.get("residual_std", 1.0))
 
-    store = TileStore.from_manifest(args.manifest, args.data_config)
+    store = load_tile_store(args.manifest, args.data_config)
     input_length = int(store.time_window.input_length)
     if input_length != int(model_config["input_length"]):
         raise ValueError("data time window does not match encoder config")

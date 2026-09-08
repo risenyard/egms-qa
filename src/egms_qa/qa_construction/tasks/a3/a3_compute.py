@@ -14,10 +14,11 @@ from pathlib import Path
 
 import torch
 
+from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
 
-ROOT = Path(".")
-TOKEN_CACHE = ROOT / "data/encoder/tokens/egms_tokens_10k.pt"
-OUT_PATH = ROOT / "outputs/tasks/a3/a3_final_table.csv"
+
+TOKEN_CACHE = DATA_DIR / "encoder/tokens/egms_tokens_10k.pt"
+OUT_PATH = OUTPUTS_DIR / "tasks-rebuilt/a3/a3_final_table.csv"
 GRID_BINS = 64
 
 

@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 
 YEAR_DAYS = 365.25
 
@@ -64,28 +63,3 @@ class TimeAxis:
                 raise ValueError(f"expected nonempty time_series [N,{self.stored_steps}] in {path}")
             window = series[:, self.t_start:self.t_end].astype(np.float64, copy=False)
         return np.nanmedian(window, axis=0)
-
-
-def read_tile_manifest(path: str | Path, source_tiles_root: str | Path | None = None) -> pd.DataFrame:
-    """Resolve runtime or release-relative paths without changing the manifest."""
-    frame = pd.read_parquet(path)
-    required = {"tile_id", "split", "path"}
-    if not required <= set(frame):
-        raise ValueError(f"manifest is missing {sorted(required - set(frame))}")
-    if frame.empty or frame["tile_id"].duplicated().any():
-        raise ValueError("manifest must contain unique tile IDs and at least one tile")
-    if frame[["tile_id", "split", "path"]].isna().any().any():
-        raise ValueError("manifest keys and paths must not be missing")
-    if not set(frame["split"]) <= {"train", "val", "test"}:
-        raise ValueError("manifest splits must be train, val or test")
-    if source_tiles_root is not None:
-        def resolve(value: str) -> str:
-            tile = Path(value)
-            if tile.is_absolute():
-                return str(tile)
-            if tile.parts[:2] not in {("data", "tiles"), ("artifacts", "source_tiles")}:
-                raise ValueError(f"unrecognized source tile path: {tile}")
-            return str(Path(source_tiles_root).joinpath(*tile.parts[2:]))
-        frame = frame.copy()
-        frame["path"] = frame["path"].map(resolve)
-    return frame

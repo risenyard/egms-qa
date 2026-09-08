@@ -9,6 +9,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from egms_qa.paths import OUTPUTS_DIR
+
 
 CLASS_LABELS = ["reconstructable", "mildly_hard", "high_error", "unreliable"]
 
@@ -100,9 +102,9 @@ def summarize(values: np.ndarray) -> dict[str, float]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base-dir", default="outputs/tasks/a2/work")
-    ap.add_argument("--out-path", default="outputs/tasks/a2/a2_final_table.csv")
-    ap.add_argument("--num-shards", type=int, default=20)
+    ap.add_argument("--base-dir", default=str(OUTPUTS_DIR / "tasks-rebuilt/a2/work"))
+    ap.add_argument("--out-path", default=str(OUTPUTS_DIR / "tasks-rebuilt/a2/a2_final_table.csv"))
+    ap.add_argument("--num-shards", type=int, default=1)
     ap.add_argument("--threshold-pool", default="train", choices=["train", "train_val"])
     ap.add_argument("--keep-work", action="store_true")
     args = ap.parse_args()

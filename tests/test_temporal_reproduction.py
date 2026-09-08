@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from egms_qa.qa_construction.temporal_inputs import TimeAxis, read_tile_manifest
+from egms_qa.qa_construction.temporal_inputs import TimeAxis
+from egms_qa.qa_construction.inputs import read_tile_manifest
 from egms_qa.qa_construction.tasks.d1.d1_compute import classify_tiles, COLUMNS, _configure_axis, _read_one
 from egms_qa.qa_construction.tasks.s3 import s3_compute
 

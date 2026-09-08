@@ -17,7 +17,9 @@ import numpy as np
 import pandas as pd
 
 from egms_qa.paths import DATA_DIR, OUTPUTS_DIR, SPLIT_MANIFEST
-from egms_qa.qa_construction.temporal_inputs import TimeAxis, read_tile_manifest
+from egms_qa.qa_construction.inputs import read_tile_manifest
+from egms_qa.qa_construction.temporal_inputs import TimeAxis
+
 
 PARAMETERS = {
     "period": 1.0, "season": "harmonic", "scp_minmax": [0, 2],

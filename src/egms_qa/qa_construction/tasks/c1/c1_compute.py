@@ -21,10 +21,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
+from egms_qa.qa_construction.inputs import read_tile_manifest
 
-ROOT = Path(".")
-MANIFEST = ROOT / "data/encoder/manifest/split.parquet"
-OUT_DIR = ROOT / "outputs/tasks/c1"
+
+MANIFEST = DATA_DIR / "encoder/manifest/split.parquet"
+OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/c1"
 EPS = 1e-12
 GRID = 8
 TILE = 7000.0
@@ -123,7 +125,7 @@ def main() -> None:
     ap.add_argument("--max-tiles", type=int, default=0)
     args = ap.parse_args()
 
-    manifest = pd.read_parquet(args.manifest)
+    manifest = read_tile_manifest(args.manifest)
     if args.max_tiles:
         manifest = manifest.iloc[: args.max_tiles].copy()
     rows = [(str(r.tile_id), str(r.split), str(r.path)) for r in manifest.itertuples(index=False)]

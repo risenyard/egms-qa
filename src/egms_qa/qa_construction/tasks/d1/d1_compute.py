@@ -5,13 +5,16 @@ import argparse
 from concurrent.futures import ProcessPoolExecutor
 import json
 from pathlib import Path
+
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from egms_qa.paths import DATA_DIR, OUTPUTS_DIR, SPLIT_MANIFEST
-from egms_qa.qa_construction.temporal_inputs import TimeAxis, YEAR_DAYS, read_tile_manifest
+from egms_qa.qa_construction.inputs import read_tile_manifest
+from egms_qa.qa_construction.temporal_inputs import TimeAxis, YEAR_DAYS
+
 
 MIN_VALID_EPOCHS = 200
 EPS = 1e-10

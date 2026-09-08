@@ -11,18 +11,25 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from egms_qa.paths import OUTPUTS_DIR, TASKS_DIR
 
-ROOT = Path(".")
-A1_PATH = ROOT / "outputs/tasks/a1/a1_final_table.csv"
-A2_PATH = ROOT / "outputs/tasks/a2/a2_final_table.csv"
-A3_PATH = ROOT / "outputs/tasks/a3/a3_final_table.csv"
-A4_PATH = ROOT / "outputs/tasks/a4/a4_final_table.csv"
-OUT_PATH = ROOT / "outputs/tasks/a5/a5_final_table.csv"
+
+A1_PATH = TASKS_DIR / "a1/a1_final_table.csv"
+A2_PATH = TASKS_DIR / "a2/a2_final_table.csv"
+A3_PATH = TASKS_DIR / "a3/a3_final_table.csv"
+A4_PATH = TASKS_DIR / "a4/a4_final_table.csv"
+OUT_PATH = OUTPUTS_DIR / "tasks-rebuilt/a5/a5_final_table.csv"
 
 
 def read_by_tile(path: Path) -> dict[str, dict[str, str]]:
     with path.open(newline="") as f:
-        return {row["tile_id"]: row for row in csv.DictReader(f)}
+        rows = list(csv.DictReader(f))
+    if any(not row.get("tile_id") or not row.get("split") for row in rows):
+        raise ValueError(f"{path} has missing tile_id or split values")
+    by_tile = {row["tile_id"]: row for row in rows}
+    if len(by_tile) != len(rows):
+        raise ValueError(f"{path} has duplicate tile_id values")
+    return by_tile
 
 
 def classify(row: dict[str, str]) -> tuple[str, str]:
@@ -76,6 +83,9 @@ def main() -> None:
     tile_ids = sorted(set(a11) & set(a21) & set(a31) & set(a41))
     if len(tile_ids) != len(a11) or len(tile_ids) != len(a21) or len(tile_ids) != len(a31) or len(tile_ids) != len(a41):
         raise ValueError("A11/A21/A31/A41 tile_id sets do not match exactly")
+    for tile_id in tile_ids:
+        if len({table[tile_id]["split"] for table in (a11, a21, a31, a41)}) != 1:
+            raise ValueError(f"A1/A2/A3/A4 split mismatch for tile {tile_id}")
 
     out_path = Path(args.out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)

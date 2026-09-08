@@ -30,15 +30,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from egms_qa.paths import OUTPUTS_DIR, TASKS_DIR
+from egms_qa.qa_construction.tables import merge_task_tables
 
-ROOT = Path(".")
-OUT_DIR = ROOT / "outputs/tasks/d4"
-B3_TABLE = ROOT / "outputs/tasks/b3/b3_final_table.csv"
-B4_TABLE = ROOT / "outputs/tasks/b4/b4_final_table.csv"
-B5_TABLE = ROOT / "outputs/tasks/b5/b5_final_table.csv"
-D1_TABLE = ROOT / "outputs/tasks/d1/d1_final_table.csv"
-D2_TABLE = ROOT / "outputs/tasks/d2/d2_final_table.csv"
-D3_TABLE = ROOT / "outputs/tasks/d3/d3_final_table.csv"
+
+OUT_DIR = OUTPUTS_DIR / "tasks-rebuilt/d4"
+B3_TABLE = TASKS_DIR / "b3/b3_final_table.csv"
+B4_TABLE = TASKS_DIR / "b4/b4_final_table.csv"
+B5_TABLE = TASKS_DIR / "b5/b5_final_table.csv"
+D1_TABLE = TASKS_DIR / "d1/d1_final_table.csv"
+D2_TABLE = TASKS_DIR / "d2/d2_final_table.csv"
+D3_TABLE = TASKS_DIR / "d3/d3_final_table.csv"
 
 QUIET_TOP_RANK_MAX = 0.30
 DOMINANCE_MARGIN_MIN = 0.15
@@ -208,19 +210,14 @@ def main() -> None:
     args = ap.parse_args()
 
     b3 = pd.read_csv(args.b3_table)[["tile_id", "split", BASE_INPUTS["trend"]]]
-    b4 = pd.read_csv(args.b4_table)[["tile_id", BASE_INPUTS["acceleration"]]]
-    b5 = pd.read_csv(args.b5_table)[["tile_id", BASE_INPUTS["seasonal"]]]
-    d1 = pd.read_csv(args.d1_table)[["tile_id", "D11_long_term_trend_shape"]]
-    d2 = pd.read_csv(args.d2_table)[["tile_id", "D21_dominant_seasonal_peak"]]
-    d3 = pd.read_csv(args.d3_table)[["tile_id", "D31_motion_intensification_mm_yr2"]]
-    df = b3.merge(b4, on="tile_id", validate="one_to_one").merge(
-        b5, on="tile_id", validate="one_to_one"
-    )
-    df = (
-        df.merge(d1, on="tile_id", validate="one_to_one")
-        .merge(d2, on="tile_id", validate="one_to_one")
-        .merge(d3, on="tile_id", validate="one_to_one")
-    )
+    b4 = pd.read_csv(args.b4_table)[["tile_id", "split", BASE_INPUTS["acceleration"]]]
+    b5 = pd.read_csv(args.b5_table)[["tile_id", "split", BASE_INPUTS["seasonal"]]]
+    d1 = pd.read_csv(args.d1_table)[["tile_id", "split", "D11_long_term_trend_shape"]]
+    d2 = pd.read_csv(args.d2_table)[["tile_id", "split", "D21_dominant_seasonal_peak"]]
+    d3 = pd.read_csv(args.d3_table)[["tile_id", "split", "D31_motion_intensification_mm_yr2"]]
+    df = b3
+    for name, table in (("B4", b4), ("B5", b5), ("D1", d1), ("D2", d2), ("D3", d3)):
+        df = merge_task_tables(df, table, name)
 
     for process, col in BASE_INPUTS.items():
         df[f"D41_{process}_rank"] = _train_percentile_rank(df[col], df["split"])
