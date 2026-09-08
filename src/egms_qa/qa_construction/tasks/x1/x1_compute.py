@@ -56,7 +56,7 @@ TASKS = [
         "supported_redirect": "Redirect to A51 for usability and deformation severity proxies, not loss: B22/B35/B36/B42 for motion typicality, C42/C51/C52 for spatial extent/priority, and D42 for temporal archetype.",
         "supported_redirect_tasks": "A51|B22|B35|B36|B42|C42|C51|C52|D42",
         "answer_policy": ANSWER_POLICY,
-        "response_template": "Cannot estimate economic loss from the current EGMS/VQA task set. It has no exposure, asset-value, vulnerability, or loss model. I can describe deformation intensity, spatial extent, and monitoring priority where supported.",
+        "response_template": "Cannot estimate economic loss from the current EGMS-QA task set. It has no exposure, asset-value, vulnerability, or loss model. I can describe deformation intensity, spatial extent, and monitoring priority where supported.",
     },
     {
         "task_id": "X15",
