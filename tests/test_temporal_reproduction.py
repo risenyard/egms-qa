@@ -81,18 +81,19 @@ def test_d1_computes_geometry_from_npz_without_intermediate_table(tmp_path):
     assert np.isfinite(result['D13_changepoint_strength'])
 
 
-def test_s3_aligns_frozen_inputs_and_preserves_undefined_posteriors(tmp_path, monkeypatch):
+def test_s3_reads_d1_geometry_and_aligns_an_explicit_table(tmp_path, monkeypatch):
     def family_table(root, family):
         columns = dict(s3_compute.SOURCES)[family]
-        return pd.DataFrame({'tile_id':['a','b'], 'split':['train','test'], **{key:[1.,2.] for key in columns}})
+        return pd.DataFrame({'tile_id':['a','b'], 'split':['train','test'], **{key:[3.,4.] for key in columns}})
     monkeypatch.setattr(s3_compute, 'read_family', family_table)
-    path = tmp_path/'temporal.csv'
+    assert s3_compute.merge_sources(tmp_path)['D12_curvature_strength'].tolist() == [3.,4.]
+    path = tmp_path/'d1.csv'
     inputs = pd.DataFrame({'tile_id':['b','a'],'split':['test','train'],
-                           'S3_trend_order_mean':[1.5,1.0], 'S3_top_changepoint_probability':[0.8,np.nan]})
+                           'D12_curvature_strength':[4.,3.], 'D13_changepoint_strength':[5.,np.nan]})
     inputs.to_csv(path,index=False)
     actual = s3_compute.merge_sources(tmp_path,path)
-    assert actual['S3_trend_order_mean'].tolist() == [1.0,1.5]
-    assert pd.isna(actual.loc[0,'S3_top_changepoint_probability'])
+    assert actual['D12_curvature_strength'].tolist() == [3.,4.]
+    assert pd.isna(actual.loc[0,'D13_changepoint_strength'])
     inputs.loc[0,'split']='val'
     inputs.to_csv(path,index=False)
     with pytest.raises(ValueError, match='index mismatch'):

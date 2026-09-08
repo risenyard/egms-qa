@@ -109,7 +109,7 @@ The release installer exposes these under `outputs/tasks/<group>/`.
 | [D4](d4/d4_algorithm.md) | D41–D42 | Dominant temporal process | [script](d4/d4_compute.py) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d4/d4_final_table.csv) | B3, B4, B5, D1, D2, D3 tables |
 | [S1](s1/s1_algorithm.md) | S11–S15 | Representation anchors | [script](s1/s1_compute.py) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s1/s1_final_table.csv) | Token cache |
 | [S2](s2/s2_algorithm.md) | S21–S22 | Representation isolation | [script](s2/s2_compute.py) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s2/s2_final_table.csv) | Token cache |
-| [S3](s3/s3_algorithm.md) | S31–S33 | Representation–monitoring relation | [script](s3/s3_compute.py) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv) | A4, B3–B5, C1–C4, D2–D3, S2 tables and frozen S3 temporal inputs |
+| [S3](s3/s3_algorithm.md) | S31–S33 | Representation–monitoring relation | [script](s3/s3_compute.py) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv) | A4, B3–B5, C1–C4, D1–D3, S2 reference tables |
 | [S4](s4/s4_algorithm.md) | S41–S43 | Local representation structure | [script](s4/s4_compute.py) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s4/s4_final_table.csv) | Token cache |
 | [X1](x1/x1_algorithm.md) | X11–X15 | Unsupported inference | [script](x1/x1_compute.py) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x1/x1_final_table.csv) | Static refusal catalog |
 | [X2](x2/x2_algorithm.md) | X21–X26 | Unavailable data or scale | [script](x2/x2_compute.py) | [table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x2/x2_final_table.csv) | Static refusal catalog |
@@ -128,15 +128,10 @@ tables needed for that workflow. The [QA guide](../README.md) gives commands
 that write new outputs separately from the downloaded artifacts.
 
 D1 computes the published geometry scores directly from the model-ready NPZ
-tiles and source time axis. S3 reads the frozen posterior estimates in
-`s3/s3_temporal_inputs.csv`, alongside the other released reference tables.
-These inputs define the exact published S3 targets.
-
-The [S3 temporal estimator](s3/s3_temporal_compute.py) provides an optional
-BEAST refit from NPZ tiles. Its Monte Carlo estimates can vary across builds
-and hardware even with fixed tile seeds. A fresh posterior realization is not
-a byte-for-byte replacement for the frozen S3 inputs. See the
-[S3 method](s3/s3_algorithm.md) for the commands and provenance.
+tiles and source time axis. D4 reads its trend-shape label; S3 reads its
+curvature and changepoint strengths alongside the other reference tables.
+See the [D4](d4/d4_algorithm.md) and [S3](s3/s3_algorithm.md) methods for the
+input columns and the `--d1-table` override for a newly computed D1 table.
 
 For other groups, consult the linked method and script for the full input,
 parameter and execution requirements. The index records dependencies; it does

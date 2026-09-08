@@ -156,11 +156,14 @@ new table. Their filenames and options are defined in the linked script;
 they are not part of the published reference-table inventory unless linked
 explicitly above.
 
+Use `--d1-table outputs/tasks-rebuilt/d1/d1_final_table.csv` to supply a
+newly computed D1 table. The D11 value copied into the D4 output is read from
+that file, and D42 is derived from that same value.
+
 ## Results
 
 The following summaries use all 10,000 rows of the
-[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d4/d4_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d4/d4_final_table.csv).
 
 ### D41 label distribution
 
@@ -179,12 +182,20 @@ values. Missing targets are reported separately.
 | `trend_acceleration_mixed` | 1,905 | 19.05% |
 | `seasonal_acceleration_mixed` | 1,463 | 14.63% |
 | `coherent_seasonal_dominated` | 1,429 | 14.29% |
+| `linear_trend_dominated` | 1,420 | 14.20% |
 | `trend_seasonal_mixed` | 1,321 | 13.21% |
 | `low_activity` | 864 | 8.64% |
-| `linear_trend_dominated` | 765 | 7.65% |
 | `intensifying_acceleration_dominated` | 487 | 4.87% |
 | `incoherent_seasonal_dominated` | 396 | 3.96% |
-| `curved_trend_dominated` | 389 | 3.89% |
-| `regime_change_trend_dominated` | 375 | 3.75% |
 | `uncertain_direction_acceleration_dominated` | 316 | 3.16% |
 | `weakening_acceleration_dominated` | 290 | 2.90% |
+| `regime_change_trend_dominated` | 80 | 0.80% |
+| `curved_trend_dominated` | 29 | 0.29% |
+
+Trend-dominated subtypes by split:
+
+| label | train | validation | test |
+|---|---:|---:|---:|
+| `linear_trend_dominated` | 1,147 | 135 | 138 |
+| `curved_trend_dominated` | 28 | 1 | 0 |
+| `regime_change_trend_dominated` | 66 | 8 | 6 |

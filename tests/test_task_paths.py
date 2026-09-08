@@ -40,10 +40,10 @@ for parser in parsers:
             value = str(default)
             if '/encoder/' in value:
                 assert value.startswith(os.environ['EGMS_QA_DATA'] + '/'), (action.dest, value)
-            if '/tasks/' in value or '/tasks-rebuilt/' in value or '/s3-temporal-refit' in value:
+            if '/tasks/' in value or '/tasks-rebuilt/' in value:
                 assert value.startswith(os.environ['EGMS_QA_OUTPUTS'] + '/'), (action.dest, value)
             assert not value.startswith(('data/', 'outputs/', './data/', './outputs/')), (action.dest, value)
-assert len(parsers) == 30, len(parsers)
+assert len(parsers) == 29, len(parsers)
 for parser in parsers:
     for action in actions(parser):
         if action.dest in {'out_dir', 'out_path', 'base_dir'} and action.default is not None:

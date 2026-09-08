@@ -138,30 +138,33 @@ python -m egms_qa.qa_construction.generate_qa \
 
 The label builder checks table identities and splits against the published
 encoder token cache, then aligns label rows to its tile order. The released
-label file remains the canonical input for reproducing model results. The
+label file supplies the targets for the published QA records. The
 optional [temporal summary](temporal_summary.md) combines D1–D4 tables for analysis.
 
-## Recompute D1 and S3
+## Recompute D1, D4, and S3
 
 With the Dataset installed, D1 fits temporal geometry from the NPZ tiles and
 data configuration. Its curvature and changepoint thresholds are fitted on
-the training split. S3 combines the reference tables with the frozen Bayesian
-temporal inputs in `outputs/tasks/s3/s3_temporal_inputs.csv`.
+the training split. S3 uses D1 curvature and changepoint strength alongside
+the other A/B/C/D monitoring indicators. D4 uses D1 trend shape to distinguish
+the trend-dominated evolution archetypes.
 
 ```bash
 pip install -e '.[tasks]'
 python -m egms_qa.qa_construction.tasks.d1.d1_compute \
     --out-dir outputs/tasks-rebuilt/d1 --workers 8
+python -m egms_qa.qa_construction.tasks.d4.d4_compute \
+    --d1-table outputs/tasks-rebuilt/d1/d1_final_table.csv \
+    --out-dir outputs/tasks-rebuilt/d4
 python -m egms_qa.qa_construction.tasks.s3.s3_compute \
+    --d1-table outputs/tasks-rebuilt/d1/d1_final_table.csv \
     --out-dir outputs/tasks-rebuilt/s3
 ```
 
-Both commands write outputs separately from the installed tables. The
-[D1 method](tasks/d1/d1_algorithm.md) and [S3 method](tasks/s3/s3_algorithm.md)
-describe their inputs and formulas. Exact S3 reproduction uses the frozen
-BEAST posterior table supplied in the Dataset. The S3 guide also provides a
-refitting command for new estimates, which can vary across estimator builds
-and hardware.
+These commands write outputs separately from the installed tables. The
+[D1 method](tasks/d1/d1_algorithm.md), [D4 method](tasks/d4/d4_algorithm.md),
+and [S3 method](tasks/s3/s3_algorithm.md) describe their inputs and formulas.
+D4 and S3 both use the D1 file passed in the commands above.
 
 The label-generation examples above use the canonical released tables.
 Consult the task index for other groups' dependencies and reconstruction scope.

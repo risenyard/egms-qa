@@ -29,23 +29,14 @@ A/B/C/D monitoring sentinel scalars:
 - motion axis: `B33_vel_abs_p90_mm_yr`, `B41_acc_abs_p90`, `B51_seasonality_p90`
 - spatial axis: `C11_noise_aware_moving_fraction`, `C21_spatial_concentration_score`,
   `C31_deformation_front_strength_mm_yr`, `C41_fast_tail_bin_fraction`
-- temporal axis: `S3_trend_order_mean`, `S3_top_changepoint_probability`,
+- temporal axis: `D12_curvature_strength`, `D13_changepoint_strength`,
   `D22_phase_coherence`, `D31_motion_intensification_mm_yr2`
 
-The two S3-specific inputs are frozen posterior estimates from
-[BEAST](https://github.com/zhaokg/Rbeast), published in
-[s3_temporal_inputs.csv](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_temporal_inputs.csv) with
-[s3_temporal_inputs_metadata.json](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_temporal_inputs_metadata.json). The first is mean posterior polynomial
-trend order over the observation window. The second is the largest posterior
-probability among candidate trend changepoints. Undefined posterior estimates
-are omitted when taking the temporal-axis maximum.
-
-The estimator fits the tile-median 294-step series with annual harmonic
-seasonality, 0–2 seasonal changepoints, seasonal orders 1–3, 0–3 trend
-changepoints, and trend orders 0–2. It uses 800 MCMC samples, 200 burn-in
-iterations, two chains, and thinning factor 5. Each tile seed is the unsigned
-little-endian integer from a four-byte BLAKE2s digest of its tile ID, modulo
-`2**31 - 1`. Physical time is read from the Dataset data config.
+The temporal axis reads curvature and changepoint strength directly from the
+[D1 reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv).
+The [D1 method](../d1/d1_algorithm.md) computes these geometry scores from the
+same tile-median displacement series. Undefined scores are omitted when taking
+the temporal-axis maximum; the remaining temporal indicators still contribute.
 
 These sentinels are oriented so larger values mean stronger monitoring signal,
 stronger structure, or worse observation quality.
@@ -79,12 +70,12 @@ Use only train tiles to estimate the S31 gap mean and standard deviation:
 
 ```text
 train mean = 0.0000000
-train std  = 35.2308617
+train std  = 35.0091216
 
--1.96 sigma = -69.0524888
--1.00 sigma = -35.2308617
-+1.00 sigma =  35.2308617
-+1.96 sigma =  69.0524888
+-1.96 sigma = -68.6178783
+-1.00 sigma = -35.0091216
++1.00 sigma = 35.0091216
++1.96 sigma = 68.6178783
 ```
 
 Then assign:
@@ -109,7 +100,7 @@ S33 reuses the same monitoring axes used by S31:
 quality_axis  = p(A41)
 motion_axis   = max(p(B33), p(B41), p(B51))
 spatial_axis  = max(p(C11), p(C21), p(C31), p(C41))
-temporal_axis = max(p(S3_trend_order_mean), p(S3_top_changepoint_probability), p(D22), p(D31))
+temporal_axis = max(p(D12), p(D13), p(D22), p(D31))
 
 S33_monitoring_distinctive_dimension
     = argmax(quality_axis, motion_axis, spatial_axis, temporal_axis)
@@ -144,28 +135,14 @@ See the [path conventions](../README.md#paths) for the relationship to Hugging F
 | C2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c2/c2_final_table.csv) | `outputs/tasks/c2/c2_final_table.csv` |
 | C3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) | `outputs/tasks/c3/c3_final_table.csv` |
 | C4 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv) | `outputs/tasks/c4/c4_final_table.csv` |
+| D1 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv) | `outputs/tasks/d1/d1_final_table.csv` |
 | D2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d2/d2_final_table.csv) | `outputs/tasks/d2/d2_final_table.csv` |
 | D3 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv) | `outputs/tasks/d3/d3_final_table.csv` |
 | S2 reference table | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s2/s2_final_table.csv) | `outputs/tasks/s2/s2_final_table.csv` |
-| Frozen temporal input | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_temporal_inputs.csv) | `outputs/tasks/s3/s3_temporal_inputs.csv` |
-| Temporal-input metadata | [HF file](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_temporal_inputs_metadata.json) | `outputs/tasks/s3/s3_temporal_inputs_metadata.json` |
 
-### Optional temporal refit
-
-To refit the Bayesian inputs as a separate experiment:
-
-```bash
-python -m egms_qa.qa_construction.tasks.s3.s3_temporal_compute \
-    --out-dir outputs/s3-temporal-refit --workers 8
-python -m egms_qa.qa_construction.tasks.s3.s3_compute \
-    --temporal-inputs outputs/s3-temporal-refit/s3_temporal_inputs.csv \
-    --out-dir outputs/s3-refit
-```
-
-The refit records the Rbeast version, parameters, tile seed rule, and input-table
-hash. The estimator build used for the frozen inputs was not recorded. Fresh
-MCMC fits can differ across builds and hardware, including under fixed seeds.
-Exact reproduction of the released S3 corpus uses the frozen input table.
+To use a newly computed D1 table, add
+`--d1-table outputs/tasks-rebuilt/d1/d1_final_table.csv`. Other input tables
+continue to come from `--tasks-root` (the installed reference directory by default).
 
 The computation may also write local summaries or diagnostics next to its
 new table. Their filenames and options are defined in the linked script;
@@ -175,30 +152,29 @@ explicitly above.
 ## Results
 
 The following summaries use all 10,000 rows of the
-[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv). Numeric summaries use finite
-values. Missing targets are reported separately.
+[published reference table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv). Numeric summaries use finite values.
 
 ### Numeric targets
 
 | task | defined | missing | p05 | median | p95 |
 |---|---:|---:|---:|---:|---:|
-| S31 | 10,000 | 0 | -58.324 | -0.129937 | 59.8337 |
+| S31 | 10,000 | 0 | -58.1142 | -0.0773437 | 59.2546 |
 
 ### S32 label distribution
 
 | label | count | share |
 |---|---:|---:|
-| `aligned` | 6,706 | 67.06% |
+| `aligned` | 6,686 | 66.86% |
 | `moderate_encoder_excess` | 1,435 | 14.35% |
-| `moderate_monitoring_excess` | 1,348 | 13.48% |
-| `strong_encoder_excess` | 256 | 2.56% |
-| `strong_monitoring_excess` | 255 | 2.55% |
+| `moderate_monitoring_excess` | 1,387 | 13.87% |
+| `strong_encoder_excess` | 250 | 2.50% |
+| `strong_monitoring_excess` | 242 | 2.42% |
 
 ### S33 label distribution
 
 | label | count | share |
 |---|---:|---:|
-| `temporal` | 4,237 | 42.37% |
-| `spatial` | 3,262 | 32.62% |
-| `motion` | 1,545 | 15.45% |
-| `quality` | 956 | 9.56% |
+| `spatial` | 3,871 | 38.71% |
+| `temporal` | 3,461 | 34.61% |
+| `motion` | 1,602 | 16.02% |
+| `quality` | 1,066 | 10.66% |
