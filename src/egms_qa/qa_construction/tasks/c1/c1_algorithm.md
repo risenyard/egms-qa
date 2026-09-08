@@ -10,7 +10,7 @@ C1 describes how many observation points in a tile show motion above the task’
 | C12 | Classification | Converts C11 into four moving-point extent levels using training-split percentiles. |
 | C13 | Grid location | Identifies the cell with the largest mean absolute velocity. Complements C11 with a location, using all eligible cells. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c1/c1_final_table.csv) · [Implementation](c1_compute.py) · [Run and files](../README.md#run-c1)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c1/c1_final_table.csv) · [Implementation](c1_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 The source NPZ files contain `mean_velocity` (mm/yr), `rmse` (mm), and `coords`. The velocity-to-RMSE ratio below is the released motion-screening rule, not a statistical significance test. `eps = 1e-12` prevents division by zero.
 

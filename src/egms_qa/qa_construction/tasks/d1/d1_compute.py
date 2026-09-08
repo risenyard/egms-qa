@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from egms_qa.qa_construction.reference import reference_table
 from egms_qa.paths import DATA_DIR, OUTPUTS_DIR, SPLIT_MANIFEST
 from egms_qa.qa_construction.inputs import read_tile_manifest
 from egms_qa.qa_construction.temporal_inputs import TimeAxis, YEAR_DAYS
@@ -246,8 +247,8 @@ def _month_labels(values: pd.Series, strong: pd.Series) -> tuple[pd.Series, pd.S
     return pd.Series(labels, index=values.index, dtype="string"), pd.Series(indices, index=values.index, dtype="float64")
 
 
-def _bin_labels(values: pd.Series, strong: pd.Series, train: pd.Series, n_bins: int) -> tuple[pd.Series, list[float]]:
-    fit = values[strong & train].dropna().astype(float).to_numpy()
+def _bin_labels(values: pd.Series, strong: pd.Series, train: pd.Series, n_bins: int, reference_fit=None) -> tuple[pd.Series, list[float]]:
+    fit = values[strong & train].dropna().astype(float).to_numpy() if reference_fit is None else reference_fit
     if len(fit) < n_bins * 5:
         out = pd.Series(pd.NA, index=values.index, dtype="string")
         return out, []
@@ -268,17 +269,20 @@ def _bin_labels(values: pd.Series, strong: pd.Series, train: pd.Series, n_bins: 
     return out, serial_edges
 
 
-def classify_tiles(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+def classify_tiles(df: pd.DataFrame, reference: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict]:
     df = df.copy()
     train = df["split"].astype(str).eq("train")
     valid = df["D1_n_valid_epochs"].ge(MIN_VALID_EPOCHS)
     d12 = pd.to_numeric(df["D12_curvature_strength"], errors="coerce")
     d13 = pd.to_numeric(df["D13_changepoint_strength"], errors="coerce")
-    fit_mask = train & valid & d12.notna() & d13.notna()
+    fit = df if reference is None else reference
+    fit_d12 = pd.to_numeric(fit["D12_curvature_strength"], errors="coerce")
+    fit_d13 = pd.to_numeric(fit["D13_changepoint_strength"], errors="coerce")
+    fit_mask = fit["split"].eq("train") & fit["D1_n_valid_epochs"].ge(MIN_VALID_EPOCHS) & fit_d12.notna() & fit_d13.notna()
     if int(fit_mask.sum()) < 100:
         raise RuntimeError("Not enough train rows to fit D1 reference thresholds.")
-    d12_threshold = float(d12[fit_mask].quantile(STRONG_QUANTILE))
-    d13_threshold = float(d13[fit_mask].quantile(STRONG_QUANTILE))
+    d12_threshold = float(fit_d12[fit_mask].quantile(STRONG_QUANTILE))
+    d13_threshold = float(fit_d13[fit_mask].quantile(STRONG_QUANTILE))
     thresholds = {
         "threshold_mode": "train_p85_primitives",
         "d12_strong_quantile": STRONG_QUANTILE,
@@ -310,6 +314,10 @@ def classify_tiles(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         has_break,
         train,
         CP_BINS,
+        reference_fit=None if reference is None else pd.to_numeric(
+            fit.loc[fit["split"].eq("train") & fit["D1_n_valid_epochs"].ge(MIN_VALID_EPOCHS)
+                    & fit_d13.ge(d13_threshold), "D14_candidate_changepoint_time_year"], errors="coerce"
+        ).dropna().to_numpy(dtype=float),
     )
     df["D14_dominant_changepoint_time_bin8"] = bins
 
@@ -331,6 +339,7 @@ def main() -> None:
     parser.add_argument("--source-tiles-root", type=Path)
     parser.add_argument("--out-dir", type=Path, default=OUTPUTS_DIR / "tasks-rebuilt/d1")
     parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument("--reference-state", type=Path)
     args = parser.parse_args()
     if args.workers < 1:
         parser.error("--workers must be positive")
@@ -343,7 +352,7 @@ def main() -> None:
     else:
         with ProcessPoolExecutor(max_workers=args.workers, initializer=_configure_axis, initargs=(axis,)) as executor:
             records = list(executor.map(_read_one, rows, chunksize=8))
-    table, summary = classify_tiles(pd.DataFrame.from_records(records))
+    table, summary = classify_tiles(pd.DataFrame.from_records(records), reference_table(args.reference_state, "d1"))
     args.out_dir.mkdir(parents=True, exist_ok=True)
     table.to_csv(args.out_dir / "d1_final_table.csv", index=False)
     summary["time_axis"] = {"stored_window": [axis.t_start, axis.t_end], "start_year": axis.start_year, "cadence_days": axis.cadence_days}

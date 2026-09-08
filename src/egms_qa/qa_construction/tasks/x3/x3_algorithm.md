@@ -10,7 +10,7 @@ X3 defines answers for unsupported interpretations of encoder vectors. These vec
 | X32 | Refusal | Declines treating similarity in the representation as proof of a real-world cause. |
 | X33 | Refusal | Declines assigning a certain meaning to a vector dimension or model mechanism without attribution evidence. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x3/x3_final_table.csv) · [Implementation](x3_compute.py) · [Run and files](../README.md#run-x3)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x3/x3_final_table.csv) · [Implementation](x3_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

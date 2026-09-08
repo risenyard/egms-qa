@@ -8,7 +8,7 @@ B5 summarizes seasonal strength across the observation points in a tile. It read
 |---|---|---|
 | B51 | Numeric value | 90th percentile of the source point seasonality field. It summarizes seasonal strength; no class is assigned. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b5/b5_final_table.csv) · [Implementation](b5_compute.py) · [Run and files](../README.md#run-b5)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b5/b5_final_table.csv) · [Implementation](b5_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

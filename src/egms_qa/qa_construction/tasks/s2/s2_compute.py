@@ -30,6 +30,7 @@ from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler, normalize
 
+from egms_qa.qa_construction.reference import fit_space, transform_space, load_reference
 from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
 
 
@@ -46,12 +47,7 @@ def load_cls(token_cache: Path) -> tuple[np.ndarray, pd.DataFrame]:
 
 
 def pca25_features(cls: np.ndarray, train_mask: np.ndarray) -> np.ndarray:
-    scaler = StandardScaler()
-    z_train = scaler.fit_transform(cls[train_mask])
-    z_all = scaler.transform(cls)
-    pca = PCA(n_components=25, random_state=0)
-    pca.fit(z_train)
-    return normalize(pca.transform(z_all), norm="l2").astype(np.float32)
+    return transform_space(cls, fit_space(cls, train_mask))
 
 
 def compute_knn_isolation(
@@ -99,8 +95,22 @@ def compute_knn_isolation(
     return pd.DataFrame(rows)
 
 
-def add_s22_rarity(final: pd.DataFrame, train_mask: np.ndarray) -> tuple[pd.DataFrame, dict[str, float]]:
-    train_values = final.loc[train_mask, "S21_local_isolation_score"].to_numpy(dtype=float)
+def reference_isolation(features, meta, reference, k, n_jobs):
+    train = reference["features"]
+    if len(train) <= k:
+        raise ValueError("reference library must contain more than k neighbors")
+    nn = NearestNeighbors(n_neighbors=k + 1, metric="cosine", algorithm="brute", n_jobs=n_jobs).fit(train)
+    distances, indices = nn.kneighbors(features)
+    positions = {str(t): i for i, t in enumerate(reference["tile_ids"])}
+    values = []
+    for tile_id, dist, idx in zip(meta["tile_id"], distances, indices):
+        self_index = positions.get(str(tile_id))
+        values.append(float(np.mean(dist[idx != self_index][:k] if self_index is not None else dist[:k])))
+    return meta.assign(S21_local_isolation_score=values)
+
+
+def add_s22_rarity(final: pd.DataFrame, train_mask: np.ndarray, reference_values=None) -> tuple[pd.DataFrame, dict[str, float]]:
+    train_values = final.loc[train_mask, "S21_local_isolation_score"].to_numpy(dtype=float) if reference_values is None else np.asarray(reference_values)
     p75, p95, p99 = np.quantile(train_values, [0.75, 0.95, 0.99])
     values = final["S21_local_isolation_score"].to_numpy(dtype=float)
     labels = np.full(len(final), "common", dtype=object)
@@ -117,11 +127,11 @@ def add_s22_rarity(final: pd.DataFrame, train_mask: np.ndarray) -> tuple[pd.Data
     return out, thresholds
 
 
-def summarize(final: pd.DataFrame, train_mask: np.ndarray, out_dir: Path, k: int) -> None:
+def summarize(final: pd.DataFrame, train_mask: np.ndarray, out_dir: Path, k: int, reference_values=None) -> None:
     values = final["S21_local_isolation_score"].to_numpy(dtype=float)
-    train_values = values[train_mask]
+    train_values = values[train_mask] if reference_values is None else np.asarray(reference_values)
     quantiles = [0.01, 0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99]
-    _, s22_thresholds = add_s22_rarity(final[["tile_id", "split", "S21_local_isolation_score"]], train_mask)
+    _, s22_thresholds = add_s22_rarity(final[["tile_id", "split", "S21_local_isolation_score"]], train_mask, reference_values)
     s22_counts = (
         final["S22_representation_rarity_class"]
         .value_counts()
@@ -136,6 +146,8 @@ def summarize(final: pd.DataFrame, train_mask: np.ndarray, out_dir: Path, k: int
         "computed_tasks": ["S21_local_isolation_score", "S22_representation_rarity_class"],
         "n_tiles": int(len(final)),
         "train_tiles": int(train_mask.sum()),
+        "reference_train_tiles": len(train_values),
+        "uses_frozen_reference": reference_values is not None,
         "algorithm": "train-only StandardScaler + PCA25 + L2 summary-token features; S21 = mean cosine distance to nearest k train neighbors, excluding self for train queries",
         "k": int(k),
         "s22_algorithm": "train-only p75/p95/p99 thresholds on S21; corpus-relative rarity tail labels",
@@ -169,15 +181,25 @@ def summarize(final: pd.DataFrame, train_mask: np.ndarray, out_dir: Path, k: int
     plt.close(fig)
 
 
-def build_outputs(token_cache: Path, out_dir: Path, k: int, n_jobs: int) -> None:
+def build_outputs(token_cache: Path, out_dir: Path, k: int, n_jobs: int, reference_state: Path | None = None) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     cls, meta = load_cls(token_cache)
     train_mask = meta["split"].astype(str).to_numpy() == "train"
-    x_all = pca25_features(cls, train_mask)
-    final = compute_knn_isolation(x_all, meta, train_mask, k=k, n_jobs=n_jobs)
-    final, _ = add_s22_rarity(final, train_mask)
+    reference_values = None
+    if reference_state is None:
+        x_all = pca25_features(cls, train_mask)
+        final = compute_knn_isolation(x_all, meta, train_mask, k=k, n_jobs=n_jobs)
+    else:
+        if k != 20:
+            raise ValueError("the frozen reference uses k=20")
+        reference = load_reference(reference_state)
+        x_all = transform_space(cls, reference["space"])
+        final = reference_isolation(x_all, meta, reference["s2"], k, n_jobs)
+        table = reference["tables"]["s2"]
+        reference_values = table.loc[table["split"].eq("train"), "S21_local_isolation_score"].to_numpy(dtype=float)
+    final, _ = add_s22_rarity(final, train_mask, reference_values)
     final.to_csv(out_dir / "s2_final_table.csv", index=False)
-    summarize(final, train_mask, out_dir, k=k)
+    summarize(final, train_mask, out_dir, k=k, reference_values=reference_values)
 
 
 def main() -> None:
@@ -186,8 +208,9 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--k", type=int, default=20)
     parser.add_argument("--n-jobs", type=int, default=8)
+    parser.add_argument("--reference-state", type=Path)
     args = parser.parse_args()
-    build_outputs(args.token_cache, args.out_dir, k=args.k, n_jobs=args.n_jobs)
+    build_outputs(args.token_cache, args.out_dir, k=args.k, n_jobs=args.n_jobs, reference_state=args.reference_state)
 
 
 if __name__ == "__main__":

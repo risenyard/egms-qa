@@ -12,7 +12,7 @@ X1 defines answers for questions whose requested conclusions cannot be establish
 | X14 | Refusal | Declines estimates of economic loss, insurance impact, asset-value loss, or compensation. |
 | X15 | Refusal | Declines prescriptions for engineering work, evacuation, repair, or operational action. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x1/x1_final_table.csv) · [Implementation](x1_compute.py) · [Run and files](../README.md#run-x1)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x1/x1_final_table.csv) · [Implementation](x1_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

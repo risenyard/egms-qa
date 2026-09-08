@@ -12,7 +12,7 @@ D3 describes whether motion is speeding up or slowing down across the observatio
 | D34 | Numeric value (mm/yr²) | Largest cell mean absolute intensification, using the same valid moving points as D31. |
 | D35 | Grid location | Identifies the cell that supplies the D34 hotspot strength. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv) · [Implementation](d3_compute.py) · [Run and files](../README.md#run-d3)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d3/d3_final_table.csv) · [Implementation](d3_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

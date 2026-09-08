@@ -9,7 +9,7 @@ B1 checks whether mean downward motion in a tile is large relative to its report
 | B11 | Numeric score | Mean downward velocity divided by median point RMSE. Larger positive values indicate stronger subsidence relative to this noise measure. |
 | B12 | Yes/no classification | Reports clear subsidence when B11 is at least 1; otherwise reports no clear subsidence. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b1/b1_final_table.csv) · [Implementation](b1_compute.py) · [Run and files](../README.md#run-b1)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b1/b1_final_table.csv) · [Implementation](b1_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 The input arrays `mean_velocity` (mm/yr) and `rmse` (mm) are read from each source NPZ tile. The split manifest identifies these files. The released score is a velocity-to-RMSE screening ratio, not a statistical significance test; `eps = 1e-12` prevents division by zero.
 

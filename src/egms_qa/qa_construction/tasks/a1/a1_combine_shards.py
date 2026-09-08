@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from egms_qa.qa_construction.reference import reference_table
 from egms_qa.paths import OUTPUTS_DIR
 
 CLASS_LABELS = ["stable", "mildly_sensitive", "highly_sensitive", "extreme"]
@@ -23,13 +24,14 @@ def threshold_mask(tile: pd.DataFrame, threshold_pool: str) -> pd.Series:
     raise ValueError(f"unknown threshold_pool={threshold_pool!r}")
 
 
-def add_tail_strata(tile: pd.DataFrame, threshold_pool: str) -> tuple[pd.DataFrame, dict]:
+def add_tail_strata(tile: pd.DataFrame, threshold_pool: str, reference: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict]:
     tile = tile.copy()
     drift = tile["A11_global_angular_drift"].astype(float)
-    pool = threshold_mask(tile, threshold_pool)
+    fit = tile if reference is None else reference
+    pool = threshold_mask(fit, threshold_pool)
     if not pool.any():
         raise ValueError(f"threshold pool {threshold_pool!r} has no rows")
-    threshold_drift = drift[pool]
+    threshold_drift = fit.loc[pool, "A11_global_angular_drift"].astype(float)
     q75, q95, q99 = [float(threshold_drift.quantile(q)) for q in (0.75, 0.95, 0.99)]
     tile["A11_global_drift_deg"] = drift * 180.0
     tile["A12_representation_stability_class"] = pd.cut(
@@ -84,6 +86,7 @@ def main() -> None:
     ap.add_argument("--num-shards", type=int, default=1)
     ap.add_argument("--threshold-pool", default="train", choices=["train", "train_val"])
     ap.add_argument("--keep-work", action="store_true")
+    ap.add_argument("--reference-state", type=Path)
     args = ap.parse_args()
 
     base = Path(args.base_dir)
@@ -100,7 +103,7 @@ def main() -> None:
     if tile["tile_id"].duplicated().any():
         dup = tile.loc[tile["tile_id"].duplicated(), "tile_id"].head().tolist()
         raise ValueError(f"duplicate tile ids in combined output, examples={dup}")
-    tile, class_summary = add_tail_strata(tile, args.threshold_pool)
+    tile, class_summary = add_tail_strata(tile, args.threshold_pool, reference_table(args.reference_state, "a1"))
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tile.to_csv(out_path, index=False)

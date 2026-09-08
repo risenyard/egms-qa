@@ -13,7 +13,7 @@ X2 defines answers for questions requiring unavailable data or a finer scope tha
 | X25 | Refusal | Declines claims about live conditions or times outside the observation window. |
 | X26 | Refusal | Declines rankings such as “worst” or “most severe” without a defined comparison population. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x2/x2_final_table.csv) · [Implementation](x2_compute.py) · [Run and files](../README.md#run-x2)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/x2/x2_final_table.csv) · [Implementation](x2_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

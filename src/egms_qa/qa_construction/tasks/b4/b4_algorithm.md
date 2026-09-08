@@ -9,7 +9,7 @@ B4 summarizes strong acceleration across the observation points in a tile. Accel
 | B41 | Numeric value (mm/yr²) | 90th percentile of absolute point acceleration: the stronger end of changes in velocity. |
 | B42 | Classification | Places B41 in five levels relative to the European candidate-pool distribution. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b4/b4_final_table.csv) · [Implementation](b4_compute.py) · [Run and files](../README.md#run-b4)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b4/b4_final_table.csv) · [Implementation](b4_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

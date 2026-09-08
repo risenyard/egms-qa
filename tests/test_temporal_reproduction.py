@@ -82,7 +82,8 @@ def test_d1_computes_geometry_from_npz_without_intermediate_table(tmp_path):
 
 
 def test_s3_reads_d1_geometry_and_aligns_an_explicit_table(tmp_path, monkeypatch):
-    def family_table(root, family):
+    def family_table(root, family, expected_rows=None):
+        assert expected_rows is None
         columns = dict(s3_compute.SOURCES)[family]
         return pd.DataFrame({'tile_id':['a','b'], 'split':['train','test'], **{key:[3.,4.] for key in columns}})
     monkeypatch.setattr(s3_compute, 'read_family', family_table)

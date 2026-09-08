@@ -12,7 +12,7 @@ S1 compares each tile’s encoder summary vector with six reference anchors lear
 | S14 | Classification | Combines S12 distance and S13 margin into strong, weak/transition, or far/ambiguous anchor support. |
 | S15 | Profile description | Provides the fixed text description of the S11 anchor profile; it is not a separate measurement. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s1/s1_final_table.csv) · [Implementation](s1_compute.py) · [Run and files](../README.md#run-s1)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s1/s1_final_table.csv) · [Implementation](s1_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

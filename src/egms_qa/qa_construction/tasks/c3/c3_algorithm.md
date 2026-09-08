@@ -10,7 +10,7 @@ C3 looks for sharp changes in mean vertical velocity between neighboring cells i
 | C32 | Grid-pair location | Locates the largest neighboring-cell contrast among the pairs used for C31. |
 | C33 | Classification | Converts C31 into four front-strength levels using training-split percentiles. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) · [Implementation](c3_compute.py) · [Run and files](../README.md#run-c3)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c3/c3_final_table.csv) · [Implementation](c3_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

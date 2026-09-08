@@ -9,7 +9,7 @@ S2 measures how isolated a tile’s encoder summary vector is from nearby traini
 | S21 | Numeric distance | Mean cosine distance to the 20 nearest training tiles after reducing the representation to 25 features. Larger values mean greater isolation. |
 | S22 | Classification | Converts S21 into common, unusual, rare, or extreme using training-split percentiles. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s2/s2_final_table.csv) · [Implementation](s2_compute.py) · [Run and files](../README.md#run-s2)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s2/s2_final_table.csv) · [Implementation](s2_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

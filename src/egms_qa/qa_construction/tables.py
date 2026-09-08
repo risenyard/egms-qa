@@ -36,7 +36,7 @@ def merge_task_tables(
     return base.merge(other, on=keys, how="left", validate="one_to_one", suffixes=(False, False))
 
 
-def read_family(root: Path, family: str) -> pd.DataFrame:
+def read_family(root: Path, family: str, expected_rows: int | None = 10000) -> pd.DataFrame:
     path = root / family / f"{family}_final_table.csv"
     if not path.exists():
         raise FileNotFoundError(path)
@@ -46,8 +46,8 @@ def read_family(root: Path, family: str) -> pd.DataFrame:
     if df["tile_id"].duplicated().any():
         dupes = df.loc[df["tile_id"].duplicated(), "tile_id"].head().tolist()
         raise ValueError(f"{path} has duplicate tile_id values: {dupes}")
-    if len(df) != 10000:
-        raise ValueError(f"{path} expected 10000 rows, found {len(df)}")
+    if expected_rows is not None and len(df) != expected_rows:
+        raise ValueError(f"{path} expected {expected_rows} rows, found {len(df)}")
     return df
 
 

@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from egms_qa.qa_construction.reference import reference_table
 from egms_qa.paths import OUTPUTS_DIR
 
 
@@ -24,14 +25,15 @@ def threshold_mask(table: pd.DataFrame, threshold_pool: str) -> pd.Series:
     raise ValueError(f"unknown threshold_pool={threshold_pool!r}")
 
 
-def add_tail_classes(table: pd.DataFrame, threshold_pool: str) -> tuple[pd.DataFrame, dict]:
+def add_tail_classes(table: pd.DataFrame, threshold_pool: str, reference: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict]:
     table = table.copy()
     score = table["A21_masked_global_mse_z"].astype(float)
-    pool = threshold_mask(table, threshold_pool)
+    fit = table if reference is None else reference
+    pool = threshold_mask(fit, threshold_pool)
     if not pool.any():
         raise ValueError(f"threshold pool {threshold_pool!r} has no rows")
-    threshold_score = score[pool]
-    threshold_rmse_mm = table.loc[pool, "A21_masked_global_rmse_mm"].astype(float)
+    threshold_score = fit.loc[pool, "A21_masked_global_mse_z"].astype(float)
+    threshold_rmse_mm = fit.loc[pool, "A21_masked_global_rmse_mm"].astype(float)
     q75, q95, q99 = [float(threshold_score.quantile(q)) for q in (0.75, 0.95, 0.99)]
     r75, r95, r99 = [float(threshold_rmse_mm.quantile(q)) for q in (0.75, 0.95, 0.99)]
     table["A22_reconstruction_reliability_class"] = pd.cut(
@@ -107,6 +109,7 @@ def main() -> None:
     ap.add_argument("--num-shards", type=int, default=1)
     ap.add_argument("--threshold-pool", default="train", choices=["train", "train_val"])
     ap.add_argument("--keep-work", action="store_true")
+    ap.add_argument("--reference-state", type=Path)
     args = ap.parse_args()
 
     base = Path(args.base_dir)
@@ -126,7 +129,7 @@ def main() -> None:
     if table["tile_id"].duplicated().any():
         dup = table.loc[table["tile_id"].duplicated(), "tile_id"].head().tolist()
         raise ValueError(f"duplicate tile ids in combined output, examples={dup}")
-    table, class_summary = add_tail_classes(table, args.threshold_pool)
+    table, class_summary = add_tail_classes(table, args.threshold_pool, reference_table(args.reference_state, "a2"))
 
     out_path = Path(args.out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)

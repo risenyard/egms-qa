@@ -30,6 +30,7 @@ from sklearn.decomposition import PCA
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler, normalize
 
+from egms_qa.qa_construction.reference import fit_space, transform_space, load_reference
 from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
 
 
@@ -72,12 +73,7 @@ def load_cls(token_cache: Path) -> tuple[np.ndarray, pd.DataFrame]:
 
 
 def pca25_features(cls: np.ndarray, train_mask: np.ndarray) -> np.ndarray:
-    scaler = StandardScaler()
-    z_train = scaler.fit_transform(cls[train_mask])
-    z_all = scaler.transform(cls)
-    pca = PCA(n_components=25, random_state=0)
-    pca.fit(z_train)
-    return normalize(pca.transform(z_all), norm="l2").astype(np.float32)
+    return transform_space(cls, fit_space(cls, train_mask))
 
 
 def cosine_distance_to_anchors(x: np.ndarray, anchors: np.ndarray) -> np.ndarray:
@@ -178,14 +174,12 @@ def fit_gmm_bic(x: np.ndarray, max_components: int = 6) -> tuple[GaussianMixture
     return models[int(metrics["bic"].idxmin())], metrics
 
 
-def gmm2d_status(assignments: pd.DataFrame, train_mask: np.ndarray) -> tuple[np.ndarray, pd.DataFrame, pd.DataFrame]:
+def fit_status_reference(assignments: pd.DataFrame, train_mask: np.ndarray) -> dict:
     raw = assignments[["S12_reference_anchor_distance", "S13_reference_anchor_margin"]].to_numpy(dtype=float)
     scaler = StandardScaler().fit(raw[train_mask])
     train_z = scaler.transform(raw[train_mask])
-    all_z = scaler.transform(raw)
     model, bic = fit_gmm_bic(train_z, max_components=6)
     train_comp = model.predict(train_z)
-    all_comp = model.predict(all_z)
 
     rows = []
     train_raw = raw[train_mask]
@@ -216,18 +210,30 @@ def gmm2d_status(assignments: pd.DataFrame, train_mask: np.ndarray) -> tuple[np.
     labels[low_margin_comp] = "far_or_ambiguous_from_reference_anchors"
 
     comp_df["S14_reference_assignment_status"] = comp_df["component"].astype(int).map(labels)
-    status = np.asarray([labels[int(comp)] for comp in all_comp], dtype=object)
-    return status, comp_df, bic
+    return {"scaler": scaler, "model": model, "labels": labels, "components": comp_df, "bic": bic}
 
 
-def build_outputs(token_cache: Path, out_dir: Path) -> None:
+def gmm2d_status(assignments: pd.DataFrame, train_mask: np.ndarray, reference: dict | None = None):
+    state = fit_status_reference(assignments, train_mask) if reference is None else reference
+    raw = assignments[["S12_reference_anchor_distance", "S13_reference_anchor_margin"]].to_numpy(dtype=float)
+    components = state["model"].predict(state["scaler"].transform(raw))
+    status = np.asarray([state["labels"][int(c)] for c in components], dtype=object)
+    return status, state["components"], state["bic"]
+
+
+def build_outputs(token_cache: Path, out_dir: Path, reference_state: Path | None = None) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     cls, meta = load_cls(token_cache)
     train_mask = meta["split"].astype(str).to_numpy() == "train"
-    x_all = pca25_features(cls, train_mask)
-    anchors, anchor_details, _ = fit_reference_anchors(x_all, train_mask, meta["tile_id"])
+    reference = None if reference_state is None else load_reference(reference_state)
+    if reference is None:
+        x_all = pca25_features(cls, train_mask)
+        anchors, anchor_details, _ = fit_reference_anchors(x_all, train_mask, meta["tile_id"])
+    else:
+        x_all = transform_space(cls, reference["space"])
+        anchors, anchor_details = reference["s1"]["anchors"], reference["s1"]["details"]
     assignments = assign_all(x_all, anchors, anchor_details)
-    status, gmm_components, gmm_bic = gmm2d_status(assignments, train_mask)
+    status, gmm_components, gmm_bic = gmm2d_status(assignments, train_mask, None if reference is None else reference["s1"]["status"])
 
     profile = assignments["reference_anchor_id"].map(lambda x: PROFILE_MAP[int(x)]["profile"])
     description = assignments["reference_anchor_id"].map(lambda x: PROFILE_MAP[int(x)]["description"])
@@ -275,6 +281,8 @@ def build_outputs(token_cache: Path, out_dir: Path) -> None:
         "token_cache": str(token_cache),
         "n_tiles": int(len(final)),
         "train_tiles": int(train_mask.sum()),
+        "reference_train_tiles": int(train_mask.sum()) if reference is None else reference["reference_train_tiles"],
+        "reference_state": str(reference_state) if reference_state else None,
         "selected_algorithm": "StandardScaler(train) + PCA25(train) + L2 + HDBSCAN(min_cluster_size=50,min_samples=80) on train summary tokens",
         "s14_algorithm": "train-only 2D GaussianMixture over [S12 distance, S13 margin], BIC-selected k=6, merged into three states",
         "status_counts": status_counts.to_dict(orient="records"),
@@ -315,8 +323,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--token-cache", type=Path, default=DEFAULT_TOKEN_CACHE)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    parser.add_argument("--reference-state", type=Path)
     args = parser.parse_args()
-    build_outputs(args.token_cache, args.out_dir)
+    build_outputs(args.token_cache, args.out_dir, args.reference_state)
 
 
 if __name__ == "__main__":

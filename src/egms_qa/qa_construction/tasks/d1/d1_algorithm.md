@@ -11,7 +11,7 @@ D1 describes the shape of a tile’s displacement history. At each observation t
 | D13 | Numeric score | Measures how much a change in slope improves on a linear fit, accounting for the size of that change. |
 | D14 | Numeric time (year) | Reports the D13 breakpoint time as a fractional year, only when D13 meets the strong-change criterion. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv) · [Implementation](d1_compute.py) · [Run and files](../README.md#run-d1)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d1/d1_final_table.csv) · [Implementation](d1_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 For each tile, read the stored model-ready EGMS displacement interval `[0,294)`
 and take the median displacement over all points at each epoch. This stored

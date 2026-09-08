@@ -9,7 +9,7 @@ B2 describes average vertical motion across the observation points in a tile. It
 | B21 | Numeric value (mm/yr) | Mean point velocity. Negative values indicate subsidence; positive values indicate uplift. |
 | B22 | Classification | Converts B21 into a corpus-relative subsidence band, with a separate uplift label when the upper velocity tail dominates. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b2/b2_final_table.csv) · [Implementation](b2_compute.py) · [Run and files](../README.md#run-b2)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b2/b2_final_table.csv) · [Implementation](b2_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 The subsidence-band cutoffs are corpus-relative quantiles from the European candidate pool. The uplift rule is calculated directly from the same tile’s velocity percentiles, so B2 does not need a B3 input table.
 

@@ -9,7 +9,7 @@ D4 combines existing motion indicators into a dominant temporal process and a mo
 | D41 | Combined classification | Compares training-reference ranks of velocity, seasonality, and acceleration strength to name the dominant process, mixed activity, or low activity. |
 | D42 | Combined classification | Adds trend shape, seasonal agreement, intensification direction, or the leading process pair to the D41 result. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d4/d4_final_table.csv) · [Implementation](d4_compute.py) · [Run and files](../README.md#run-d4)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d4/d4_final_table.csv) · [Implementation](d4_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

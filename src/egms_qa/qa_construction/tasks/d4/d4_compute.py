@@ -30,6 +30,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from egms_qa.qa_construction.reference import reference_table
 from egms_qa.paths import OUTPUTS_DIR, TASKS_DIR
 from egms_qa.qa_construction.tables import merge_task_tables
 
@@ -131,10 +132,11 @@ def _d42_archetype(row: pd.Series) -> str:
     return "unknown"
 
 
-def _train_percentile_rank(values: pd.Series, split: pd.Series) -> np.ndarray:
+def _train_percentile_rank(values: pd.Series, split: pd.Series, reference_values=None) -> np.ndarray:
     arr = pd.to_numeric(values, errors="coerce").to_numpy(dtype=np.float64)
     split_arr = split.astype(str).to_numpy()
-    train = np.sort(arr[(split_arr == "train") & np.isfinite(arr)])
+    fit = arr[(split_arr == "train") & np.isfinite(arr)] if reference_values is None else np.asarray(reference_values, dtype=float)
+    train = np.sort(fit[np.isfinite(fit)])
     if train.size == 0:
         raise ValueError(f"no finite train rows for {values.name}")
     out = np.full(arr.shape, np.nan, dtype=np.float64)
@@ -207,6 +209,7 @@ def main() -> None:
     ap.add_argument("--d2-table", default=str(D2_TABLE))
     ap.add_argument("--d3-table", default=str(D3_TABLE))
     ap.add_argument("--out-dir", default=str(OUT_DIR))
+    ap.add_argument("--reference-state", type=Path)
     args = ap.parse_args()
 
     b3 = pd.read_csv(args.b3_table)[["tile_id", "split", BASE_INPUTS["trend"]]]
@@ -219,8 +222,10 @@ def main() -> None:
     for name, table in (("B4", b4), ("B5", b5), ("D1", d1), ("D2", d2), ("D3", d3)):
         df = merge_task_tables(df, table, name)
 
+    reference = reference_table(args.reference_state, "d4")
     for process, col in BASE_INPUTS.items():
-        df[f"D41_{process}_rank"] = _train_percentile_rank(df[col], df["split"])
+        ref_values = None if reference is None else reference.loc[reference["split"].eq("train"), col]
+        df[f"D41_{process}_rank"] = _train_percentile_rank(df[col], df["split"], ref_values)
 
     rank_cols = [f"D41_{process}_rank" for process in BASE_INPUTS]
     ranks = df[rank_cols].to_numpy(dtype=np.float64)
@@ -283,9 +288,10 @@ def main() -> None:
         "n_tiles": int(len(final)),
         "tasks": ["D41_temporal_dominant_process", "D42_temporal_evolution_archetype"],
         "base_inputs": BASE_INPUTS,
-        "rank_method": "train-split empirical percentile rank applied to all 10k tiles",
+        "rank_method": "reference-training empirical percentile rank applied to target tiles",
         "rank_fit_split": "train",
-        "rank_fit_n": int(df["split"].astype(str).eq("train").sum()),
+        "rank_fit_n": int((df if reference is None else reference)["split"].eq("train").sum()),
+        "reference_state": str(args.reference_state) if args.reference_state else None,
         "D41_rule": {
             "low_activity": f"D41_top_rank < {QUIET_TOP_RANK_MAX}",
             "dominant": f"D41_dominance_margin >= {DOMINANCE_MARGIN_MIN}",

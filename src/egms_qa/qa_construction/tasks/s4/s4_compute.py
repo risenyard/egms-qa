@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+from egms_qa.qa_construction.reference import reference_table
 from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
 
 
@@ -108,8 +109,9 @@ def compute_s41_s43(
     return pd.DataFrame(rows), pd.DataFrame(diagnostics)
 
 
-def add_s42(final: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
-    train_values = final.loc[final["split"].astype(str) == "train", S41_COL].to_numpy(dtype=np.float64)
+def add_s42(final: pd.DataFrame, reference: pd.DataFrame | None = None) -> tuple[pd.DataFrame, dict[str, float]]:
+    fit = final if reference is None else reference
+    train_values = fit.loc[fit["split"].astype(str) == "train", S41_COL].to_numpy(dtype=np.float64)
     p50, p90, p95 = np.quantile(train_values, [0.50, 0.90, 0.95])
     values = final[S41_COL].to_numpy(dtype=np.float64)
     labels = np.full(len(final), "spatially_coherent", dtype=object)
@@ -226,11 +228,11 @@ def plot_distribution(final: pd.DataFrame, diagnostics: pd.DataFrame, out_dir: P
     plt.close(fig)
 
 
-def build_outputs(token_cache: Path, out_dir: Path) -> None:
+def build_outputs(token_cache: Path, out_dir: Path, reference_state: Path | None = None) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     tokens, token_mask, meta = load_tokens(token_cache)
     final, diagnostics = compute_s41_s43(tokens, token_mask, meta)
-    final, s42_thresholds = add_s42(final)
+    final, s42_thresholds = add_s42(final, reference_table(reference_state, "s4"))
     final = final[["tile_id", "split", S41_COL, S42_COL, S43_COL]]
     final.to_csv(out_dir / "s4_final_table.csv", index=False)
     summarize(final, diagnostics, out_dir, token_cache, s42_thresholds)
@@ -241,8 +243,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--token-cache", type=Path, default=DEFAULT_TOKEN_CACHE)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    parser.add_argument("--reference-state", type=Path)
     args = parser.parse_args()
-    build_outputs(args.token_cache, args.out_dir)
+    build_outputs(args.token_cache, args.out_dir, args.reference_state)
 
 
 if __name__ == "__main__":

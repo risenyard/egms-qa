@@ -9,7 +9,7 @@ A1 checks whether removing most observation points changes the encoder’s repre
 | A11 | Numeric score | Average change in the whole-tile representation after keeping only 20% of its points. Smaller values mean greater stability. |
 | A12 | Classification | Groups A11 into four stability levels using percentiles fitted on the training split. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a1/a1_final_table.csv) · [Implementation](a1_compute.py) · [Run and files](../README.md#run-a1)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a1/a1_final_table.csv) · [Implementation](a1_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

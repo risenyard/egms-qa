@@ -11,7 +11,7 @@ D2 describes when annual displacement cycles peak, how closely the point peak ti
 | D23 | Numeric value (days) | Measures the spread of annual peak timing using the same point phases as D21 and D22, with low-amplitude points filtered. |
 | D24 | Numeric value (mm) | Median change in annual amplitude from the early half to the late half of the observation window; positive means stronger seasonality. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d2/d2_final_table.csv) · [Implementation](d2_compute.py) · [Run and files](../README.md#run-d2)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/d2/d2_final_table.csv) · [Implementation](d2_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 For each tile, read the stored model-ready displacement
 `time_series[:, 0:294]`. The data config records that this is identical to

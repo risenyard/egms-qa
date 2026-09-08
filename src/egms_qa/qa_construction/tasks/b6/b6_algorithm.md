@@ -8,7 +8,7 @@ B6 combines two existing classifications: [B36 velocity typicality](../b3/b3_alg
 |---|---|---|
 | B61 | Yes/no classification | Triggers monitoring when either the velocity or acceleration reference class is extreme. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b6/b6_final_table.csv) · [Implementation](b6_compute.py) · [Run and files](../README.md#run-b6)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b6/b6_final_table.csv) · [Implementation](b6_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

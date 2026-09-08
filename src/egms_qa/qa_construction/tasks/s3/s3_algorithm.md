@@ -10,7 +10,7 @@ S3 compares two kinds of rarity: isolation of the encoder representation and unu
 | S32 | Classification | Converts S31 into aligned, monitoring-excess, or encoder-excess levels using the training mean and standard deviation. |
 | S33 | Explanation category | Names the strongest monitoring dimension used in S31: quality, motion, spatial, or temporal. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv) · [Implementation](s3_compute.py) · [Run and files](../README.md#run-s3)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s3/s3_final_table.csv) · [Implementation](s3_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 The monitoring inputs are grouped into four dimensions. A percentile rank
 places a value within the training distribution; this task uses a 0–99 scale.

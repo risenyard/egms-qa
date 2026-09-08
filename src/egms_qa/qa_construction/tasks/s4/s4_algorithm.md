@@ -10,7 +10,7 @@ S4 measures variation among the encoder vectors for a tile’s 8×8 spatial cell
 | S42 | Classification | Converts S41 into four local-structure levels using training-split percentiles. |
 | S43 | Numeric score | Gini inequality of cell-vector deviations from their mean. Complements S41 by showing whether variation is concentrated in a few cells. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s4/s4_final_table.csv) · [Implementation](s4_compute.py) · [Run and files](../README.md#run-s4)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/s4/s4_final_table.csv) · [Implementation](s4_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 The cached `spatial_tokens[:, 1:65, :]` contain the 64 cell vectors, and `token_mask[:, 1:65]` identifies valid cells. The centroid is their mean vector; RMS means root mean square. S41 and S43 use only the current tile’s valid cells, while S42 uses thresholds fitted on training tiles.
 

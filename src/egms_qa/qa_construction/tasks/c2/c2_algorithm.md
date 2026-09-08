@@ -9,7 +9,7 @@ C2 measures whether motion is spread evenly across a tile or concentrated in a f
 | C21 | Numeric score | Gini inequality of cell mean motion magnitudes. Larger values mean motion is concentrated in fewer cells. |
 | C22 | Classification | Converts C21 into four concentration levels using training-split percentiles. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c2/c2_final_table.csv) · [Implementation](c2_compute.py) · [Run and files](../README.md#run-c2)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c2/c2_final_table.csv) · [Implementation](c2_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 The Gini score measures inequality: zero means equal cell magnitudes, and larger values mean greater differences between cells. Only cells with enough observations enter the calculation.
 

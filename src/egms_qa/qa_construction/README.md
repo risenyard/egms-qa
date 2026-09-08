@@ -74,70 +74,62 @@ the released targets and approved phrasings.
 
 ## Reproduce task computation
 
-Complete [setup](#installation-and-data-setup), then follow the
-[task setup and input requirements](tasks/README.md#setup) to install task
-dependencies and any required tiles, tokens, or encoder files.
+Complete the [task-system setup](tasks/README.md#setup), then compute all task
+groups in dependency order:
 
-Compute task results from the released tiles and representations using the
-[task commands](tasks/README.md#run-and-files). Write each group's results to
-`outputs/tasks-working/<group>/`, and assemble all 27 final tables there,
-including the X refusal catalogs.
+```bash
+python -m egms_qa.qa_construction.run_tasks \
+    --out-dir outputs/tasks-rebuilt
+```
 
-Follow task dependency order and pass newly computed upstream tables through
-the documented input flags. For example, C5 must read the new B2 table.
-Default input paths otherwise read the installed reference tables.
-
-Rebuild labels and QA from that working set:
+The runner writes a complete set of task tables and automatically connects
+upstream results to downstream computations. See the
+[task-system guide](tasks/README.md#run-the-task-system) for execution options
+and output checks. To turn these results into labels and QA:
 
 ```bash
 python -m egms_qa.qa_construction.build_labels \
-    --tasks-root outputs/tasks-working \
+    --tasks-root outputs/tasks-rebuilt \
     --skip-cache-validation --out-dir outputs/labels-recomputed
 python -m egms_qa.qa_construction.generate_qa \
     --labels outputs/labels-recomputed/labels.parquet \
     --meta outputs/labels-recomputed/labels_meta.json \
-    --tasks-root outputs/tasks-working \
+    --tasks-root outputs/tasks-rebuilt \
     --out-dir outputs/qa-recomputed
 ```
 
-The output layout matches the QA generation workflow above. Compare recomputed
-values and class counts with the installed references before using the new QA.
-Task-specific fitting requirements and reproduction limits are documented in
-the [task methods and reconstruction scope](tasks/README.md#reconstruction-scope).
-
 ## Construct QA for new tiles
 
-Start with your prepared NPZ tiles and a manifest containing `tile_id`, `split`,
-and `path`. Match the [source-tile format](https://huggingface.co/datasets/risenyard/egms-qa-dataset#source-tile-contract).
-For tasks that use representations, extract tokens for these tiles using the
-[Encoder local-input workflow](../../egms_encoder/README.md#use-local-inputs).
+Complete the [task-system setup](tasks/README.md#setup), then supply your prepared
+tiles and manifest to the [new-tile workflow](tasks/README.md#new-tiles):
 
-Compute targets from the new tiles using the [task methods and commands](tasks/README.md#run-and-files).
-Supply your manifest, tokens, and computed upstream tables through each task's
-input options. Preserve the documented units, categorical labels, and
-reference populations when applying the existing task definitions.
+```bash
+python -m egms_qa.qa_construction.run_tasks \
+    --mode new-tiles --manifest my_data/split.parquet \
+    --out-dir outputs/tasks-new
+```
 
-Assemble the resulting targets into `my_data/labels.parquet` following the
+This computes task values for your tiles using the published reference system.
+Assemble those targets into `my_data/labels.parquet` following the
 [Dataset label contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#labels-and-task-metadata).
-The release label builder requires the fixed 10,000-tile split; another
-collection needs its own label-table assembly. With
-[setup](#installation-and-data-setup) complete, generate QA from that table:
+The release label builder retains its fixed 10,000-tile requirement; other
+collections need their own label-table assembly.
 
 ```bash
 python -m egms_qa.qa_construction.generate_qa \
     --labels my_data/labels.parquet \
+    --tasks-root outputs/tasks-new \
     --out-dir outputs/qa-custom
 ```
 
-The generator reuses the installed task definitions and approved phrasings and
-writes QA under `outputs/qa-custom/qa/`. Unavailable targets receive missing-data
-answers. Adapting task rules or reference populations requires corresponding
-changes to the task and answer definitions.
+QA appears under `outputs/qa-custom/qa/`. The generator uses the installed task
+metadata and approved phrasings. Missing targets receive missing-data answers.
 
 ## Code reference
 
 | module | purpose |
 |---|---|
+| [run_tasks.py](run_tasks.py) | run the complete task system with aligned inputs |
 | [tasks/](tasks/README.md) | task definitions, algorithms, and computation commands |
 | [build_labels.py](build_labels.py) | aggregate task reference tables into labels and metadata |
 | [qa_lib.py](qa_lib.py) | question phrasings, answer rendering, and validation |

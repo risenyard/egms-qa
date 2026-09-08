@@ -9,7 +9,7 @@ C4 measures the area occupied by fast-moving parts of a tile. Observation points
 | C41 | Numeric fraction | Share of valid cells whose 90th-percentile absolute velocity reaches 4.8 mm/yr, a fixed corpus-relative fast-motion cutoff. |
 | C42 | Classification | Combines C41 with the number of fast cells to label their extent as none, sparse, localized, or extensive. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv) · [Implementation](c4_compute.py) · [Run and files](../README.md#run-c4)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c4/c4_final_table.csv) · [Implementation](c4_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 The fast-motion cutoff is corpus-relative: 4.8 mm/yr is the 95th percentile of cell-level velocity-tail values from 83,323 European candidate tiles. This reference pool is distinct from the released 10,000-tile dataset.
 

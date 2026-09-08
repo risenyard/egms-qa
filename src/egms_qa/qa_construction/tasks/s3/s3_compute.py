@@ -16,6 +16,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from egms_qa.qa_construction.reference import load_reference
 from egms_qa.paths import OUTPUTS_DIR, TASKS_DIR
 from egms_qa.qa_construction.tables import align_family_to_base, read_family
 
@@ -66,13 +67,13 @@ S32_CLASS_ORDER = [
 S33_CLASS_ORDER = ["quality", "motion", "spatial", "temporal"]
 
 
-def merge_sources(tasks_root: Path, d1_table: Path | None = None) -> pd.DataFrame:
+def merge_sources(tasks_root: Path, d1_table: Path | None = None, reference_tables=None) -> pd.DataFrame:
     base = None
     for family, cols in SOURCES:
-        source = (
+        source = reference_tables[family] if reference_tables is not None else (
             pd.read_csv(d1_table)
             if family == "d1" and d1_table is not None
-            else read_family(tasks_root, family)
+            else read_family(tasks_root, family, expected_rows=None)
         )
         df = source[["tile_id", "split", *cols]]
         if base is None:
@@ -104,56 +105,49 @@ def train_percentile_p99(values: np.ndarray, train_mask: np.ndarray) -> np.ndarr
     return 99.0 * empirical_percentile(values, values[train_mask])
 
 
-def compute_s31(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    train_mask = df["split"].astype(str).to_numpy() == "train"
+def _rank_axes(df: pd.DataFrame, reference: pd.DataFrame) -> pd.DataFrame:
+    train = reference["split"].eq("train")
     work = df.copy()
-
-    s21 = work["S21_local_isolation_score"].to_numpy(dtype=np.float64)
-    work["embedding_rarity_p"] = train_percentile_p99(s21, train_mask)
-
-    scalar_p_cols: dict[str, str] = {}
-    for cols in AXES.values():
-        for col in cols:
-            values = work[col].to_numpy(dtype=np.float64)
-            p_col = f"{col}__p"
-            work[p_col] = train_percentile_p99(values, train_mask)
-            scalar_p_cols[col] = p_col
-
+    s21 = work["S21_local_isolation_score"].to_numpy(dtype=float)
+    work["embedding_rarity_p"] = 99.0 * empirical_percentile(
+        s21, reference.loc[train, "S21_local_isolation_score"].to_numpy(dtype=float))
     axis_cols = []
     for axis_name, cols in AXES.items():
-        p_cols = [scalar_p_cols[col] for col in cols]
+        p_cols = []
+        for col in cols:
+            p_col = f"{col}__p"
+            work[p_col] = 99.0 * empirical_percentile(
+                work[col].to_numpy(dtype=float), reference.loc[train, col].to_numpy(dtype=float))
+            p_cols.append(p_col)
         axis_col = f"{axis_name}_axis_max_p"
-        work[axis_col] = np.nanmax(work[p_cols].to_numpy(dtype=np.float64), axis=1)
+        work[axis_col] = np.nanmax(work[p_cols].to_numpy(dtype=float), axis=1)
         axis_cols.append(axis_col)
+    work["monitoring_axis_mean_raw_p"] = np.nanmean(work[axis_cols].to_numpy(dtype=float), axis=1)
+    return work
 
-    work["monitoring_axis_mean_raw_p"] = np.nanmean(work[axis_cols].to_numpy(dtype=np.float64), axis=1)
-    raw = work["monitoring_axis_mean_raw_p"].to_numpy(dtype=np.float64)
-    work["monitoring_rarity_p"] = train_percentile_p99(raw, train_mask)
+
+def compute_s31(df: pd.DataFrame, reference: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
+    fit = df if reference is None else reference
+    work = _rank_axes(df, fit)
+    fit_work = work if reference is None else _rank_axes(fit, fit)
+    train = fit_work["split"].eq("train")
+    ref_raw = fit_work.loc[train, "monitoring_axis_mean_raw_p"].to_numpy(dtype=float)
+    work["monitoring_rarity_p"] = 99.0 * empirical_percentile(
+        work["monitoring_axis_mean_raw_p"].to_numpy(dtype=float), ref_raw)
     work[S31_COL] = work["embedding_rarity_p"] - work["monitoring_rarity_p"]
-
+    reference_gap = (fit_work.loc[train, "embedding_rarity_p"].to_numpy(dtype=float)
+                     - 99.0 * empirical_percentile(ref_raw, ref_raw))
     final = work[["tile_id", "split", S31_COL]].copy()
-    final, s32_thresholds = add_s32(final)
-
-    diagnostics = work[
-        [
-            "tile_id",
-            "split",
-            "embedding_rarity_p",
-            "monitoring_rarity_p",
-            "quality_axis_max_p",
-            "motion_axis_max_p",
-            "spatial_axis_max_p",
-            "temporal_axis_max_p",
-            S31_COL,
-        ]
-    ].copy()
-    diagnostics.attrs["s32_thresholds"] = s32_thresholds
-    final = add_s33(final, diagnostics)
-    return final, diagnostics
+    final, thresholds = add_s32(final, reference_gap)
+    diagnostics = work[["tile_id", "split", "embedding_rarity_p", "monitoring_rarity_p",
+                        "quality_axis_max_p", "motion_axis_max_p", "spatial_axis_max_p",
+                        "temporal_axis_max_p", S31_COL]].copy()
+    diagnostics.attrs["s32_thresholds"] = thresholds
+    return add_s33(final, diagnostics), diagnostics
 
 
-def add_s32(final: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, float]]:
-    train_gap = final.loc[final["split"].astype(str) == "train", S31_COL].to_numpy(dtype=np.float64)
+def add_s32(final: pd.DataFrame, reference_gap=None) -> tuple[pd.DataFrame, dict[str, float]]:
+    train_gap = final.loc[final["split"].astype(str) == "train", S31_COL].to_numpy(dtype=np.float64) if reference_gap is None else np.asarray(reference_gap)
     train_mean = float(np.mean(train_gap))
     train_std = float(np.std(train_gap, ddof=1))
     thresholds = {
@@ -300,8 +294,10 @@ def main() -> None:
     parser.add_argument("--d1-table", type=Path, help="Defaults to <tasks-root>/d1/d1_final_table.csv")
     parser.add_argument("--out-dir", type=Path, default=OUTPUTS_DIR / "tasks-rebuilt/s3")
     parser.add_argument("--plot", action="store_true", help="Also write a distribution plot (requires tasks extra)")
+    parser.add_argument("--reference-state", type=Path)
     args = parser.parse_args()
-    final, diagnostics = compute_s31(merge_sources(args.tasks_root, args.d1_table))
+    reference = None if args.reference_state is None else merge_sources(args.tasks_root, reference_tables=load_reference(args.reference_state)["tables"])
+    final, diagnostics = compute_s31(merge_sources(args.tasks_root, args.d1_table), reference)
     args.out_dir.mkdir(parents=True, exist_ok=True)
     final.to_csv(args.out_dir / "s3_final_table.csv", index=False)
     summary = summarize(final, diagnostics)

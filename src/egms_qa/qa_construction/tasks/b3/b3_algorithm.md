@@ -13,7 +13,7 @@ B3 describes the slow and fast ends of the point-velocity distribution in a tile
 | B35 | Classification | Converts B33 into five motion-strength levels using fixed velocity cutoffs. |
 | B36 | Classification | Places B33 in five levels relative to the European candidate-pool distribution. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) · [Implementation](b3_compute.py) · [Run and files](../README.md#run-b3)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/b3/b3_final_table.csv) · [Implementation](b3_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

@@ -22,6 +22,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from egms_qa.qa_construction.reference import reference_table
 from egms_qa.paths import DATA_DIR, OUTPUTS_DIR
 from egms_qa.qa_construction.inputs import read_tile_manifest
 
@@ -43,9 +44,9 @@ def _train_thresholds(df: pd.DataFrame, column: str, quantiles: list[float]) -> 
     return [float(train.quantile(q)) for q in quantiles]
 
 
-def _add_concentration_class(df: pd.DataFrame) -> tuple[pd.DataFrame, list[float]]:
+def _add_concentration_class(df: pd.DataFrame, reference: pd.DataFrame | None = None) -> tuple[pd.DataFrame, list[float]]:
     df = df.copy()
-    thresholds = _train_thresholds(df, "C21_spatial_concentration_score", C22_QUANTILES)
+    thresholds = _train_thresholds(df if reference is None else reference, "C21_spatial_concentration_score", C22_QUANTILES)
     df["C22_spatial_concentration_class"] = pd.cut(
         df["C21_spatial_concentration_score"].astype(float),
         bins=[-np.inf, *thresholds, np.inf],
@@ -105,6 +106,7 @@ def main() -> None:
     ap.add_argument("--out-dir", default=str(OUT_DIR))
     ap.add_argument("--workers", type=int, default=int(os.environ.get("SLURM_CPUS_PER_TASK", "8")))
     ap.add_argument("--chunksize", type=int, default=32)
+    ap.add_argument("--reference-state", type=Path)
     args = ap.parse_args()
 
     manifest = read_tile_manifest(args.manifest)
@@ -113,7 +115,7 @@ def main() -> None:
         records = list(ex.map(_read_one, rows, chunksize=args.chunksize))
 
     df = pd.DataFrame.from_records(records)
-    df, thresholds = _add_concentration_class(df)
+    df, thresholds = _add_concentration_class(df, reference_table(args.reference_state, "c2"))
     df = df[["tile_id", "split", "C21_spatial_concentration_score", "C22_spatial_concentration_class"]]
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

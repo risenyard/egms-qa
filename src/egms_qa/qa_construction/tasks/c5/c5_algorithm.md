@@ -9,7 +9,7 @@ C5 combines overall motion and local spatial evidence. It reads [B61 monitoring 
 | C51 | Combined classification | Uses the monitoring-trigger and front-strength classes to assign no, standard, or high monitoring priority. |
 | C52 | Yes/no classification | Flags strong local motion when the mean subsidence band is low or low-mid. Complements C51 with evidence that an average can obscure. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c5/c5_final_table.csv) · [Implementation](c5_compute.py) · [Run and files](../README.md#run-c5)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/c5/c5_final_table.csv) · [Implementation](c5_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

@@ -9,7 +9,7 @@ A2 checks how well the encoder reconstructs a time interval hidden at every obse
 | A21 | Numeric error | Mean squared error when reconstructing a hidden time interval. Smaller values mean better reconstruction; values use normalized displacement. |
 | A22 | Classification | Groups A21 into four reconstruction-reliability levels using training-split percentiles. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a2/a2_final_table.csv) · [Implementation](a2_compute.py) · [Run and files](../README.md#run-a2)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a2/a2_final_table.csv) · [Implementation](a2_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

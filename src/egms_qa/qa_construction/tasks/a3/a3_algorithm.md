@@ -9,7 +9,7 @@ A3 describes how widely observation points cover a tile. The tile is divided int
 | A31 | Numeric fraction | Share of the 64 spatial cells that contain observations, from 0 to 1. |
 | A32 | Classification | Converts A31 into four coverage levels using fixed occupied-cell thresholds. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a3/a3_final_table.csv) · [Implementation](a3_compute.py) · [Run and files](../README.md#run-a3)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a3/a3_final_table.csv) · [Implementation](a3_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

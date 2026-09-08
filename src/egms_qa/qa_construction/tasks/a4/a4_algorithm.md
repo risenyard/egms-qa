@@ -9,7 +9,7 @@ A4 summarizes typical measurement noise in a tile, a spatial collection of EGMS 
 | A41 | Numeric value (mm) | Median point measurement error, expressed as root mean squared error (RMSE). |
 | A42 | Classification | Converts A41 into four noise levels using fixed millimeter thresholds. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a4/a4_final_table.csv) · [Implementation](a4_compute.py) · [Run and files](../README.md#run-a4)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a4/a4_final_table.csv) · [Implementation](a4_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 ## Algorithm steps
 

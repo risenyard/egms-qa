@@ -9,7 +9,7 @@ A5 combines four quality checks into a tile usability decision and its reason. I
 | A51 | Combined classification | Combines four input quality classes: representation stability, reconstruction reliability, spatial coverage, and measurement noise. |
 | A52 | Reason category | Explains the A51 decision by naming the quality issue, multiple issues, or stable inputs. |
 
-[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a5/a5_final_table.csv) · [Implementation](a5_compute.py) · [Run and files](../README.md#run-a5)
+[Task index](../README.md) · [Published table](https://huggingface.co/datasets/risenyard/egms-qa-dataset/blob/main/artifacts/reference_tables/a5/a5_final_table.csv) · [Implementation](a5_compute.py) · [Run the task system](../README.md#run-the-task-system)
 
 A12 and A22 use training-split, corpus-relative thresholds. A5 applies the class rules below without fitting additional thresholds.
 
