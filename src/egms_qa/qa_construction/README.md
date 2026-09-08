@@ -15,19 +15,17 @@ documents the released files, data formats, and splits. The
 [task index](tasks/README.md) provides task definitions, methods, and computation
 commands.
 
-The middle columns show which released artifacts each workflow reuses.
-“Partial” means that task groups not being recomputed retain their released
-results.
+Each workflow starts at a different stage. The checks indicate the released
+data stages taken as already prepared; all three workflows generate new QA.
 
 | Goal | Released tiles | Released task results | Released QA records | Where to start |
 |---|---|---|---|---|
-| Use published QA | — | — | ✓ | [Read QA records](https://huggingface.co/datasets/risenyard/egms-qa-dataset#qa-use) |
-| Reproduce QA | — | ✓ | — | [Generate QA from released task results](#generate-qa-from-released-task-results) |
-| Reproduce task results and QA | As needed | Partial | — | [Recompute task results and generate QA](#recompute-task-results-and-generate-qa) |
-| Generate QA for a new collection | — | — | — | [Generate QA from your own labels](#generate-qa-from-your-own-labels) |
+| Reproduce QA generation | ✓ | ✓ | — | [From released task results](#reproduce-qa-generation) |
+| Reproduce task computation | ✓ | — | — | [From released tiles](#reproduce-task-computation) |
+| Construct QA for new tiles | — | — | — | [From new tiles](#construct-qa-for-new-tiles) |
 
-The last workflow takes your prepared labels as input. Task-specific token
-and metadata requirements are listed in the [task index](tasks/README.md#setup).
+The new-tile workflow uses your own source tiles. To use the published QA
+without rebuilding it, follow the [Dataset loading example](https://huggingface.co/datasets/risenyard/egms-qa-dataset#qa-use).
 
 ## Installation and data setup
 
@@ -45,10 +43,8 @@ Run all commands below from the repository root. Setup installs reference
 tables under `outputs/tasks/` and published labels, metadata, and QA under
 `outputs/qa/`. Use separate output directories for new results.
 
-To read the published QA directly, use the
-[Dataset loading example](https://huggingface.co/datasets/risenyard/egms-qa-dataset#qa-use).
 
-## Generate QA from released task results
+## Reproduce QA generation
 
 After completing [setup](#installation-and-data-setup), rebuild labels from
 the released reference tables and pass them to the QA generator:
@@ -76,23 +72,20 @@ add `--max-tiles 2 --train-cycles 1` to the generation command. The Dataset
 contains fixed published splits; these commands generate a new corpus from
 the released targets and approved phrasings.
 
-## Recompute task results and generate QA
+## Reproduce task computation
 
 Complete [setup](#installation-and-data-setup), then follow the
 [task setup and input requirements](tasks/README.md#setup) to install task
 dependencies and any required tiles, tokens, or encoder files.
 
-Start with a new working copy of the reference tables:
+Compute task results from the released tiles and representations using the
+[task commands](tasks/README.md#run-and-files). Write each group's results to
+`outputs/tasks-working/<group>/`, and assemble all 27 final tables there,
+including the X refusal catalogs.
 
-```bash
-cp -rL outputs/tasks outputs/tasks-working
-```
-
-Run the selected [task commands](tasks/README.md#run-and-files), directing each
-output to `outputs/tasks-working/<group>/`. Recompute affected downstream
-tasks as well, passing the new tables through their documented input flags.
-For example, updating B2 requires updating C5 with the new B2 table. Keep the
-complete set of 27 final tables in the working directory.
+Follow task dependency order and pass newly computed upstream tables through
+the documented input flags. For example, C5 must read the new B2 table.
+Default input paths otherwise read the installed reference tables.
 
 Rebuild labels and QA from that working set:
 
@@ -112,13 +105,23 @@ values and class counts with the installed references before using the new QA.
 Task-specific fitting requirements and reproduction limits are documented in
 the [task methods and reconstruction scope](tasks/README.md#reconstruction-scope).
 
-## Generate QA from your own labels
+## Construct QA for new tiles
 
-With [setup](#installation-and-data-setup) complete, provide a Parquet label
-table following the [Dataset label contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#labels-and-task-metadata).
-Use the existing task definitions, units, and categorical labels. Unavailable
-targets receive missing-data answers. The
-[task methods](tasks/README.md#task-groups) describe how to compute each target.
+Start with your prepared NPZ tiles and a manifest containing `tile_id`, `split`,
+and `path`. Match the [source-tile format](https://huggingface.co/datasets/risenyard/egms-qa-dataset#source-tile-contract).
+For tasks that use representations, extract tokens for these tiles using the
+[Encoder local-input workflow](../../egms_encoder/README.md#use-local-inputs).
+
+Compute targets from the new tiles using the [task methods and commands](tasks/README.md#run-and-files).
+Supply your manifest, tokens, and computed upstream tables through each task's
+input options. Preserve the documented units, categorical labels, and
+reference populations when applying the existing task definitions.
+
+Assemble the resulting targets into `my_data/labels.parquet` following the
+[Dataset label contract](https://huggingface.co/datasets/risenyard/egms-qa-dataset#labels-and-task-metadata).
+The release label builder requires the fixed 10,000-tile split; another
+collection needs its own label-table assembly. With
+[setup](#installation-and-data-setup) complete, generate QA from that table:
 
 ```bash
 python -m egms_qa.qa_construction.generate_qa \
@@ -126,14 +129,10 @@ python -m egms_qa.qa_construction.generate_qa \
     --out-dir outputs/qa-custom
 ```
 
-The generator reuses the installed task metadata and approved phrasings and
-writes QA under `outputs/qa-custom/qa/`. Supply `--meta` and `--tasks-root`
-when using a separate task-metadata file or refusal catalogs.
-
-The release label builder requires the fixed 10,000-tile split. For another
-collection, prepare the label table directly and use the generation command
-above. Adding tasks or changing label rules also requires adapting their
-question and answer definitions.
+The generator reuses the installed task definitions and approved phrasings and
+writes QA under `outputs/qa-custom/qa/`. Unavailable targets receive missing-data
+answers. Adapting task rules or reference populations requires corresponding
+changes to the task and answer definitions.
 
 ## Code reference
 
