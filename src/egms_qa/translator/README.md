@@ -25,7 +25,7 @@ the encoder tokens, labels, and task tables used by these workflows.
 
 ## Installation
 
-Follow the shared [installation instructions](../../../README.md#installation)
+Follow the shared [installation instructions](../../../docs/environment.md#create-the-environment)
 to clone the repository and create a Python environment, then install the
 translator dependencies from the repository root:
 

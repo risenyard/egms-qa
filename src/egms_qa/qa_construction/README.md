@@ -29,7 +29,7 @@ without rebuilding it, follow the [Dataset loading example](https://huggingface.
 
 ## Installation and data setup
 
-Follow the shared [installation instructions](../../../README.md#installation)
+Follow the shared [installation instructions](../../../docs/environment.md#create-the-environment)
 to clone the repository, create a Python environment, and install the core
 package. Label aggregation and QA generation run on CPU. For task reference
 computation, also install the `tasks` extra as shown there. The

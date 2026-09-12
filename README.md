@@ -36,40 +36,9 @@ weights, and recipes are available through the
 
 ## Installation
 
-Python 3.10 or later is required. Use Python 3.10 for the verified full-workflow
-setup; installation was also checked with Python 3.12. The commands below use
-Linux and Bash. Install Python with its `venv` support first, then create an
-isolated environment. For CPU-only use or a specific CUDA build, read the
-[PyTorch build selection](docs/environment.md#choose-the-environment) before
-installing the project:
-
-```bash
-git clone https://github.com/risenyard/egms-qa
-cd egms-qa
-python3.10 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e .
-```
-
-The core package supports encoder workflows, label aggregation, and QA
-rendering. Install the optional dependencies for the remaining workflows:
-
-```bash
-python -m pip install -e '.[tasks]'        # QA task reference-value computation
-python -m pip install -e '.[translator]'   # Translator training and evaluation
-```
-
-For all workflows, install `python -m pip install -e '.[tasks,translator]'`.
-In a new shell, return to this checkout and run `source .venv/bin/activate`.
-See [Python and CUDA environment setup](docs/environment.md) for the verified
-package versions, CPU/CUDA build selection, checks, and common setup errors.
-
-Label aggregation, QA rendering, and small encoder checks can run on CPU.
-GPU execution is recommended for encoder training and full-collection token
-extraction. Translator training and evaluation require CUDA. Follow the
-component guides above to download the required artifacts and run each
-workflow from the repository root.
+Requires Python 3.10 or later. Follow the [environment setup guide](docs/environment.md)
+to install the core package and optional dependencies; Translator workflows require
+CUDA. Then use the component guides above for data preparation and examples.
 
 ## Dataset
 

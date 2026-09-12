@@ -1,9 +1,23 @@
 # Python and CUDA environment
 
-Start with the [installation commands](../README.md#installation) to clone the
-repository and create `.venv`. All commands here run from that checkout with
-`.venv` activated. A Python environment contains the packages; NVIDIA drivers
-and GPU access are provided by the machine or cluster.
+Create an isolated Python environment, choose the dependencies for your
+workflow, and check CPU/GPU access before following a component guide.
+NVIDIA drivers and GPU access are provided by the machine or cluster.
+
+## Create the environment
+
+The following commands use Linux and Bash. Install Python 3.10 with its `venv`
+support first, then clone the repository and create the environment:
+
+```bash
+git clone https://github.com/risenyard/egms-qa
+cd egms-qa
+python3.10 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+```
+
+Run the remaining commands from this checkout with `.venv` activated.
 
 ## Choose the environment
 
@@ -12,6 +26,15 @@ also checked for core, `tasks`, and `translator` installation; full workflows
 were exercised on Python 3.10. To use 3.12, replace `python3.10` with
 `python3.12` in the environment-creation command. Other operating systems and
 Python versions have not received the same workflow validation.
+
+For a CPU-only machine, select a CPU PyTorch build before installing the
+project to avoid downloading CUDA packages. For GPU use, select a PyTorch
+CUDA build compatible with your NVIDIA driver. Use the official
+[PyTorch installation selector](https://pytorch.org/get-started/locally/),
+run its command inside `.venv`, then run the appropriate project installation
+command below. EGMS-QA does not require `torchvision` or `torchaudio`.
+
+Run the installation command for your workload:
 
 | Workload | Package installation | Compute |
 |---|---|---|
@@ -24,13 +47,6 @@ Extras add dependencies to the same environment; do not create a separate
 checkout or environment for each component. Reading QA directly with
 `load_dataset()` additionally requires `python -m pip install datasets`, as
 shown in the [Dataset card](https://huggingface.co/datasets/risenyard/egms-qa-dataset#qa-use).
-
-For a CPU-only machine, select a CPU PyTorch build before installing the
-project to avoid downloading CUDA packages. For GPU use, select a PyTorch
-CUDA build compatible with your NVIDIA driver. Use the official
-[PyTorch installation selector](https://pytorch.org/get-started/locally/),
-run its command inside `.venv`, then run the appropriate project installation
-command above. EGMS-QA does not require `torchvision` or `torchaudio`.
 
 ## Verified package versions
 

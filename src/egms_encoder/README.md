@@ -35,7 +35,7 @@ provides the prepared tiles and precomputed tokens.
 
 ## Installation
 
-Follow the shared [installation instructions](../../README.md#installation)
+Follow the shared [installation instructions](../../docs/environment.md#create-the-environment)
 to clone the repository, create a Python environment, and install the core
 package. The [environment guide](../../docs/environment.md) lists verified
 versions and CPU/CUDA checks. Run all commands below from the `egms-qa`
