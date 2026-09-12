@@ -35,14 +35,11 @@ provides the prepared tiles and precomputed tokens.
 
 ## Installation
 
-Python 3.10 or later is required. Clone and install the code once, then run all
-commands below from the `egms-qa` repository root.
-
-```bash
-git clone https://github.com/risenyard/egms-qa
-cd egms-qa
-pip install -e .
-```
+Follow the shared [installation instructions](../../README.md#installation)
+to clone the repository, create a Python environment, and install the core
+package. The [environment guide](../../docs/environment.md) lists verified
+versions and CPU/CUDA checks. Run all commands below from the `egms-qa`
+repository root with that environment activated.
 
 ## Extract tokens
 

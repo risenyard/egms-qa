@@ -25,17 +25,19 @@ the encoder tokens, labels, and task tables used by these workflows.
 
 ## Installation
 
-Python 3.10 or later is required. Training and answer generation require CUDA
-and enough GPU memory for the host model in bfloat16 plus its runtime state.
-Command previews with `--dry-run` can run on CPU.
+Follow the shared [installation instructions](../../../README.md#installation)
+to clone the repository and create a Python environment, then install the
+translator dependencies from the repository root:
 
 ```bash
-git clone https://github.com/risenyard/egms-qa
-cd egms-qa
-pip install -e '.[translator]'
+python -m pip install -e '.[translator]'
 ```
 
-Run all commands below from the `egms-qa` repository root.
+Training and answer generation require CUDA, bfloat16 support, and enough GPU
+memory for the host model plus its runtime state. Complete the
+[CUDA check](../../../docs/environment.md#check-the-environment) before running
+them. Command previews with `--dry-run` can run on CPU. Run all commands below
+from the `egms-qa` repository root with the environment activated.
 
 ## Ask one question
 

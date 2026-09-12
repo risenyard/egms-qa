@@ -29,13 +29,14 @@ without rebuilding it, follow the [Dataset loading example](https://huggingface.
 
 ## Installation and data setup
 
-Python 3.10 or later is required. Label aggregation and QA generation run on
-CPU. Clone and install the code, then download the QA artifacts:
+Follow the shared [installation instructions](../../../README.md#installation)
+to clone the repository, create a Python environment, and install the core
+package. Label aggregation and QA generation run on CPU. For task reference
+computation, also install the `tasks` extra as shown there. The
+[environment guide](../../../docs/environment.md) lists verified versions and
+CPU/CUDA checks. With the environment activated, download the QA artifacts:
 
 ```bash
-git clone https://github.com/risenyard/egms-qa
-cd egms-qa
-pip install -e .
 python -m egms_qa.release install --download --components qa
 ```
 

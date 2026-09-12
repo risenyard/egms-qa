@@ -32,20 +32,31 @@ Translator 通过投影器与 LoRA 适配宿主语言模型，使其根据冻结
 
 ## 安装
 
-环境要求 Python 3.10 或更高版本。从源码安装三个模块共用的代码包：
+环境要求 Python 3.10 或更高版本。完整工作流已在 Python 3.10 上验证，
+Python 3.12 也已通过安装检查。以下命令使用 Linux 和 Bash；先安装带有
+`venv` 支持的 Python，再创建独立环境。仅使用 CPU 或需要指定 CUDA 构建时，
+请先查看 [PyTorch 构建选择](docs/environment.md#choose-the-environment)，再安装项目：
 
 ```bash
 git clone https://github.com/risenyard/egms-qa
 cd egms-qa
-pip install -e .
+python3.10 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
 
 基础安装支持 encoder 工作流、标签聚合与 QA 渲染。其他工作流使用对应的可选依赖：
 
 ```bash
-pip install -e '.[tasks]'        # QA 任务参考值计算
-pip install -e '.[translator]'   # Translator 训练与评测
+python -m pip install -e '.[tasks]'        # QA 任务参考值计算
+python -m pip install -e '.[translator]'   # Translator 训练与评测
 ```
+
+需要全部工作流时，运行 `python -m pip install -e '.[tasks,translator]'`。
+每次打开新终端后，先回到此仓库并运行 `source .venv/bin/activate`。
+已验证的依赖版本、CPU/CUDA 安装选择、环境检查与常见错误处理见
+[Python 与 CUDA 环境配置](docs/environment.md)。
 
 标签聚合、QA 渲染和少量 encoder 检查可在 CPU 上运行。Encoder 训练与完整集合
 的 token 提取建议使用 GPU，translator 训练与评测需要 CUDA。按上方模块指南
