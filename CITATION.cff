@@ -6,9 +6,9 @@ authors:
   - family-names: Li
     given-names: Senyang
 version: 1.0.0
-date-released: 2026-09-04
+date-released: 2026-09-12
 repository-code: https://github.com/risenyard/egms-qa
-url: https://huggingface.co/risenyard
+url: https://huggingface.co/collections/risenyard/egms-qa
 license: MIT
 keywords:
   - European Ground Motion Service

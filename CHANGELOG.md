@@ -3,17 +3,19 @@
 All notable changes to EGMS-QA are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## 1.0.0 - 2026-09-04
+## 1.0.0 - 2026-09-12
 
 ### Added
 
 - Self-contained encoder, QA-construction, and translator packages.
 - Frozen 10,000-tile split and public data/checkpoint configurations.
-- Deterministic definitions and implementations for 78 A/B/C/D/S/X tasks.
+- Definitions and implementations for 78 A/B/C/D/S/X tasks.
 - Natural-language QA generation, extraction, training, and evaluation tools.
 - Support for Qwen, Gemma, Llama, and Mistral host-model families.
 - Structured Hugging Face dataset installer and SHA256 release audit.
-- English and Chinese project documentation.
+- English and Chinese project documentation, isolated environment setup, and
+  a runnable one-question example.
+- Local tile/checkpoint inputs, resumable evaluation, and per-task result export.
 
 ### Release artifacts
 
